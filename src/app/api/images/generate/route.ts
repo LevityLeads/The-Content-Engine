@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// Using Nano Banana (Gemini 2.5 Flash Image) for image generation
+// Using Nano Banana Pro (Gemini 3 Pro Image) with Thinking for image generation
 // See: https://ai.google.dev/gemini-api/docs/image-generation
 
 export async function POST(request: NextRequest) {
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if we have the Google API key for Nano Banana
+    // Check if we have the Google API key for Nano Banana Pro
     const googleApiKey = process.env.GOOGLE_API_KEY;
 
     let imageUrl = null;
@@ -41,9 +41,9 @@ export async function POST(request: NextRequest) {
 
     if (googleApiKey) {
       try {
-        // Use Nano Banana (Gemini 2.5 Flash Image) for image generation
+        // Use Nano Banana Pro (Gemini 3 Pro Image) with Thinking for image generation
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${googleApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${googleApiKey}`,
           {
             method: "POST",
             headers: {
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
                 },
               ],
               generationConfig: {
-                responseModalities: ["IMAGE"],
+                responseModalities: ["TEXT", "IMAGE"],
               },
             }),
           }
@@ -77,25 +77,25 @@ export async function POST(request: NextRequest) {
               const mimeType = part.inlineData.mimeType || "image/png";
               imageUrl = `data:${mimeType};base64,${imageBase64}`;
               generationStatus = "generated";
-              generationMessage = "Image generated successfully with Nano Banana (Gemini 2.5 Flash Image)";
+              generationMessage = "Image generated successfully with Nano Banana Pro (Gemini Image Generation)";
               break;
             }
           }
 
           if (!imageUrl) {
-            generationMessage = "Nano Banana returned no image. The prompt may have been filtered.";
+            generationMessage = "Nano Banana Pro returned no image. The prompt may have been filtered.";
           }
         } else {
           const errorData = await response.text();
-          console.error("Nano Banana API error:", errorData);
-          generationMessage = `Nano Banana generation failed: ${response.status}. Image prompt saved for retry.`;
+          console.error("Nano Banana Pro API error:", errorData);
+          generationMessage = `Nano Banana Pro generation failed: ${response.status}. Image prompt saved for retry.`;
         }
       } catch (err) {
-        console.error("Nano Banana API error:", err);
-        generationMessage = "Nano Banana generation failed. Image prompt saved for manual creation.";
+        console.error("Nano Banana Pro API error:", err);
+        generationMessage = "Nano Banana Pro generation failed. Image prompt saved for manual creation.";
       }
     } else {
-      generationMessage = "No image generation API configured. Add GOOGLE_API_KEY for Nano Banana image generation.";
+      generationMessage = "No image generation API configured. Add GOOGLE_API_KEY for Nano Banana Pro image generation.";
     }
 
     // Save image record to database
