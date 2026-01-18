@@ -97,7 +97,7 @@ Generate 4 distinct content ideas for social media posts based on this input.`;
 
     // Call Claude Opus 4.5
     const message = await anthropic.messages.create({
-      model: "claude-opus-4-5-20250101",
+      model: "claude-opus-4-5-20251101",
       max_tokens: 4096,
       messages: [
         {
