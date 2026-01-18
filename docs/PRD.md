@@ -35,11 +35,11 @@
 
 ### 1.1 Vision
 
-The Content Engine is an AI-powered content automation system that transforms raw inputs (voice notes, articles, links, rough ideas) into polished, platform-specific social media content. The system handles the entire content lifecycle—from ideation through publishing—while maintaining human oversight and continuously learning to reduce manual intervention over time.
+The Content Engine is an AI-powered content automation system that transforms raw inputs (text, articles, links, documents) into polished, platform-specific social media content. The system handles the entire content lifecycle—from ideation through publishing—while maintaining human oversight and continuously learning to reduce manual intervention over time.
 
 ### 1.2 Core Value Proposition
 
-- **Input Flexibility:** Accept content in any form—speak it, paste it, link it
+- **Input Flexibility:** Accept content in any form—type it, paste it, link it, upload it
 - **AI-Powered Ideation:** Generate multiple content angles from a single input
 - **Platform Intelligence:** Automatically adapt content for each platform's unique requirements
 - **Visual Generation:** Create on-brand images using state-of-the-art AI
@@ -105,10 +105,10 @@ Existing solutions address pieces of this workflow:
 │   │  INPUT  │───▶│  PARSE  │───▶│ IDEATE  │───▶│ APPROVE │             │
 │   └─────────┘    └─────────┘    └─────────┘    └─────────┘             │
 │       │                                             │                   │
-│   Voice Notes                                       ▼                   │
+│   Text Ideas                                        ▼                   │
 │   Articles        ┌─────────────────────────────────────────┐          │
 │   Links           │            HUMAN CHECKPOINT             │          │
-│   Raw Ideas       └─────────────────────────────────────────┘          │
+│   Documents       └─────────────────────────────────────────┘          │
 │                                     │                                   │
 │                                     ▼                                   │
 │   ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐             │
@@ -188,14 +188,16 @@ Existing solutions address pieces of this workflow:
 │                                  CLIENT LAYER                                 │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐                 │
-│  │   Dashboard    │  │  Mobile PWA    │  │ iOS Shortcuts  │                 │
-│  │   (Next.js)    │  │   (Future)     │  │   (Webhook)    │                 │
-│  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘                 │
-│          │                   │                   │                           │
-└──────────┼───────────────────┼───────────────────┼───────────────────────────┘
-           │                   │                   │
-           ▼                   ▼                   ▼
+│  ┌────────────────────────────────────────────────────────────┐             │
+│  │                      Dashboard (Next.js)                   │             │
+│  │   • Text input    • Document upload    • Link/URL paste    │             │
+│  └────────────────────────────────────────┬───────────────────┘             │
+│                                           │                                  │
+│         Future: Mobile PWA, iOS Shortcuts, API webhooks                      │
+│                                                                              │
+└───────────────────────────────────────────┼──────────────────────────────────┘
+                                            │
+                                            ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                                   API LAYER                                   │
 ├──────────────────────────────────────────────────────────────────────────────┤
@@ -209,7 +211,7 @@ Existing solutions address pieces of this workflow:
 │  │  /api/images      - Generate and manage images                      │    │
 │  │  /api/publish     - Handle publishing workflow                      │    │
 │  │  /api/analytics   - Aggregate and serve analytics                   │    │
-│  │  /api/webhooks    - Handle external webhooks (iOS, Late.dev)        │    │
+│  │  /api/webhooks    - Handle Late.dev callbacks (Future: more)        │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -252,15 +254,15 @@ Existing solutions address pieces of this workflow:
 
 **Purpose:** Transform diverse input types into structured, actionable data
 
-**Inputs:**
-- Voice notes (audio files via webhook)
-- Article URLs (for extraction/summarization)
+**Inputs (MVP - Dashboard Only):**
 - Raw text (ideas, notes, threads)
+- Article URLs (for extraction/summarization)
 - Links to external content
+- Document uploads (PDF, Word, etc.)
 
 **Processing:**
 1. Detect input type
-2. Extract/transcribe content (audio → text via Whisper or similar)
+2. Extract content (parse documents, fetch URLs)
 3. Summarize and extract key themes
 4. Identify potential content angles
 5. Store structured output with metadata
@@ -269,9 +271,8 @@ Existing solutions address pieces of this workflow:
 ```typescript
 interface ParsedInput {
   id: string;
-  originalType: 'voice' | 'article' | 'text' | 'link';
+  originalType: 'text' | 'article' | 'link' | 'document';
   rawContent: string;
-  transcription?: string;  // For voice notes
   summary: string;
   keyThemes: string[];
   potentialAngles: string[];
@@ -400,13 +401,13 @@ interface GeneratedImage {
 │                         CONTENT ENGINE WORKFLOW                              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  STAGE 1: INPUT CAPTURE                                                     │
-│  ────────────────────                                                       │
+│  STAGE 1: INPUT CAPTURE (via Dashboard)                                     │
+│  ───────────────────────────────────────                                    │
 │                                                                             │
-│  User captures idea via:                                                    │
-│  • iOS Shortcut → Webhook → /api/webhooks/voice                            │
-│  • Dashboard text input → /api/inputs                                       │
-│  • URL paste → /api/inputs (auto-detected)                                 │
+│  User captures idea via dashboard:                                          │
+│  • Text input → Type or paste raw ideas                                    │
+│  • URL paste → Auto-detected, content extracted                            │
+│  • Document upload → PDF, Word, etc. parsed                                │
 │                                                                             │
 │                              ▼                                              │
 │                                                                             │
@@ -414,8 +415,8 @@ interface GeneratedImage {
 │  ───────────────────────────                                                │
 │                                                                             │
 │  System automatically:                                                      │
-│  • Transcribes audio (if voice)                                            │
 │  • Extracts article content (if URL)                                       │
+│  • Parses document content (if upload)                                     │
 │  • Identifies key themes and angles                                        │
 │  • Stores in inputs table                                                  │
 │                                                                             │
@@ -499,78 +500,28 @@ interface GeneratedImage {
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 6.2 Voice Note Capture Flow (iOS Shortcut)
-
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   iOS Shortcut  │────▶│   Webhook URL   │────▶│  Parse Service  │
-│  (Voice Memo)   │     │ /api/webhooks/  │     │                 │
-└─────────────────┘     │     voice       │     └────────┬────────┘
-                        └─────────────────┘              │
-                                                         ▼
-User speaks idea        Audio file uploaded     ┌─────────────────┐
-into iPhone             to Supabase Storage     │  Transcription  │
-                                                │  (Whisper API)  │
-                                                └────────┬────────┘
-                                                         │
-                                                         ▼
-                                                ┌─────────────────┐
-                                                │  Ideation Queue │
-                                                └─────────────────┘
-```
-
-**iOS Shortcut Configuration:**
-1. Trigger: Voice memo saved or manual activation
-2. Action: Record audio (if manual)
-3. Action: Upload to webhook URL with auth header
-4. Action: Show confirmation notification
-
 ---
 
 ## 7. Feature Specifications
 
-### 7.1 Input Management
+### 7.1 Input Management (Dashboard-Based)
 
-#### 7.1.1 Voice Note Input
+All inputs are captured through the dashboard interface. Future versions may add additional input methods (iOS Shortcuts, API webhooks, mobile app).
+
+#### 7.1.1 Text Input
 
 | Attribute | Specification |
 |-----------|--------------|
-| Supported Formats | .m4a, .mp3, .wav, .webm |
-| Max Duration | 10 minutes |
-| Max File Size | 25MB |
-| Transcription | Whisper API (via OpenAI or local) |
-| Latency Target | < 30 seconds for 2-minute audio |
+| Max Length | 10,000 characters |
+| Formats | Plain text, Markdown |
+| Rich Content | Links auto-detected and expanded |
+| Use Cases | Raw ideas, notes, talking points, outlines |
 
-**Webhook Endpoint:** `POST /api/webhooks/voice`
-
-**Request:**
-```typescript
-// Headers
-{
-  "Authorization": "Bearer <user_api_key>",
-  "Content-Type": "multipart/form-data"
-}
-
-// Body
-{
-  "audio": File,  // Audio file
-  "metadata": {
-    "device": "iPhone",
-    "duration": 120,  // seconds
-    "timestamp": "2026-01-18T10:30:00Z"
-  }
-}
-```
-
-**Response:**
-```typescript
-{
-  "success": true,
-  "inputId": "inp_abc123",
-  "status": "processing",
-  "estimatedCompletion": "2026-01-18T10:30:30Z"
-}
-```
+**Dashboard Interface:**
+- Large text area with character count
+- Markdown preview toggle
+- Auto-save drafts
+- Quick submit or save for later
 
 #### 7.1.2 Article/URL Input
 
@@ -589,13 +540,21 @@ into iPhone             to Supabase Storage     │  Transcription  │
 5. Identify quotable segments
 6. Store with source attribution
 
-#### 7.1.3 Text Input
+#### 7.1.3 Document Upload
 
 | Attribute | Specification |
 |-----------|--------------|
-| Max Length | 10,000 characters |
-| Formats | Plain text, Markdown |
-| Rich Content | Links auto-detected and expanded |
+| Supported Formats | .pdf, .docx, .doc, .txt, .md |
+| Max File Size | 10MB |
+| Max Content | 10,000 words |
+| Processing | Extract text, preserve structure |
+
+**Processing Steps:**
+1. Upload file to Supabase Storage
+2. Extract text content (PDF parsing, DOCX extraction)
+3. Preserve document structure (headings, lists)
+4. Summarize via Claude
+5. Store with source file reference
 
 ### 7.2 Idea Generation
 
@@ -938,10 +897,9 @@ CREATE TABLE inputs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   brand_id UUID REFERENCES brands(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id),
-  type TEXT NOT NULL, -- 'voice', 'article', 'text', 'link'
+  type TEXT NOT NULL, -- 'text', 'article', 'link', 'document'
   raw_content TEXT,
-  file_url TEXT, -- For voice notes
-  transcription TEXT,
+  file_url TEXT, -- For document uploads
   parsed_content JSONB, -- Structured extracted content
   summary TEXT,
   key_themes TEXT[],
@@ -1087,8 +1045,9 @@ CREATE POLICY "Users can access their organization's brands"
 ```typescript
 // Request
 {
-  type: 'text' | 'link' | 'article',
+  type: 'text' | 'link' | 'article' | 'document',
   content: string,  // Text content or URL
+  fileId?: string,  // For document uploads (Supabase Storage reference)
   brandId: string
 }
 
@@ -1103,21 +1062,21 @@ CREATE POLICY "Users can access their organization's brands"
 }
 ```
 
-**POST /api/webhooks/voice**
+**POST /api/inputs/upload**
 ```typescript
 // Headers
-Authorization: Bearer <api_key>
 Content-Type: multipart/form-data
 
 // Body
-audio: File
+file: File  // PDF, DOCX, etc.
 brandId: string
 
 // Response
 {
   success: true,
   inputId: string,
-  status: 'processing'
+  status: 'processing',
+  fileName: string
 }
 ```
 
@@ -1298,7 +1257,7 @@ const analytics = await late.analytics.getPost(post.id);
 
 ```typescript
 // Enums
-type InputType = 'voice' | 'article' | 'text' | 'link';
+type InputType = 'text' | 'article' | 'link' | 'document';
 type IdeaStatus = 'pending' | 'approved' | 'rejected' | 'generated';
 type ContentStatus = 'draft' | 'approved' | 'scheduled' | 'published' | 'failed';
 type Platform = 'twitter' | 'instagram' | 'linkedin';
@@ -1311,8 +1270,7 @@ interface Input {
   userId: string;
   type: InputType;
   rawContent?: string;
-  fileUrl?: string;
-  transcription?: string;
+  fileUrl?: string;  // For document uploads
   parsedContent?: {
     summary: string;
     keyThemes: string[];
@@ -1540,7 +1498,7 @@ async function validateApiKey(key: string): Promise<User | null> {
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │  + Add Input                                                     │   │
 │  │  ──────────────────────────────────────────────────────────────  │   │
-│  │  [Voice] [Text] [Link] [Article URL]                             │   │
+│  │  [Text] [Link/URL] [Upload Document]                             │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 │  ┌─────────────────────┐  ┌─────────────────────┐                      │
@@ -1849,8 +1807,8 @@ interface AutoApprovalConfig {
 | User Authentication | P0 | Supabase Auth, email/password |
 | Dashboard UI | P0 | Basic layout, navigation |
 | Text Input | P0 | Paste text, submit ideas |
-| Voice Webhook | P0 | iOS Shortcut → webhook → storage |
-| Audio Transcription | P0 | Whisper API integration |
+| URL/Link Input | P0 | Auto-detect URLs, extract content |
+| Document Upload | P1 | PDF/DOCX parsing and extraction |
 | Idea Generation | P0 | Claude integration, 4 ideas per input |
 | Idea Review UI | P0 | Approve/reject interface |
 | Brand Voice Setup | P0 | Basic voice configuration |
@@ -1863,11 +1821,12 @@ interface AutoApprovalConfig {
 1. Project setup, CI/CD pipeline
 2. Supabase schema and RLS policies
 3. Authentication flow complete
-4. Input processing pipeline
-5. Claude integration for ideation
-6. Copy generation pipeline
-7. Late.dev OAuth and posting
-8. End-to-end workflow testing
+4. Dashboard input interface (text, URL, document upload)
+5. Input processing pipeline (URL extraction, document parsing)
+6. Claude integration for ideation
+7. Copy generation pipeline
+8. Late.dev OAuth and posting
+9. End-to-end workflow testing
 
 ### Phase 2: Visual Generation
 
@@ -2043,7 +2002,14 @@ interface AutoApprovalConfig {
 - **Collaboration:** Comments, suggestions, approval workflows
 - **White-Label:** Agency version with client management
 
-### 17.4 Integrations
+### 17.4 Additional Input Methods
+
+- **Voice Notes:** iOS Shortcuts integration with webhook for voice capture
+- **Mobile App:** Dedicated mobile app for on-the-go capture
+- **API Webhooks:** Public API for third-party integrations
+- **Browser Extension:** Capture content while browsing
+
+### 17.5 Integrations
 
 - **Notion:** Import ideas from Notion databases
 - **Slack:** Notifications and quick approvals
@@ -2058,7 +2024,7 @@ interface AutoApprovalConfig {
 
 | Term | Definition |
 |------|------------|
-| Input | Raw content captured by user (voice, text, link) |
+| Input | Raw content captured by user via dashboard (text, link, document) |
 | Idea | AI-generated content concept from an input |
 | Content | Fully generated, platform-specific post ready for publishing |
 | Brand | Configuration for voice, visuals, and connected accounts |
@@ -2163,6 +2129,7 @@ Create an eye-catching image that would make someone stop scrolling.
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | January 2026 | - | Initial PRD |
+| 1.1 | January 2026 | - | Simplified inputs to dashboard-only (text, URL, document upload). Voice/webhook inputs moved to Future Considerations. |
 
 ---
 
