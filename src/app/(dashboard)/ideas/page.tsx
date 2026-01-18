@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,10 +25,13 @@ interface Idea {
 }
 
 export default function IdeasPage() {
+  const router = useRouter();
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [generatingContent, setGeneratingContent] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("pending");
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchIdeas();
@@ -51,6 +55,7 @@ export default function IdeasPage() {
 
   const handleAction = async (id: string, status: "approved" | "rejected") => {
     setActionLoading(id);
+    setSuccessMessage(null);
     try {
       const res = await fetch("/api/ideas", {
         method: "PATCH",
@@ -66,6 +71,34 @@ export default function IdeasPage() {
             idea.id === id ? { ...idea, status } : idea
           )
         );
+
+        // If approved, generate content
+        if (status === "approved") {
+          setActionLoading(null);
+          setGeneratingContent(id);
+          setSuccessMessage("Idea approved! Generating content for all platforms...");
+
+          const contentRes = await fetch("/api/content/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ideaId: id }),
+          });
+
+          const contentData = await contentRes.json();
+          if (contentData.success) {
+            setSuccessMessage(`Content generated for ${contentData.content?.length || 0} platforms! View in Content page.`);
+            // Update idea status to generated
+            setIdeas((prev) =>
+              prev.map((idea) =>
+                idea.id === id ? { ...idea, status: "generated" } : idea
+              )
+            );
+          } else {
+            setSuccessMessage("Idea approved but content generation failed. Try again from Content page.");
+          }
+          setGeneratingContent(null);
+        }
+
         // If filtering by pending, remove from list
         if (filter === "pending") {
           setIdeas((prev) => prev.filter((idea) => idea.id !== id));
@@ -75,6 +108,7 @@ export default function IdeasPage() {
       console.error("Error updating idea:", err);
     } finally {
       setActionLoading(null);
+      setGeneratingContent(null);
     }
   };
 
@@ -83,6 +117,8 @@ export default function IdeasPage() {
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "approved":
+        return "default";
+      case "generated":
         return "default";
       case "rejected":
         return "destructive";
@@ -116,7 +152,7 @@ export default function IdeasPage() {
 
       {/* Filter Tabs */}
       <div className="flex gap-2">
-        {["pending", "approved", "rejected", ""].map((f) => (
+        {["pending", "approved", "generated", "rejected", ""].map((f) => (
           <Button
             key={f || "all"}
             variant={filter === f ? "default" : "outline"}
@@ -127,6 +163,16 @@ export default function IdeasPage() {
           </Button>
         ))}
       </div>
+
+      {/* Success Message */}
+      {successMessage && (
+        <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-400">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            {successMessage}
+          </div>
+        </div>
+      )}
 
       {/* Loading State */}
       {isLoading && (
@@ -229,26 +275,36 @@ export default function IdeasPage() {
                   <div className="flex gap-2 pt-2">
                     <Button
                       className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
-                      disabled={actionLoading === idea.id}
+                      disabled={actionLoading === idea.id || generatingContent === idea.id}
                       onClick={() => handleAction(idea.id, "approved")}
                     >
                       {actionLoading === idea.id ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Approving...
+                        </>
+                      ) : generatingContent === idea.id ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Generating Content...
+                        </>
                       ) : (
-                        <Check className="mr-2 h-4 w-4" />
+                        <>
+                          <Check className="mr-2 h-4 w-4" />
+                          Approve & Generate
+                        </>
                       )}
-                      Approve
                     </Button>
                     <Button
                       className="flex-1"
                       variant="outline"
-                      disabled={actionLoading === idea.id}
+                      disabled={actionLoading === idea.id || generatingContent === idea.id}
                       onClick={() => handleAction(idea.id, "rejected")}
                     >
                       <X className="mr-2 h-4 w-4" />
                       Reject
                     </Button>
-                    <Button variant="outline" size="icon">
+                    <Button variant="outline" size="icon" disabled={generatingContent === idea.id}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button variant="outline" size="icon">
