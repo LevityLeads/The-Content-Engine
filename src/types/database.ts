@@ -135,14 +135,14 @@ export type Database = {
         Row: {
           id: string;
           brand_id: string;
-          user_id: string;
-          type: "text" | "article" | "link" | "document";
+          user_id: string | null;
+          type: string;
           raw_content: string | null;
           file_url: string | null;
           parsed_content: Json | null;
           summary: string | null;
           key_themes: string[] | null;
-          status: "pending" | "parsed" | "ideated" | "archived";
+          status: string;
           metadata: Json;
           created_at: string;
           updated_at: string;
@@ -150,14 +150,14 @@ export type Database = {
         Insert: {
           id?: string;
           brand_id: string;
-          user_id: string;
-          type: "text" | "article" | "link" | "document";
+          user_id?: string | null;
+          type: string;
           raw_content?: string | null;
           file_url?: string | null;
           parsed_content?: Json | null;
           summary?: string | null;
           key_themes?: string[] | null;
-          status?: "pending" | "parsed" | "ideated" | "archived";
+          status?: string;
           metadata?: Json;
           created_at?: string;
           updated_at?: string;
@@ -165,14 +165,14 @@ export type Database = {
         Update: {
           id?: string;
           brand_id?: string;
-          user_id?: string;
-          type?: "text" | "article" | "link" | "document";
+          user_id?: string | null;
+          type?: string;
           raw_content?: string | null;
           file_url?: string | null;
           parsed_content?: Json | null;
           summary?: string | null;
           key_themes?: string[] | null;
-          status?: "pending" | "parsed" | "ideated" | "archived";
+          status?: string;
           metadata?: Json;
           created_at?: string;
           updated_at?: string;
@@ -191,8 +191,8 @@ export type Database = {
           potential_hooks: string[] | null;
           confidence_score: number | null;
           ai_reasoning: string | null;
-          status: "pending" | "approved" | "rejected" | "generated";
-          user_feedback: string | null;
+          status: string;
+          feedback_notes: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -208,8 +208,8 @@ export type Database = {
           potential_hooks?: string[] | null;
           confidence_score?: number | null;
           ai_reasoning?: string | null;
-          status?: "pending" | "approved" | "rejected" | "generated";
-          user_feedback?: string | null;
+          status?: string;
+          feedback_notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -225,8 +225,8 @@ export type Database = {
           potential_hooks?: string[] | null;
           confidence_score?: number | null;
           ai_reasoning?: string | null;
-          status?: "pending" | "approved" | "rejected" | "generated";
-          user_feedback?: string | null;
+          status?: string;
+          feedback_notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };

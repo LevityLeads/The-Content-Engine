@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, FileText, Link2, Upload, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, FileText, Link2, Upload, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,36 +11,101 @@ import { cn } from "@/lib/utils";
 
 type InputType = "text" | "link" | "document";
 
+interface InputRecord {
+  id: string;
+  type: InputType;
+  raw_content: string;
+  status: string;
+  created_at: string;
+}
+
 export default function InputsPage() {
   const [inputType, setInputType] = useState<InputType>("text");
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [recentInputs, setRecentInputs] = useState<Array<{
-    id: string;
-    type: InputType;
-    preview: string;
-    status: string;
-    createdAt: Date;
-  }>>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [recentInputs, setRecentInputs] = useState<InputRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Fetch recent inputs on mount
+  useEffect(() => {
+    fetchRecentInputs();
+  }, []);
+
+  const fetchRecentInputs = async () => {
+    try {
+      const res = await fetch("/api/inputs?limit=10");
+      const data = await res.json();
+      if (data.success) {
+        setRecentInputs(data.inputs || []);
+      }
+    } catch (err) {
+      console.error("Error fetching inputs:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!content.trim()) return;
 
     setIsSubmitting(true);
+    setError(null);
+    setSuccessMessage(null);
 
-    // TODO: Submit to API
-    // For now, just add to local state
-    const newInput = {
-      id: crypto.randomUUID(),
-      type: inputType,
-      preview: content.slice(0, 100) + (content.length > 100 ? "..." : ""),
-      status: "pending",
-      createdAt: new Date(),
-    };
+    try {
+      // Step 1: Save the input
+      const inputRes = await fetch("/api/inputs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: inputType, content }),
+      });
 
-    setRecentInputs([newInput, ...recentInputs]);
-    setContent("");
-    setIsSubmitting(false);
+      const inputData = await inputRes.json();
+
+      if (!inputData.success) {
+        throw new Error(inputData.error || "Failed to save input");
+      }
+
+      // Add to local state immediately
+      setRecentInputs([inputData.input, ...recentInputs]);
+      setContent("");
+      setIsSubmitting(false);
+
+      // Step 2: Generate ideas
+      setIsGenerating(true);
+      setSuccessMessage("Input saved! Generating ideas with AI...");
+
+      const ideaRes = await fetch("/api/ideas/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inputId: inputData.input.id }),
+      });
+
+      const ideaData = await ideaRes.json();
+
+      if (ideaData.success) {
+        // Update the input status in local state
+        setRecentInputs((prev) =>
+          prev.map((inp) =>
+            inp.id === inputData.input.id ? { ...inp, status: "ideated" } : inp
+          )
+        );
+        setSuccessMessage(
+          `Generated ${ideaData.ideas?.length || 0} content ideas! Check the Ideas page.`
+        );
+      } else {
+        // Input saved but idea generation failed
+        setError(ideaData.error || "Ideas generated, but there was an issue. Check Ideas page.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setIsSubmitting(false);
+      setIsGenerating(false);
+    }
   };
 
   const inputTypes = [
@@ -48,6 +113,19 @@ export default function InputsPage() {
     { id: "link" as const, label: "Link", icon: Link2, description: "Share a URL to extract content" },
     { id: "document" as const, label: "Document", icon: Upload, description: "Upload PDF, DOCX, or TXT" },
   ];
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case "ideated":
+        return "default";
+      case "pending":
+        return "secondary";
+      case "processing":
+        return "outline";
+      default:
+        return "secondary";
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -58,6 +136,21 @@ export default function InputsPage() {
           Add raw content to transform into social media posts
         </p>
       </div>
+
+      {/* Success/Error Messages */}
+      {successMessage && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            {successMessage}
+          </div>
+        </div>
+      )}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+          {error}
+        </div>
+      )}
 
       {/* Input Form */}
       <Card>
@@ -105,6 +198,7 @@ export default function InputsPage() {
               className="min-h-[200px] resize-none"
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              disabled={isSubmitting || isGenerating}
             />
           )}
 
@@ -114,6 +208,7 @@ export default function InputsPage() {
               placeholder="https://example.com/article-to-summarize"
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              disabled={isSubmitting || isGenerating}
             />
           )}
 
@@ -130,6 +225,7 @@ export default function InputsPage() {
                 type="file"
                 accept=".pdf,.docx,.doc,.txt,.md"
                 className="mt-4 max-w-xs"
+                disabled={isSubmitting || isGenerating}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) setContent(file.name);
@@ -148,17 +244,22 @@ export default function InputsPage() {
           {/* Submit Button */}
           <Button
             onClick={handleSubmit}
-            disabled={!content.trim() || isSubmitting}
+            disabled={!content.trim() || isSubmitting || isGenerating}
             className="w-full"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
+                Saving input...
+              </>
+            ) : isGenerating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating ideas with AI...
               </>
             ) : (
               <>
-                <Plus className="mr-2 h-4 w-4" />
+                <Sparkles className="mr-2 h-4 w-4" />
                 Add Input & Generate Ideas
               </>
             )}
@@ -188,15 +289,16 @@ export default function InputsPage() {
                       {input.type === "link" && <Link2 className="h-4 w-4 text-muted-foreground" />}
                       {input.type === "document" && <Upload className="h-4 w-4 text-muted-foreground" />}
                       <span className="text-sm font-medium capitalize">{input.type}</span>
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant={getStatusBadgeVariant(input.status)} className="text-xs">
                         {input.status}
                       </Badge>
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {input.preview}
+                    <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                      {input.raw_content?.slice(0, 150)}
+                      {(input.raw_content?.length || 0) > 150 ? "..." : ""}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {input.createdAt.toLocaleTimeString()}
+                      {new Date(input.created_at).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -206,8 +308,18 @@ export default function InputsPage() {
         </Card>
       )}
 
+      {/* Loading State */}
+      {isLoading && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="mb-4 h-12 w-12 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Loading inputs...</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Empty State */}
-      {recentInputs.length === 0 && (
+      {!isLoading && recentInputs.length === 0 && (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
