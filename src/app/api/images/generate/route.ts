@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// Google Gemini/Imagen API for image generation
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+// Using Nano Banana (Gemini 2.5 Flash Image) for image generation
+// See: https://ai.google.dev/gemini-api/docs/image-generation
 
 export async function POST(request: NextRequest) {
   try {
-    if (!GOOGLE_API_KEY) {
-      return NextResponse.json(
-        { error: "Google API key not configured. Add GOOGLE_API_KEY to environment variables." },
-        { status: 500 }
-      );
-    }
-
     const supabase = await createClient();
     const body = await request.json();
     const { contentId, prompt } = body;
@@ -24,10 +17,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch the content to get brand context
+    // Fetch the content to verify it exists
     const { data: content, error: contentError } = await supabase
       .from("content")
-      .select("*, brands(*)")
+      .select("id, platform")
       .eq("id", contentId)
       .single();
 
@@ -38,69 +31,71 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call Google Imagen API (Gemini 2.0 Flash with image generation)
-    // Using the Gemini API endpoint for image generation
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GOOGLE_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
+    // Check if we have the Google API key for Nano Banana
+    const googleApiKey = process.env.GOOGLE_API_KEY;
+
+    let imageUrl = null;
+    let imageBase64 = null;
+    let generationStatus = "pending";
+    let generationMessage = "";
+
+    if (googleApiKey) {
+      try {
+        // Use Nano Banana (Gemini 2.5 Flash Image) for image generation
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${googleApiKey}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              contents: [
                 {
-                  text: `Generate an image: ${prompt}.
-                  Style: Professional, modern, suitable for social media.
-                  Aspect ratio: Square (1:1) for Instagram, or 16:9 for Twitter/LinkedIn.
-                  No text overlay on the image.`,
+                  parts: [
+                    {
+                      text: `${prompt}. Style: Professional, modern, suitable for social media marketing. High quality, visually appealing. No text overlays in the image.`,
+                    },
+                  ],
                 },
               ],
-            },
-          ],
-          generationConfig: {
-            responseModalities: ["image", "text"],
-            responseMimeType: "image/png",
-          },
-        }),
-      }
-    );
+              generationConfig: {
+                responseModalities: ["IMAGE"],
+              },
+            }),
+          }
+        );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Google API error:", errorText);
+        if (response.ok) {
+          const data = await response.json();
 
-      // Fallback: Return a placeholder response if image gen fails
-      // In production, you might use a different service or queue for retry
-      return NextResponse.json({
-        success: true,
-        image: {
-          id: null,
-          url: null,
-          status: "pending",
-          message: "Image generation queued. Google Imagen API may require additional setup.",
-          prompt: prompt,
-        },
-      });
-    }
+          // Extract base64 image from response
+          const parts = data.candidates?.[0]?.content?.parts || [];
+          for (const part of parts) {
+            if (part.inlineData?.data) {
+              imageBase64 = part.inlineData.data;
+              const mimeType = part.inlineData.mimeType || "image/png";
+              imageUrl = `data:${mimeType};base64,${imageBase64}`;
+              generationStatus = "generated";
+              generationMessage = "Image generated successfully with Nano Banana (Gemini 2.5 Flash Image)";
+              break;
+            }
+          }
 
-    const result = await response.json();
-
-    // Extract image data from response
-    let imageUrl = null;
-    let imageData = null;
-
-    if (result.candidates?.[0]?.content?.parts) {
-      for (const part of result.candidates[0].content.parts) {
-        if (part.inlineData) {
-          imageData = part.inlineData.data;
-          // In production, upload to Supabase Storage and get URL
-          // For now, we'll store the base64 data reference
-          imageUrl = `data:${part.inlineData.mimeType};base64,${imageData.substring(0, 50)}...`;
+          if (!imageUrl) {
+            generationMessage = "Nano Banana returned no image. The prompt may have been filtered.";
+          }
+        } else {
+          const errorData = await response.text();
+          console.error("Nano Banana API error:", errorData);
+          generationMessage = `Nano Banana generation failed: ${response.status}. Image prompt saved for retry.`;
         }
+      } catch (err) {
+        console.error("Nano Banana API error:", err);
+        generationMessage = "Nano Banana generation failed. Image prompt saved for manual creation.";
       }
+    } else {
+      generationMessage = "No image generation API configured. Add GOOGLE_API_KEY for Nano Banana image generation.";
     }
 
     // Save image record to database
@@ -109,7 +104,7 @@ export async function POST(request: NextRequest) {
       .insert({
         content_id: contentId,
         prompt: prompt,
-        url: imageUrl || "pending",
+        url: imageUrl || `placeholder:${content.platform}`,
         is_primary: true,
         format: "png",
         dimensions: { width: 1024, height: 1024 },
@@ -128,7 +123,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       image: savedImage,
-      hasImageData: !!imageData,
+      generated: !!imageUrl,
+      status: generationStatus,
+      message: generationMessage,
     });
   } catch (error) {
     console.error("Error in POST /api/images/generate:", error);
