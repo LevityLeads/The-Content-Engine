@@ -116,7 +116,7 @@ Each post should have a detailed image prompt that would create a compelling vis
 
     // Call Claude Opus 4.5
     const message = await anthropic.messages.create({
-      model: "claude-opus-4-5-20250101",
+      model: "claude-opus-4-5-20251101",
       max_tokens: 4096,
       messages: [
         {
