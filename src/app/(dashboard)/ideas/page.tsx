@@ -228,8 +228,7 @@ export default function IdeasPage() {
                 {idea.status === "pending" && (
                   <div className="flex gap-2 pt-2">
                     <Button
-                      className="flex-1"
-                      variant="default"
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
                       disabled={actionLoading === idea.id}
                       onClick={() => handleAction(idea.id, "approved")}
                     >
