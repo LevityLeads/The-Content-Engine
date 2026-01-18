@@ -114,9 +114,9 @@ ${ideaData.inputs?.raw_content || "No source content available"}
 Generate optimized posts for each target platform: ${ideaData.target_platforms?.join(", ")}.
 Each post should have a detailed image prompt that would create a compelling visual to accompany the post.`;
 
-    // Call Claude
+    // Call Claude Opus 4.5
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-opus-4-5-20250101",
       max_tokens: 4096,
       messages: [
         {
