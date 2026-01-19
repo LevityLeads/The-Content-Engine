@@ -101,34 +101,67 @@ export default function ContentPage() {
       const res = await fetch(`/api/images/generate?contentId=${contentId}`);
       const data = await res.json();
       if (data.success && data.images) {
+        // Store all images for this content (newest first from API)
         setImages((prev) => ({
           ...prev,
           [contentId]: data.images,
         }));
-        // Map ALL images to slides by matching prompts - build arrays instead of overwriting
+
+        // Map images to slides by matching prompts - try multiple patterns
         const imgMap: Record<number, CarouselImage[]> = {};
-        // Images come sorted by created_at DESC (newest first), so we build arrays with newest at index 0
+        // Also keep track of unmatched images
+        const unmatchedImages: CarouselImage[] = [];
+
+        // Images come sorted by created_at DESC (newest first)
         data.images.forEach((img: ContentImage & { created_at?: string }) => {
           if (img.url && !img.url.startsWith("placeholder:")) {
-            // Try to match by slide number in prompt
-            const slideMatch = img.prompt?.match(/slide\s*(\d+)/i);
-            if (slideMatch) {
-              const slideNum = parseInt(slideMatch[1]);
-              if (!imgMap[slideNum]) {
-                imgMap[slideNum] = [];
+            const carouselImg: CarouselImage = {
+              id: img.id,
+              url: img.url,
+              model: img.model,
+              createdAt: img.created_at,
+            };
+
+            // Try multiple patterns to match slide number
+            // Pattern 1: [Slide X] at beginning
+            // Pattern 2: Slide X: anywhere
+            // Pattern 3: slide X anywhere (case insensitive)
+            // Pattern 4: - Slide X: format
+            const patterns = [
+              /^\[slide\s*(\d+)\]/i,
+              /slide\s*(\d+)\s*:/i,
+              /slide\s*(\d+)/i,
+              /-\s*slide\s*(\d+)/i,
+            ];
+
+            let matched = false;
+            for (const pattern of patterns) {
+              const match = img.prompt?.match(pattern);
+              if (match) {
+                const slideNum = parseInt(match[1]);
+                if (!imgMap[slideNum]) {
+                  imgMap[slideNum] = [];
+                }
+                imgMap[slideNum].push(carouselImg);
+                matched = true;
+                break;
               }
-              imgMap[slideNum].push({
-                id: img.id,
-                url: img.url,
-                model: img.model,
-                createdAt: img.created_at,
-              });
+            }
+
+            // If no slide pattern found, add to unmatched
+            if (!matched) {
+              unmatchedImages.push(carouselImg);
             }
           }
         });
-        if (Object.keys(imgMap).length > 0) {
-          setSlideImages((prev) => ({ ...prev, [contentId]: imgMap }));
+
+        // If we have slides but some images didn't match, put unmatched in slide 0
+        // This allows old images to still be viewed
+        if (unmatchedImages.length > 0) {
+          imgMap[0] = unmatchedImages;
         }
+
+        setSlideImages((prev) => ({ ...prev, [contentId]: imgMap }));
       }
     } catch (err) {
       console.error("Error fetching images:", err);
@@ -275,7 +308,25 @@ export default function ContentPage() {
   };
 
   const getSlideImages = (contentId: string, slideNumber: number): CarouselImage[] => {
-    return slideImages[contentId]?.[slideNumber] || [];
+    const slideImgs = slideImages[contentId]?.[slideNumber] || [];
+    // If no images for this specific slide, also check unmatched images (slide 0)
+    // This handles old images that don't have slide numbers in their prompts
+    if (slideImgs.length === 0 && slideNumber > 0) {
+      return slideImages[contentId]?.[0] || [];
+    }
+    return slideImgs;
+  };
+
+  // Get ALL images for a content item (for non-carousel posts)
+  const getAllContentImages = (contentId: string): CarouselImage[] => {
+    const contentImgs = images[contentId] || [];
+    return contentImgs
+      .filter(img => img.url && !img.url.startsWith("placeholder:"))
+      .map(img => ({
+        id: img.id,
+        url: img.url,
+        model: img.model,
+      }));
   };
 
   const isSlideGenerating = (contentId: string, slideNumber: number): boolean => {
@@ -465,21 +516,12 @@ export default function ContentPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Non-carousel Generated Image Display - Now with carousel for all versions */}
-                  {!hasCarousel && contentImages.length > 0 && (
-                    <div className="space-y-2">
-                      {contentImages.filter(img => img.url && !img.url.startsWith("placeholder:")).length > 1 && (
-                        <div className="flex items-center justify-between">
-                          <Badge variant="secondary" className="text-xs">
-                            {contentImages.filter(img => img.url && !img.url.startsWith("placeholder:")).length} image versions
-                          </Badge>
-                        </div>
-                      )}
+                  {!hasCarousel && (() => {
+                    const allImages = getAllContentImages(item.id);
+                    if (allImages.length === 0) return null;
+                    return (
                       <ImageCarousel
-                        images={contentImages.filter(img => img.url && !img.url.startsWith("placeholder:")).map(img => ({
-                          id: img.id,
-                          url: img.url,
-                          model: img.model,
-                        }))}
+                        images={allImages}
                         aspectRatio="aspect-video max-h-96"
                         onDownload={(url) => handleDownloadImage(url, item.platform)}
                         modelBadge={(model) => {
@@ -497,8 +539,8 @@ export default function ContentPage() {
                           );
                         }}
                       />
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Post Copy / Caption */}
                   <div className="space-y-2">
@@ -887,7 +929,7 @@ export default function ContentPage() {
                           ) : hasGeneratedImage(item.id) ? (
                             <>
                               <ImageIcon className="mr-2 h-4 w-4" />
-                              Regenerate
+                              Generate Another
                             </>
                           ) : (
                             <>
