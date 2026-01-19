@@ -189,12 +189,18 @@ ALL slides in a carousel MUST use the EXACT SAME:
 - Primary text color (same hex)
 - Accent color (same hex)
 - Typography hierarchy (same weight/size rules)
+- Visual treatment (ALL text-only OR ALL with consistent icon style)
 
 Before writing any slide prompts, FIRST define your carousel design system:
 1. Pick ONE background color (e.g., #1a1a2e)
 2. Pick ONE primary text color (e.g., #ffffff)
 3. Pick ONE accent color (e.g., #ff6b6b)
 4. Use font: Inter (bold for headlines, regular for body)
+5. Pick ONE visual treatment and apply to ALL slides:
+   - "text-only": Pure typography, no icons or illustrations
+   - "text-with-line-icons": Text + simple monoline icons in accent color
+   - "text-with-filled-icons": Text + solid filled icons
+   - "text-with-illustrations": Text + consistent illustration style
 
 Then EVERY slide prompt MUST start with these EXACT values. No variation.
 
@@ -259,18 +265,31 @@ When creating carousel slides, EVERY slide prompt must use IDENTICAL:
 - Font family (Inter)
 - Text colors (exact hex codes)
 - Layout margins and spacing rules
+- Visual treatment (text-only OR same icon/illustration style)
 
-### Good Carousel Prompt Example (Slide 1 of 4):
+### Good Carousel Prompt Example - TEXT-ONLY (Slide 1 of 4):
 \`\`\`
-Bold modern graphic with charcoal black background (#1a1a1a). Large bold white text (#ffffff) in Inter Bold font reading "This Changed Everything" centered vertically. Subtle coral accent line (#ff6b6b) below the text. Clean minimalist layout with 15% margins. Overall aesthetic: bold, editorial, premium.
-\`\`\`
-
-### Good Carousel Prompt Example (Slide 2 of same carousel):
-\`\`\`
-Bold modern graphic with charcoal black background (#1a1a1a). Header text in white (#ffffff) Inter Bold reading "The Problem" at top. Body text in coral (#ff6b6b) Inter Regular reading "Most people chase metrics instead of building systems." Text left-aligned with 15% margins. Clean minimalist layout. Overall aesthetic: bold, editorial, premium.
+Bold modern graphic with charcoal black background (#1a1a1a). Large bold white text (#ffffff) in Inter Bold font reading "This Changed Everything" centered vertically. Subtle coral accent line (#ff6b6b) below the text. Clean minimalist layout with 15% margins. TEXT-ONLY design - no icons, illustrations, or imagery. Overall aesthetic: bold, editorial, premium.
 \`\`\`
 
-Note: Both slides use IDENTICAL: background (#1a1a1a), font (Inter), colors (#ffffff, #ff6b6b), margins (15%), aesthetic (bold, editorial, premium).
+### Good Carousel Prompt Example - TEXT-ONLY (Slide 2 of same carousel):
+\`\`\`
+Bold modern graphic with charcoal black background (#1a1a1a). Header text in white (#ffffff) Inter Bold reading "The Problem" at top. Body text in coral (#ff6b6b) Inter Regular reading "Most people chase metrics instead of building systems." Text left-aligned with 15% margins. TEXT-ONLY design - no icons, illustrations, or imagery. Overall aesthetic: bold, editorial, premium.
+\`\`\`
+
+Note: Both slides use IDENTICAL: background (#1a1a1a), font (Inter), colors (#ffffff, #ff6b6b), margins (15%), aesthetic (bold, editorial, premium), visual treatment (text-only).
+
+### Good Carousel Prompt Example - WITH ICONS (Slide 1 of 4):
+\`\`\`
+Bold modern graphic with charcoal black background (#1a1a1a). Large bold white text (#ffffff) in Inter Bold font reading "3 Systems You Need" centered vertically. Subtle coral accent line (#ff6b6b) below the text. Small monoline icon of three stacked boxes in coral (#ff6b6b) above the headline. Clean minimalist layout with 15% margins. CONSISTENT STYLE: all icons are simple monoline drawings in coral. Overall aesthetic: bold, editorial, premium.
+\`\`\`
+
+### Good Carousel Prompt Example - WITH ICONS (Slide 2 of same carousel):
+\`\`\`
+Bold modern graphic with charcoal black background (#1a1a1a). Header text in white (#ffffff) Inter Bold reading "1. The Capture System" at top. Body text in coral (#ff6b6b) Inter Regular reading "Never lose another idea." Text left-aligned with 15% margins. Small monoline icon of an inbox/tray in coral (#ff6b6b) to the right of the headline. CONSISTENT STYLE: all icons are simple monoline drawings in coral, same weight and style as slide 1. Overall aesthetic: bold, editorial, premium.
+\`\`\`
+
+Note: Both slides use IDENTICAL icon style (monoline, coral color, same line weight) in addition to matching background, font, colors, and margins.
 
 ### Bad Image Prompt Example:
 \`\`\`
@@ -318,18 +337,19 @@ Return a JSON array with content for each requested platform:
         "primaryColor": "#ffffff",
         "accentColor": "#ff6b6b",
         "font": "Inter",
-        "aesthetic": "bold, editorial, premium"
+        "aesthetic": "bold, editorial, premium",
+        "visualTreatment": "text-only"
       },
       "carouselSlides": [
         {
           "slideNumber": 1,
           "text": "Hook text for slide 1",
-          "imagePrompt": "MUST include: background (#1a1a1a), Inter font, colors (#ffffff, #ff6b6b), aesthetic (bold, editorial, premium) - exactly matching carouselStyle above"
+          "imagePrompt": "MUST include: background (#1a1a1a), Inter font, colors (#ffffff, #ff6b6b), aesthetic (bold, editorial, premium), visualTreatment (text-only = no icons/illustrations) - exactly matching carouselStyle above"
         },
         {
           "slideNumber": 2,
           "text": "Content for slide 2",
-          "imagePrompt": "MUST include: background (#1a1a1a), Inter font, colors (#ffffff, #ff6b6b), aesthetic (bold, editorial, premium) - exactly matching carouselStyle above"
+          "imagePrompt": "MUST include: background (#1a1a1a), Inter font, colors (#ffffff, #ff6b6b), aesthetic (bold, editorial, premium), visualTreatment (text-only = no icons/illustrations) - exactly matching carouselStyle above"
         }
       ]
     }
@@ -370,6 +390,8 @@ Before returning any content, verify:
 - [ ] All image prompts are fully self-contained
 - [ ] ALL carousel slides use IDENTICAL: background color, font (Inter), text colors, accent color, aesthetic
 - [ ] carouselStyle is defined BEFORE slides and ALL slide prompts match it exactly
+- [ ] visualTreatment is defined (text-only, text-with-line-icons, etc.) and EVERY slide follows it
+- [ ] If using icons/illustrations, EVERY slide specifies the same icon style, color, and line weight
 
 ---
 
@@ -418,7 +440,7 @@ ${sourceContent.substring(0, 3000)}${sourceContent.length > 3000 ? "\n\n[Content
 
 Generate content for: ${platforms.map((p) => p.toUpperCase()).join(", ")}
 
-${platforms.includes("instagram") ? "For Instagram: Create a carousel with 4-6 slides. Remember slide 1 is HOOK ONLY. CRITICAL: Define carouselStyle FIRST (background, colors, font: Inter, aesthetic), then ensure EVERY slide imagePrompt uses those EXACT same values for visual consistency." : ""}
+${platforms.includes("instagram") ? "For Instagram: Create a carousel with 4-6 slides. Remember slide 1 is HOOK ONLY. CRITICAL: Define carouselStyle FIRST (background, colors, font: Inter, aesthetic, visualTreatment), then ensure EVERY slide imagePrompt uses those EXACT same values for visual consistency. Visual treatment must be consistent: if text-only, NO slide gets icons; if using icons, EVERY slide must specify the same icon style." : ""}
 ${platforms.includes("twitter") ? "For Twitter: If the idea warrants depth, create a thread. Otherwise, a powerful single tweet." : ""}
 
 ---
