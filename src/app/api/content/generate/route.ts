@@ -63,33 +63,38 @@ Respond in JSON format:
 }
 
 **CRITICAL - IMAGE PROMPT RULES:**
-Each imagePrompt will be sent to an AI image generator. Follow these rules STRICTLY:
+Each imagePrompt creates a graphic design. Follow these rules STRICTLY:
 
-**NEVER INCLUDE in image prompts:**
-- Platform names (Instagram, Twitter, LinkedIn, Facebook, TikTok, etc.)
-- Social media terms (carousel, post, story, reel, feed, etc.)
-- UI elements (frame, border, mockup, phone screen, app interface)
-- Format mentions (square format, vertical format, etc.)
+**ABSOLUTELY FORBIDDEN in image prompts (will ruin the output):**
+- ANY platform names: Instagram, Twitter, LinkedIn, Facebook, TikTok, YouTube
+- ANY social media terms: carousel, post, story, reel, feed, social media, content
+- ANY UI elements: like buttons, comment icons, share buttons, hearts, profile pictures, avatars, follower counts, phone frames, app interfaces, mockups, notifications, navigation bars
+- ANY format references: "for Instagram", "social media graphic", "post design"
+- ANY cross-references: "same as slide 1", "consistent with previous"
 
-**ALWAYS INCLUDE in image prompts:**
-1. **Background**: Exact color with hex code (e.g., "deep navy blue #1a365d background")
-2. **Typography**: Font style, weight, color (e.g., "bold condensed sans-serif text in cream #faf5f0")
-3. **Layout**: Where elements are positioned (e.g., "centered headline at top, supporting text below")
-4. **Visual elements**: Icons, illustrations, textures (e.g., "subtle grain texture overlay, small line-art icons")
-5. **Color palette**: List ALL colors used
-6. **The specific text/headline to display**
-7. **Aspect ratio**: Use "1:1 aspect ratio" instead of "square format for Instagram"
+**REQUIRED in every image prompt:**
+1. **Background**: Solid color OR gradient with hex codes (e.g., "deep charcoal #2d2d2d background")
+2. **Main headline**: The exact text in quotes (e.g., headline 'YOUR TEXT HERE')
+3. **Typography style**: Font weight and style (e.g., "bold condensed sans-serif")
+4. **Text color**: With hex code (e.g., "warm cream #f5f2ed text")
+5. **Layout**: Position of elements (e.g., "headline centered in upper third")
+6. **Supporting elements**: Textures, icons, illustrations if any
+7. **Overall aesthetic**: (e.g., "clean editorial design", "modern minimalist poster")
 
-WRONG (will cause problems):
-- "Square format for Instagram carousel" - DO NOT mention Instagram!
-- "Social media post with..." - DO NOT mention social media!
-- "Instagram-style graphic..." - DO NOT mention platforms!
-- "Consistent with slide 1..." - NO cross-references!
+**DESIGN SYSTEM for carousel sets:**
+All slides in a carousel MUST share: same background color, same typography style, same color palette.
+But each slide prompt must be FULLY SELF-CONTAINED (no references to other slides).
 
-CORRECT (pure visual description):
-- "Deep navy blue (#1a365d) background with subtle grain texture. 1:1 aspect ratio. Large bold condensed sans-serif headline 'YOUR HEADLINE' in cream (#faf5f0) centered at top. Supporting text in smaller cream font below. Small terracotta (#c4704b) line-art icon in corner. Clean, modern, minimalist editorial aesthetic."
+WRONG examples:
+- "Instagram carousel slide" ❌
+- "Social media graphic with..." ❌
+- "Leave space for UI elements" ❌
+- "Same style as slide 1" ❌
 
-Every image prompt must be a pure visual description with NO platform or social media references.`;
+CORRECT example:
+"Deep charcoal (#2d2d2d) background with subtle paper grain texture. Bold condensed sans-serif headline 'THE 2AM MOMENTS THAT MATTER MOST' in warm cream (#f5f2ed) positioned in the upper half. Smaller supporting text 'What felt like survival became my most meaningful memories' below in the same cream color. Subtle constellation line-art illustrations in muted gold (#c4a35a) in the corners. Clean, modern editorial poster aesthetic."
+
+The output should look like a beautiful poster or magazine spread - NOT a social media mockup.`;
 
 export async function POST(request: NextRequest) {
   try {
