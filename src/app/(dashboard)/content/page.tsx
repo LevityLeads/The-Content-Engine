@@ -83,6 +83,7 @@ export default function ContentPage() {
   const [currentSlideIndex, setCurrentSlideIndex] = useState<Record<string, number>>({});
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedVersionIndex, setSelectedVersionIndex] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchContent();
@@ -428,6 +429,16 @@ export default function ContentPage() {
     setCurrentSlideIndex((prev) => ({ ...prev, [contentId]: index }));
   };
 
+  const getVersionIndex = (contentId: string, slideNumber: number): number => {
+    const key = `${contentId}-${slideNumber}`;
+    return selectedVersionIndex[key] || 0;
+  };
+
+  const setVersionIndex = (contentId: string, slideNumber: number, index: number) => {
+    const key = `${contentId}-${slideNumber}`;
+    setSelectedVersionIndex((prev) => ({ ...prev, [key]: index }));
+  };
+
   const draftCount = content.filter((c) => c.status === "draft").length;
   const approvedCount = content.filter((c) => c.status === "approved").length;
 
@@ -735,16 +746,43 @@ export default function ContentPage() {
                                 {/* Main Carousel Image */}
                                 <div className="relative aspect-[4/5] bg-black/10">
                                   {(() => {
-                                    const slideImgs = getSlideImages(item.id, carouselSlides[currentSlide]?.slideNumber || 1);
-                                    if (slideImgs.length > 0) {
+                                    const slideNum = carouselSlides[currentSlide]?.slideNumber || 1;
+                                    const slideImgs = getSlideImages(item.id, slideNum);
+                                    const versionIdx = getVersionIndex(item.id, slideNum);
+                                    const safeVersionIdx = Math.min(versionIdx, slideImgs.length - 1);
+                                    if (slideImgs.length > 0 && slideImgs[safeVersionIdx]) {
                                       return (
-                                        <ImageCarousel
-                                          images={slideImgs}
-                                          aspectRatio="aspect-[4/5]"
-                                          showThumbnails={false}
-                                          onDownload={(url) => handleDownloadImage(url, item.platform, currentSlide + 1)}
-                                          modelBadge={renderModelBadge}
-                                        />
+                                        <>
+                                          <img
+                                            src={slideImgs[safeVersionIdx].url}
+                                            alt={`Slide ${currentSlide + 1}`}
+                                            className="w-full h-full object-cover"
+                                          />
+                                          {/* Model badge */}
+                                          {slideImgs[safeVersionIdx].model && (
+                                            <div className="absolute top-2 left-2 z-10">
+                                              {renderModelBadge(slideImgs[safeVersionIdx].model!)}
+                                            </div>
+                                          )}
+                                          {/* Version counter badge (if multiple versions) */}
+                                          {slideImgs.length > 1 && (
+                                            <Badge className="absolute bottom-2 left-2 bg-black/70 text-white border-0 z-10 text-xs">
+                                              v{safeVersionIdx + 1}/{slideImgs.length}
+                                            </Badge>
+                                          )}
+                                          {/* Download button */}
+                                          <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-8 w-8 p-0 z-10"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDownloadImage(slideImgs[safeVersionIdx].url, item.platform, currentSlide + 1);
+                                            }}
+                                          >
+                                            <Download className="h-4 w-4" />
+                                          </Button>
+                                        </>
                                       );
                                     }
                                     return (
@@ -790,36 +828,86 @@ export default function ContentPage() {
                             </PlatformPostMockup>
 
                             {/* Slide Thumbnails */}
-                            <div className="flex gap-2 overflow-x-auto pb-2">
-                              {carouselSlides.map((slide, idx) => {
-                                const slideImgs = getSlideImages(item.id, slide.slideNumber);
-                                const hasImage = slideImgs.length > 0;
-                                return (
-                                  <button
-                                    key={slide.slideNumber}
-                                    onClick={() => setCurrentSlide(item.id, idx)}
-                                    className={cn(
-                                      "flex-shrink-0 w-16 h-20 rounded-lg overflow-hidden border-2 transition-all",
-                                      idx === currentSlide
-                                        ? "border-primary ring-2 ring-primary/30"
-                                        : "border-transparent opacity-60 hover:opacity-100"
-                                    )}
-                                  >
-                                    {hasImage ? (
-                                      <img
-                                        src={slideImgs[0].url}
-                                        alt={`Slide ${slide.slideNumber}`}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full bg-muted flex items-center justify-center">
-                                        <span className="text-xs text-muted-foreground">{slide.slideNumber}</span>
-                                      </div>
-                                    )}
-                                  </button>
-                                );
-                              })}
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground">Slides</p>
+                              <div className="flex gap-2 overflow-x-auto pb-2">
+                                {carouselSlides.map((slide, idx) => {
+                                  const slideImgs = getSlideImages(item.id, slide.slideNumber);
+                                  const versionIdx = getVersionIndex(item.id, slide.slideNumber);
+                                  const displayImg = slideImgs[Math.min(versionIdx, slideImgs.length - 1)];
+                                  const hasImage = slideImgs.length > 0;
+                                  return (
+                                    <button
+                                      key={slide.slideNumber}
+                                      onClick={() => setCurrentSlide(item.id, idx)}
+                                      className={cn(
+                                        "relative flex-shrink-0 w-16 h-20 rounded-lg overflow-hidden border-2 transition-all",
+                                        idx === currentSlide
+                                          ? "border-primary ring-2 ring-primary/30"
+                                          : "border-transparent opacity-60 hover:opacity-100"
+                                      )}
+                                    >
+                                      {hasImage && displayImg ? (
+                                        <>
+                                          <img
+                                            src={displayImg.url}
+                                            alt={`Slide ${slide.slideNumber}`}
+                                            className="w-full h-full object-cover"
+                                          />
+                                          {slideImgs.length > 1 && (
+                                            <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded">
+                                              {slideImgs.length}
+                                            </span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                                          <span className="text-xs text-muted-foreground">{slide.slideNumber}</span>
+                                        </div>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
+
+                            {/* Version Thumbnails for Current Slide */}
+                            {(() => {
+                              const slideNum = carouselSlides[currentSlide]?.slideNumber || 1;
+                              const slideImgs = getSlideImages(item.id, slideNum);
+                              const versionIdx = getVersionIndex(item.id, slideNum);
+                              if (slideImgs.length > 1) {
+                                return (
+                                  <div className="space-y-2">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                      Versions for Slide {currentSlide + 1} ({slideImgs.length} generated)
+                                    </p>
+                                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                                      {slideImgs.map((img, idx) => (
+                                        <button
+                                          key={img.id}
+                                          onClick={() => setVersionIndex(item.id, slideNum, idx)}
+                                          className={cn(
+                                            "flex-shrink-0 w-12 h-12 rounded-md overflow-hidden border-2 transition-all",
+                                            idx === versionIdx
+                                              ? "border-emerald-500 ring-2 ring-emerald-500/30"
+                                              : "border-transparent opacity-60 hover:opacity-100"
+                                          )}
+                                          title={`Version ${idx + 1}${idx === 0 ? " (newest)" : ""}`}
+                                        >
+                                          <img
+                                            src={img.url}
+                                            alt={`Version ${idx + 1}`}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
 
                             {/* Generate Image Button */}
                             <Button
