@@ -185,6 +185,43 @@ This project uses specialized roles for development. Roles are **automatically d
 3. **Work happens with auto-handover between roles as needed**
 4. **QA automatically verifies and deploys**
 
+### Role Announcements (Visibility)
+
+You'll always see clear announcements when roles are assigned or change:
+
+**When a role is activated:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🎭 ROLE: Frontend Developer                             │
+│                                                         │
+│ Task: Build the calendar page                           │
+│ Detected from: "calendar page" → UI/dashboard work      │
+│                                                         │
+│ I'll be working on: src/app/(dashboard)/calendar/       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**When handing off:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ ✅ HANDOFF: Frontend → QA                               │
+│                                                         │
+│ Completed: Calendar page built                          │
+│ Branch: claude/frontend-calendar                        │
+│ Ready for: Verification and deployment                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+**When escalating:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ ⬆️ ESCALATING: Frontend → Full Stack                    │
+│                                                         │
+│ Reason: Task also needs API endpoint                    │
+│ Continuing as Full Stack role...                        │
+└─────────────────────────────────────────────────────────┘
+```
+
 ### Auto-Role Detection
 
 When you start a session, describe your task and the system will detect the right role:
@@ -207,6 +244,7 @@ When you start a session, describe your task and the system will detect the righ
 - **QA**: test, verify, merge, deploy, ship, broken, bug, check
 - **DevOps**: CI/CD, GitHub Actions, deployment, environment, infrastructure
 - **Full Stack**: spans multiple areas, end-to-end, both UI and API
+- **Docs**: update docs, document, what changed, sync documentation, architecture review
 
 ### Auto-Handover Rules
 
@@ -231,6 +269,7 @@ The system automatically hands off between roles:
 | **Full Stack** | Cross-cutting frontend + backend | Both frontend and backend |
 | **QA** | Testing, verification, merge & deploy | Test suite, quality gates |
 | **DevOps** | CI/CD, deployment, infrastructure | `.github/`, deployment config |
+| **Docs** | Documentation sync, architecture review | `CLAUDE.md`, `RULES.md`, `docs/`, `.claude/` |
 
 ### Explicit Role Selection (Optional)
 
@@ -242,6 +281,7 @@ You can explicitly select a role if you prefer:
 - `/role:fullstack` - Full Stack Developer
 - `/role:qa` - QA & Merge Coordinator
 - `/role:devops` - DevOps Engineer
+- `/role:docs` - Documentation & Sync Specialist
 
 ### Parallel Sessions Workflow
 
