@@ -1,30 +1,25 @@
 name: Auto-create and merge Claude PRs
 
 on:
-  # Trigger on push to claude/* branches to create PR
   push:
     branches:
       - 'claude/**'
-  # Trigger on PR events to merge
-  pull_request:
-    types: [opened, synchronize, reopened]
 
 jobs:
-  # Job 1: Create PR when pushing to claude/* branch
-  create-pr:
+  create-and-merge:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
 
     permissions:
       contents: write
       pull-requests: write
 
     steps:
-      - name: Create Pull Request
+      - name: Create or update PR and merge
         uses: actions/github-script@v7
         with:
           script: |
             const branch = context.ref.replace('refs/heads/', '');
+            let prNumber;
 
             // Check if PR already exists for this branch
             const { data: prs } = await github.rest.pulls.list({
@@ -35,44 +30,37 @@ jobs:
             });
 
             if (prs.length > 0) {
-              console.log(`PR already exists for ${branch}: #${prs[0].number}`);
-              return;
+              prNumber = prs[0].number;
+              console.log(`Found existing PR #${prNumber} for ${branch}`);
+            } else {
+              // Create new PR
+              const { data: pr } = await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Auto-merge: ${branch}`,
+                head: branch,
+                base: 'main',
+                body: 'Automatically created PR from claude branch push.'
+              });
+              prNumber = pr.number;
+              console.log(`Created PR #${prNumber} for ${branch}`);
             }
 
-            // Create new PR
-            const { data: pr } = await github.rest.pulls.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Auto-merge: ${branch}`,
-              head: branch,
-              base: 'main',
-              body: 'Automatically created PR from claude branch push.'
-            });
-
-            console.log(`Created PR #${pr.number} for ${branch}`);
-
-  # Job 2: Auto-merge PRs from claude/* branches
-  auto-merge:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'claude/')
-
-    permissions:
-      contents: write
-      pull-requests: write
-
-    steps:
-      - name: Auto-merge PR
-        uses: actions/github-script@v7
-        with:
-          script: |
             // Small delay to ensure PR is ready
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 3000));
 
-            await github.rest.pulls.merge({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
-              merge_method: 'squash'
-            });
-
-            console.log(`Auto-merged PR #${context.payload.pull_request.number} from ${context.payload.pull_request.head.ref}`);
+            // Merge the PR
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                merge_method: 'squash'
+              });
+              console.log(`Successfully merged PR #${prNumber}`);
+            } catch (error) {
+              console.log(`Merge failed: ${error.message}`);
+              // If merge fails, it might be due to conflicts or checks
+              // Log the error but don't fail the workflow
+              throw error;
+            }
