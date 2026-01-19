@@ -4,6 +4,43 @@ import { createClient } from "@/lib/supabase/server";
 // Using Nano Banana Pro (Gemini 3 Pro Image) with Thinking for image generation
 // See: https://ai.google.dev/gemini-api/docs/image-generation
 
+// Platform-specific image configurations
+// Sources: https://blog.hootsuite.com/social-media-image-sizes-guide/
+//          https://buffer.com/resources/social-media-image-sizes/
+const PLATFORM_IMAGE_CONFIG: Record<string, {
+  aspectRatio: string;
+  width: number;
+  height: number;
+  description: string;
+}> = {
+  instagram: {
+    aspectRatio: "4:5",
+    width: 1080,
+    height: 1350,
+    description: "Instagram vertical feed post (4:5 ratio - optimal for engagement)",
+  },
+  twitter: {
+    aspectRatio: "16:9",
+    width: 1600,
+    height: 900,
+    description: "Twitter/X feed post (16:9 landscape - optimal display in timeline)",
+  },
+  linkedin: {
+    aspectRatio: "1.91:1",
+    width: 1200,
+    height: 627,
+    description: "LinkedIn feed post (1.91:1 landscape - optimal for professional feed)",
+  },
+};
+
+// Default config for unknown platforms
+const DEFAULT_CONFIG = {
+  aspectRatio: "1:1",
+  width: 1080,
+  height: 1080,
+  description: "Square image (1:1 - universal format)",
+};
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -17,7 +54,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch the content to verify it exists
+    // Fetch the content to verify it exists and get platform
     const { data: content, error: contentError } = await supabase
       .from("content")
       .select("id, platform")
@@ -31,6 +68,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get platform-specific image configuration
+    const platform = (content.platform || "").toLowerCase();
+    const imageConfig = PLATFORM_IMAGE_CONFIG[platform] || DEFAULT_CONFIG;
+
     // Check if we have the Google API key for Nano Banana Pro
     const googleApiKey = process.env.GOOGLE_API_KEY;
 
@@ -41,7 +82,27 @@ export async function POST(request: NextRequest) {
 
     if (googleApiKey) {
       try {
-        // Use Nano Banana Pro (Gemini 3 Pro Image Preview) with Thinking for image generation
+        // Build platform-specific prompt
+        const fullPrompt = `${prompt}.
+
+IMAGE FORMAT REQUIREMENTS:
+- This image is for ${platform.toUpperCase()} - ${imageConfig.description}
+- Dimensions: ${imageConfig.width}x${imageConfig.height} pixels
+- Aspect ratio: ${imageConfig.aspectRatio}
+- Optimize composition for this specific format
+
+STYLE REQUIREMENTS:
+- Include a bold, attention-grabbing headline or hook text directly on the image
+- The text should be large, readable, and designed to STOP THE SCROLL
+- Make viewers instantly intrigued and want to learn more
+- Use striking typography that pops against the background
+- High contrast, vibrant colors that demand attention
+- Professional social media aesthetic but with punch
+- The headline should create curiosity and urgency
+- Think viral content - what makes someone stop scrolling?
+- Leave safe zones for platform UI elements (profile pics, buttons, etc.)`;
+
+        // Use Nano Banana Pro (Gemini 3 Pro Image Preview) with Thinking
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${googleApiKey}`,
           {
@@ -54,23 +115,14 @@ export async function POST(request: NextRequest) {
                 {
                   parts: [
                     {
-                      text: `${prompt}.
-
-IMPORTANT STYLE REQUIREMENTS:
-- Include a bold, attention-grabbing headline or hook text directly on the image
-- The text should be large, readable, and designed to STOP THE SCROLL
-- Make viewers instantly intrigued and want to learn more
-- Use striking typography that pops against the background
-- High contrast, vibrant colors that demand attention
-- Professional social media aesthetic but with punch
-- The headline should create curiosity and urgency
-- Think viral content - what makes someone stop scrolling?`,
+                      text: fullPrompt,
                     },
                   ],
                 },
               ],
               generationConfig: {
                 responseModalities: ["TEXT", "IMAGE"],
+                aspectRatio: imageConfig.aspectRatio,
               },
             }),
           }
@@ -87,7 +139,7 @@ IMPORTANT STYLE REQUIREMENTS:
               const mimeType = part.inlineData.mimeType || "image/png";
               imageUrl = `data:${mimeType};base64,${imageBase64}`;
               generationStatus = "generated";
-              generationMessage = "Image generated successfully with Nano Banana Pro (Gemini Image Generation)";
+              generationMessage = `Image generated for ${platform.toUpperCase()} (${imageConfig.width}x${imageConfig.height})`;
               break;
             }
           }
@@ -108,7 +160,7 @@ IMPORTANT STYLE REQUIREMENTS:
       generationMessage = "No image generation API configured. Add GOOGLE_API_KEY for Nano Banana Pro image generation.";
     }
 
-    // Save image record to database
+    // Save image record to database with platform-specific dimensions
     const { data: savedImage, error: saveError } = await supabase
       .from("images")
       .insert({
@@ -117,7 +169,11 @@ IMPORTANT STYLE REQUIREMENTS:
         url: imageUrl || `placeholder:${content.platform}`,
         is_primary: true,
         format: "png",
-        dimensions: { width: 1024, height: 1024 },
+        dimensions: {
+          width: imageConfig.width,
+          height: imageConfig.height,
+          aspectRatio: imageConfig.aspectRatio,
+        },
       })
       .select()
       .single();
@@ -136,6 +192,12 @@ IMPORTANT STYLE REQUIREMENTS:
       generated: !!imageUrl,
       status: generationStatus,
       message: generationMessage,
+      platform: platform,
+      dimensions: {
+        width: imageConfig.width,
+        height: imageConfig.height,
+        aspectRatio: imageConfig.aspectRatio,
+      },
     });
   } catch (error) {
     console.error("Error in POST /api/images/generate:", error);
