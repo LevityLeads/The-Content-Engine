@@ -110,22 +110,39 @@ export async function DELETE(request: NextRequest) {
       // Continue with content deletion even if images fail
     }
 
-    // Delete the content
-    const { error } = await supabase
+    // Delete the content and return the deleted row to verify it actually happened
+    const { data: deleted, error } = await supabase
       .from("content")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .select()
+      .single();
 
     if (error) {
       console.error("Error deleting content:", error);
+      // Check if it's a "no rows returned" error (PGRST116) which means RLS blocked it or row doesn't exist
+      if (error.code === "PGRST116") {
+        return NextResponse.json(
+          { error: "Content not found or you don't have permission to delete it" },
+          { status: 404 }
+        );
+      }
       return NextResponse.json(
         { error: "Failed to delete content" },
         { status: 500 }
       );
     }
 
+    if (!deleted) {
+      return NextResponse.json(
+        { error: "Content not found or already deleted" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
+      deleted: { id: deleted.id },
     });
   } catch (error) {
     console.error("Error in DELETE /api/content:", error);
