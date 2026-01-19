@@ -329,7 +329,7 @@ export default function ContentPage() {
             const generatedImage = contentImages.find(
               (img) => img.url && !img.url.startsWith("placeholder:")
             );
-            const hasCarousel = item.copy_carousel_slides && item.copy_carousel_slides.length > 0;
+            const hasCarousel = !!(item.copy_carousel_slides && item.copy_carousel_slides.length > 0);
             const carouselSlides = hasCarousel && isNewCarouselFormat(item.copy_carousel_slides)
               ? item.copy_carousel_slides
               : null;
