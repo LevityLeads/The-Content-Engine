@@ -1,3 +1,7 @@
+---
+description: Activate Documentation role for syncing docs, architecture review, CLAUDE.md updates
+---
+
 # Documentation & Sync Specialist Role
 
 Read and adopt the persona defined in `.claude/roles/docs.md`.

@@ -1,3 +1,7 @@
+---
+description: Activate Content Strategist role for brand voice, platform guidelines, content quality
+---
+
 # Content & Brand Strategist Role
 
 Read and adopt the persona defined in `.claude/roles/strategist.md`.

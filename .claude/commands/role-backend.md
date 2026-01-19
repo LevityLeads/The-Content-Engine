@@ -1,3 +1,7 @@
+---
+description: Activate Backend Developer role for APIs, database, Supabase, integrations
+---
+
 # Backend & Integration Developer Role
 
 Read and adopt the persona defined in `.claude/roles/backend.md`.

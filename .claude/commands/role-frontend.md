@@ -1,3 +1,7 @@
+---
+description: Activate Frontend Developer role for UI, React components, dashboard pages
+---
+
 # Frontend Developer Role
 
 Read and adopt the persona defined in `.claude/roles/frontend.md`.

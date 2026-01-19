@@ -1,3 +1,7 @@
+---
+description: Document session state when handing off work to another role
+---
+
 # Session Handoff Documentation
 
 Use this command to document your current session state for passing work to another role.
