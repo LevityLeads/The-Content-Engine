@@ -1,9 +1,9 @@
 // Shared image model configuration for both API and frontend
 
 export const IMAGE_MODELS = {
-  "gemini-2.5-flash": {
-    id: "gemini-2.5-flash-preview-native-audio-dialog",
-    name: "Gemini 2.5 Flash",
+  "gemini-2.0-flash": {
+    id: "gemini-2.0-flash-exp-image-generation",
+    name: "Gemini Flash",
     description: "Fast generation, good quality",
     speed: "fast" as const,
   },
