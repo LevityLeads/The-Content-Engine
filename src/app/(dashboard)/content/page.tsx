@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageCarousel, type CarouselImage } from "@/components/ui/image-carousel";
+import { PlatformPostMockup } from "@/components/ui/platform-mockups";
+import { cn } from "@/lib/utils";
 
 interface ContentImage {
   id: string;
@@ -56,10 +58,16 @@ const platformColors: Record<string, string> = {
   instagram: "bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500",
 };
 
+const statusColors: Record<string, string> = {
+  draft: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  approved: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  scheduled: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  published: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+};
+
 export default function ContentPage() {
   const [content, setContent] = useState<Content[]>([]);
   const [images, setImages] = useState<Record<string, ContentImage[]>>({});
-  // Store ALL images per slide (not just the latest), keyed by contentId -> slideNumber -> array of images
   const [slideImages, setSlideImages] = useState<Record<string, Record<number, CarouselImage[]>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("draft");
@@ -71,6 +79,8 @@ export default function ContentPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [approvedSlides, setApprovedSlides] = useState<Record<string, number[]>>({});
   const [selectedModel, setSelectedModel] = useState<ImageModelKey>(DEFAULT_MODEL);
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [currentSlideIndex, setCurrentSlideIndex] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchContent();
@@ -101,18 +111,14 @@ export default function ContentPage() {
       const res = await fetch(`/api/images/generate?contentId=${contentId}`);
       const data = await res.json();
       if (data.success && data.images) {
-        // Store all images for this content (newest first from API)
         setImages((prev) => ({
           ...prev,
           [contentId]: data.images,
         }));
 
-        // Map images to slides by matching prompts - try multiple patterns
         const imgMap: Record<number, CarouselImage[]> = {};
-        // Also keep track of unmatched images
         const unmatchedImages: CarouselImage[] = [];
 
-        // Images come sorted by created_at DESC (newest first)
         data.images.forEach((img: ContentImage & { created_at?: string }) => {
           if (img.url && !img.url.startsWith("placeholder:")) {
             const carouselImg: CarouselImage = {
@@ -122,11 +128,6 @@ export default function ContentPage() {
               createdAt: img.created_at,
             };
 
-            // Try multiple patterns to match slide number
-            // Pattern 1: [Slide X] at beginning
-            // Pattern 2: Slide X: anywhere
-            // Pattern 3: slide X anywhere (case insensitive)
-            // Pattern 4: - Slide X: format
             const patterns = [
               /^\[slide\s*(\d+)\]/i,
               /slide\s*(\d+)\s*:/i,
@@ -148,15 +149,12 @@ export default function ContentPage() {
               }
             }
 
-            // If no slide pattern found, add to unmatched
             if (!matched) {
               unmatchedImages.push(carouselImg);
             }
           }
         });
 
-        // If we have slides but some images didn't match, put unmatched in slide 0
-        // This allows old images to still be viewed
         if (unmatchedImages.length > 0) {
           imgMap[0] = unmatchedImages;
         }
@@ -191,7 +189,6 @@ export default function ContentPage() {
       if (data.success) {
         setImageMessage(data.message);
         if (slideNumber && data.image?.url && !data.image.url.startsWith("placeholder:")) {
-          // For slide images, prepend to the array (newest first) instead of replacing
           const newImage: CarouselImage = {
             id: data.image.id,
             url: data.image.url,
@@ -206,7 +203,6 @@ export default function ContentPage() {
             },
           }));
         } else if (!slideNumber) {
-          // For non-slide (primary) images, refetch to get updated list
           fetchImagesForContent(contentId);
         }
       } else {
@@ -298,6 +294,18 @@ export default function ContentPage() {
     document.body.removeChild(link);
   };
 
+  const toggleCard = (id: string) => {
+    setExpandedCards((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
   const getContentImages = (contentId: string): ContentImage[] => {
     return images[contentId] || [];
   };
@@ -309,15 +317,12 @@ export default function ContentPage() {
 
   const getSlideImages = (contentId: string, slideNumber: number): CarouselImage[] => {
     const slideImgs = slideImages[contentId]?.[slideNumber] || [];
-    // If no images for this specific slide, also check unmatched images (slide 0)
-    // This handles old images that don't have slide numbers in their prompts
     if (slideImgs.length === 0 && slideNumber > 0) {
       return slideImages[contentId]?.[0] || [];
     }
     return slideImgs;
   };
 
-  // Get ALL images for a content item (for non-carousel posts)
   const getAllContentImages = (contentId: string): CarouselImage[] => {
     const contentImgs = images[contentId] || [];
     return contentImgs
@@ -333,30 +338,24 @@ export default function ContentPage() {
     return (generatingSlides[contentId] || []).includes(slideNumber);
   };
 
-  // Helper to normalize a slide - handles objects, JSON strings, or plain strings
   const normalizeSlide = (slide: CarouselSlide | string | unknown): CarouselSlide | null => {
     if (!slide) return null;
 
-    // First, ensure we have an object to work with
     let obj: Record<string, unknown> | null = null;
 
     if (typeof slide === "object") {
-      // Already an object - use directly
       obj = slide as Record<string, unknown>;
     } else if (typeof slide === "string") {
-      // Try to parse JSON string
       try {
         const parsed = JSON.parse(slide);
         if (parsed && typeof parsed === "object") {
           obj = parsed;
         }
       } catch {
-        // Not valid JSON - could be legacy plain text
         return null;
       }
     }
 
-    // Check if object has required carousel slide properties
     if (obj && "text" in obj && "imagePrompt" in obj) {
       return {
         slideNumber: typeof obj.slideNumber === "number" ? obj.slideNumber : 1,
@@ -368,37 +367,64 @@ export default function ContentPage() {
     return null;
   };
 
-  // Helper to parse carousel slides (handles JSON strings from database)
   const parseCarouselSlides = (slides: CarouselSlide[] | string[] | null): { parsed: CarouselSlide[] | null; legacy: string[] | null } => {
     if (!slides || slides.length === 0) return { parsed: null, legacy: null };
 
-    // Try to normalize all slides
     const validSlides: CarouselSlide[] = [];
     const legacySlides: string[] = [];
 
     slides.forEach((slide, index) => {
       const normalized = normalizeSlide(slide);
       if (normalized) {
-        // Ensure slideNumber is set correctly
         normalized.slideNumber = normalized.slideNumber || index + 1;
         validSlides.push(normalized);
       } else if (typeof slide === "string" && !slide.trim().startsWith("{")) {
-        // Only treat as legacy if it's not JSON-like
         legacySlides.push(slide);
       }
     });
 
-    // If we got valid parsed slides, use them
     if (validSlides.length > 0) {
       return { parsed: validSlides, legacy: null };
     }
 
-    // Otherwise return legacy if we have any
     return { parsed: null, legacy: legacySlides.length > 0 ? legacySlides : null };
+  };
+
+  const getPostType = (item: Content): string => {
+    if (item.copy_carousel_slides && item.copy_carousel_slides.length > 0) {
+      return "Carousel";
+    }
+    if (item.copy_thread_parts && item.copy_thread_parts.length > 0) {
+      return "Thread";
+    }
+    return "Single Post";
+  };
+
+  const getCurrentSlide = (contentId: string, totalSlides: number): number => {
+    return currentSlideIndex[contentId] || 0;
+  };
+
+  const setCurrentSlide = (contentId: string, index: number) => {
+    setCurrentSlideIndex((prev) => ({ ...prev, [contentId]: index }));
   };
 
   const draftCount = content.filter((c) => c.status === "draft").length;
   const approvedCount = content.filter((c) => c.status === "approved").length;
+
+  const renderModelBadge = (model: string) => {
+    const modelKey = model as ImageModelKey;
+    if (!IMAGE_MODELS[modelKey]) return null;
+    return (
+      <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
+        {IMAGE_MODELS[modelKey].speed === "fast" ? (
+          <Zap className="h-3 w-3 mr-1" />
+        ) : (
+          <Brain className="h-3 w-3 mr-1" />
+        )}
+        {IMAGE_MODELS[modelKey].name}
+      </Badge>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -474,522 +500,369 @@ export default function ContentPage() {
         </Card>
       )}
 
-      {/* Content List */}
+      {/* Content List - Collapsible Cards */}
       {!isLoading && content.length > 0 && (
-        <div className="grid gap-4">
+        <div className="space-y-2">
           {content.map((item) => {
-            const contentImages = getContentImages(item.id);
+            const isExpanded = expandedCards.has(item.id);
             const hasCarousel = !!(item.copy_carousel_slides && item.copy_carousel_slides.length > 0);
-            const { parsed: carouselSlides, legacy: legacySlides } = parseCarouselSlides(item.copy_carousel_slides);
-            const totalSlides = carouselSlides?.length || legacySlides?.length || 0;
+            const { parsed: carouselSlides } = parseCarouselSlides(item.copy_carousel_slides);
+            const totalSlides = carouselSlides?.length || 0;
             const allSlidesApproved = totalSlides > 0 ? areAllSlidesApproved(item.id, totalSlides) : true;
+            const postType = getPostType(item);
+            const allImages = getAllContentImages(item.id);
+            const currentSlide = getCurrentSlide(item.id, totalSlides);
 
             return (
               <Card key={item.id} className="overflow-hidden">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-2 rounded-lg ${platformColors[item.platform] || "bg-gray-500"}`}>
-                        {platformIcons[item.platform] || <FileText className="h-4 w-4 text-white" />}
-                      </div>
-                      <div>
-                        <CardTitle className="text-base capitalize">{item.platform}</CardTitle>
-                        {item.ideas && (
-                          <CardDescription className="text-xs">
-                            From: {item.ideas.concept?.slice(0, 50)}...
-                          </CardDescription>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {hasCarousel && (
-                        <Badge variant="outline" className="text-xs">
-                          <Images className="mr-1 h-3 w-3" />
-                          Carousel ({totalSlides} slides)
-                        </Badge>
-                      )}
-                      <Badge variant={item.status === "draft" ? "secondary" : item.status === "approved" ? "default" : "outline"}>
-                        {item.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Non-carousel Generated Image Display - Now with carousel for all versions */}
-                  {!hasCarousel && (() => {
-                    const allImages = getAllContentImages(item.id);
-                    if (allImages.length === 0) return null;
-                    return (
-                      <ImageCarousel
-                        images={allImages}
-                        aspectRatio="aspect-video max-h-96"
-                        onDownload={(url) => handleDownloadImage(url, item.platform)}
-                        modelBadge={(model) => {
-                          const modelKey = model as ImageModelKey;
-                          if (!IMAGE_MODELS[modelKey]) return null;
-                          return (
-                            <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
-                              {IMAGE_MODELS[modelKey].speed === "fast" ? (
-                                <Zap className="h-3 w-3 mr-1" />
-                              ) : (
-                                <Brain className="h-3 w-3 mr-1" />
-                              )}
-                              {IMAGE_MODELS[modelKey].name}
-                            </Badge>
-                          );
-                        }}
-                      />
-                    );
-                  })()}
-
-                  {/* Post Copy / Caption */}
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Caption</p>
-                    {editingId === item.id ? (
-                      <div className="space-y-2">
-                        <Textarea
-                          value={editedCopy}
-                          onChange={(e) => setEditedCopy(e.target.value)}
-                          className="min-h-[150px] font-mono text-sm"
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleUpdateContent(item.id, { copy_primary: editedCopy })}
-                          >
-                            Save
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditingId(null)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
+                {/* Collapsed Header Row */}
+                <div
+                  className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => toggleCard(item.id)}
+                >
+                  {/* Expand Icon */}
+                  <div className="text-muted-foreground">
+                    {isExpanded ? (
+                      <ChevronDown className="h-5 w-5" />
                     ) : (
-                      <div
-                        className="rounded-lg border bg-muted/30 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => {
-                          setEditingId(item.id);
-                          setEditedCopy(item.copy_primary);
-                        }}
-                      >
-                        <p className="text-sm whitespace-pre-wrap">{item.copy_primary}</p>
-                        {item.copy_hashtags && item.copy_hashtags.length > 0 && (
-                          <p className="text-sm text-primary mt-2">
-                            {item.copy_hashtags.map((h) => `#${h}`).join(" ")}
-                          </p>
-                        )}
-                      </div>
+                      <ChevronRight className="h-5 w-5" />
                     )}
                   </div>
 
-                  {/* NEW FORMAT: Carousel Slides with Individual Image Prompts */}
-                  {carouselSlides && carouselSlides.length > 0 && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-medium text-muted-foreground">
-                          Carousel Slides ({carouselSlides.length})
-                          {item.metadata?.carouselStyle && (
-                            <span className="ml-2 text-primary">Style: {item.metadata.carouselStyle.slice(0, 50)}...</span>
-                          )}
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="default"
-                          onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
-                          disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
-                        >
-                          <Images className="mr-2 h-4 w-4" />
-                          Generate All Images
-                        </Button>
-                      </div>
+                  {/* Platform Icon */}
+                  <div className={`p-2 rounded-lg ${platformColors[item.platform] || "bg-gray-500"}`}>
+                    {platformIcons[item.platform] || <FileText className="h-4 w-4 text-white" />}
+                  </div>
 
-                      <div className="grid gap-4">
-                        {carouselSlides.map((slide) => {
-                          const slideImgs = getSlideImages(item.id, slide.slideNumber);
-                          const isGenerating = isSlideGenerating(item.id, slide.slideNumber);
-                          const isApproved = isSlideApproved(item.id, slide.slideNumber);
-                          const hasImages = slideImgs.length > 0;
+                  {/* Title/Concept */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">
+                      {item.ideas?.concept || item.copy_primary.slice(0, 60) + "..."}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {item.copy_primary.slice(0, 100)}...
+                    </p>
+                  </div>
 
-                          return (
-                            <div
-                              key={slide.slideNumber}
-                              className={`rounded-lg border p-4 ${isApproved ? "border-emerald-500 bg-emerald-500/5" : "bg-muted/20"}`}
-                            >
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    Slide {slide.slideNumber}
-                                  </Badge>
-                                  {hasImages && slideImgs.length > 1 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {slideImgs.length} versions
-                                    </Badge>
-                                  )}
-                                  {isApproved && (
-                                    <Badge className="bg-emerald-500 text-xs">
-                                      <Check className="mr-1 h-3 w-3" />
-                                      Approved
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex gap-2">
-                                  {!isApproved ? (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="text-emerald-500 border-emerald-500 hover:bg-emerald-500/10"
-                                      onClick={() => handleApproveSlide(item.id, slide.slideNumber)}
-                                    >
-                                      <CheckCircle2 className="h-4 w-4" />
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="text-red-500 border-red-500 hover:bg-red-500/10"
-                                      onClick={() => handleRejectSlide(item.id, slide.slideNumber)}
-                                    >
-                                      <XCircle className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
+                  {/* Post Type Badge */}
+                  <Badge variant="outline" className="text-xs shrink-0">
+                    {hasCarousel && <Images className="mr-1 h-3 w-3" />}
+                    {postType}
+                    {hasCarousel && ` (${totalSlides})`}
+                  </Badge>
 
-                              <div className="grid md:grid-cols-2 gap-4">
-                                {/* Slide Image Carousel */}
-                                <div className="space-y-2">
-                                  <ImageCarousel
-                                    images={slideImgs}
-                                    aspectRatio="aspect-[4/5]"
-                                    onDownload={(url) => handleDownloadImage(url, item.platform, slide.slideNumber)}
-                                    modelBadge={(model) => {
-                                      const modelKey = model as ImageModelKey;
-                                      if (!IMAGE_MODELS[modelKey]) return null;
-                                      return (
-                                        <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
-                                          {IMAGE_MODELS[modelKey].speed === "fast" ? (
-                                            <Zap className="h-3 w-3 mr-1" />
-                                          ) : (
-                                            <Brain className="h-3 w-3 mr-1" />
-                                          )}
-                                          {IMAGE_MODELS[modelKey].name}
-                                        </Badge>
-                                      );
-                                    }}
-                                    emptyState={
-                                      <div className="rounded-lg border border-dashed aspect-[4/5] flex items-center justify-center bg-muted/10">
-                                        <div className="text-center p-4">
-                                          <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                                          <p className="text-xs text-muted-foreground">No image yet</p>
-                                        </div>
-                                      </div>
-                                    }
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant={hasImages ? "outline" : "default"}
-                                    className="w-full"
-                                    onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
-                                    disabled={isGenerating}
-                                    title={slide.imagePrompt}
-                                  >
-                                    {isGenerating ? (
-                                      <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Generating...
-                                      </>
-                                    ) : hasImages ? (
-                                      <>
-                                        <ImageIcon className="mr-2 h-4 w-4" />
-                                        Generate Another
-                                      </>
-                                    ) : (
-                                      <>
-                                        <ImageIcon className="mr-2 h-4 w-4" />
-                                        Generate Image
-                                      </>
-                                    )}
-                                  </Button>
-                                </div>
-
-                                {/* Slide Content */}
-                                <div className="space-y-3">
-                                  <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Slide Text</p>
-                                    <p className="text-sm">{slide.text}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Image Prompt</p>
-                                    <p className="text-xs text-muted-foreground">{slide.imagePrompt}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                  {/* Theme Badge */}
+                  {item.ideas?.angle && (
+                    <Badge variant="secondary" className="text-xs capitalize shrink-0">
+                      {item.ideas.angle}
+                    </Badge>
                   )}
 
-                  {/* LEGACY FORMAT: Old carousel slides (just text) - with image generation */}
-                  {legacySlides && legacySlides.length > 0 && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-medium text-muted-foreground">
-                          Carousel ({legacySlides.length} slides)
-                        </p>
-                        {item.metadata?.imagePrompt && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => {
-                              // Generate all legacy slide images
-                              legacySlides.forEach((slideText, i) => {
-                                const slidePrompt = `${item.metadata?.imagePrompt || ''} - Slide ${i + 1}: ${slideText.slice(0, 100)}`;
-                                handleGenerateImage(item.id, slidePrompt, i + 1);
-                              });
-                            }}
-                            disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
-                          >
-                            <Images className="mr-2 h-4 w-4" />
-                            Generate All Images
-                          </Button>
-                        )}
-                      </div>
-                      <div className="grid gap-4">
-                        {legacySlides.map((slideText, i) => {
-                          const slideNum = i + 1;
-                          const slideImgs = getSlideImages(item.id, slideNum);
-                          const isGenerating = isSlideGenerating(item.id, slideNum);
-                          const isApproved = isSlideApproved(item.id, slideNum);
-                          const hasImages = slideImgs.length > 0;
-                          const slideImagePrompt = item.metadata?.imagePrompt
-                            ? `${item.metadata.imagePrompt} - Slide ${slideNum}: ${slideText.slice(0, 100)}`
-                            : `Create an image for: ${slideText}`;
+                  {/* Status Badge */}
+                  <Badge className={cn("text-xs capitalize shrink-0", statusColors[item.status] || "")}>
+                    {item.status}
+                  </Badge>
 
-                          return (
-                            <div
-                              key={i}
-                              className={`rounded-lg border p-4 ${isApproved ? "border-emerald-500 bg-emerald-500/5" : "bg-muted/20"}`}
-                            >
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    Slide {slideNum}
-                                  </Badge>
-                                  {hasImages && slideImgs.length > 1 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      {slideImgs.length} versions
-                                    </Badge>
-                                  )}
-                                  {isApproved && (
-                                    <Badge className="bg-emerald-500 text-xs">
-                                      <Check className="mr-1 h-3 w-3" />
-                                      Approved
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex gap-2">
-                                  {!isApproved ? (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="text-emerald-500 border-emerald-500 hover:bg-emerald-500/10"
-                                      onClick={() => handleApproveSlide(item.id, slideNum)}
-                                    >
-                                      <CheckCircle2 className="h-4 w-4" />
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="text-red-500 border-red-500 hover:bg-red-500/10"
-                                      onClick={() => handleRejectSlide(item.id, slideNum)}
-                                    >
-                                      <XCircle className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="grid md:grid-cols-2 gap-4">
-                                {/* Slide Image Carousel */}
-                                <div className="space-y-2">
-                                  <ImageCarousel
-                                    images={slideImgs}
-                                    aspectRatio="aspect-[4/5]"
-                                    onDownload={(url) => handleDownloadImage(url, item.platform, slideNum)}
-                                    modelBadge={(model) => {
-                                      const modelKey = model as ImageModelKey;
-                                      if (!IMAGE_MODELS[modelKey]) return null;
-                                      return (
-                                        <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
-                                          {IMAGE_MODELS[modelKey].speed === "fast" ? (
-                                            <Zap className="h-3 w-3 mr-1" />
-                                          ) : (
-                                            <Brain className="h-3 w-3 mr-1" />
-                                          )}
-                                          {IMAGE_MODELS[modelKey].name}
-                                        </Badge>
-                                      );
-                                    }}
-                                    emptyState={
-                                      <div className="rounded-lg border border-dashed aspect-[4/5] flex items-center justify-center bg-muted/10">
-                                        <div className="text-center p-4">
-                                          <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                                          <p className="text-xs text-muted-foreground">No image yet</p>
-                                        </div>
-                                      </div>
-                                    }
-                                  />
-                                  <Button
-                                    size="sm"
-                                    variant={hasImages ? "outline" : "default"}
-                                    className="w-full"
-                                    onClick={() => handleGenerateImage(item.id, slideImagePrompt, slideNum)}
-                                    disabled={isGenerating}
-                                    title={slideImagePrompt}
-                                  >
-                                    {isGenerating ? (
-                                      <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Generating...
-                                      </>
-                                    ) : hasImages ? (
-                                      <>
-                                        <ImageIcon className="mr-2 h-4 w-4" />
-                                        Generate Another
-                                      </>
-                                    ) : (
-                                      <>
-                                        <ImageIcon className="mr-2 h-4 w-4" />
-                                        Generate Image
-                                      </>
-                                    )}
-                                  </Button>
-                                </div>
-
-                                {/* Slide Content */}
-                                <div className="space-y-3">
-                                  <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Slide Text</p>
-                                    <p className="text-sm">{slideText}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Image Prompt</p>
-                                    <p className="text-xs text-muted-foreground italic">{slideImagePrompt}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Thread Parts for Twitter */}
-                  {item.copy_thread_parts && item.copy_thread_parts.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">Thread ({item.copy_thread_parts.length} tweets)</p>
-                      <div className="space-y-2">
-                        {item.copy_thread_parts.map((tweet, i) => (
-                          <div key={i} className="rounded-lg border bg-muted/20 p-3">
-                            <p className="text-xs text-muted-foreground mb-1">Tweet {i + 1}</p>
-                            <p className="text-sm">{tweet}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Non-carousel Image Generation */}
-                  {!hasCarousel && item.metadata?.imagePrompt && (
-                    <div className="rounded-lg border border-dashed p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Image Prompt</p>
-                          <p className="text-sm text-muted-foreground">{item.metadata.imagePrompt}</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant={hasGeneratedImage(item.id) ? "outline" : "default"}
-                          onClick={() => handleGenerateImage(item.id, item.metadata.imagePrompt!)}
-                          disabled={generatingImage === item.id}
-                        >
-                          {generatingImage === item.id ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Generating...
-                            </>
-                          ) : hasGeneratedImage(item.id) ? (
-                            <>
-                              <ImageIcon className="mr-2 h-4 w-4" />
-                              Generate Another
-                            </>
-                          ) : (
-                            <>
-                              <ImageIcon className="mr-2 h-4 w-4" />
-                              Generate Image
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex gap-2 pt-2">
+                  {/* Quick Actions */}
+                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
                       onClick={() => handleCopyToClipboard(
                         `${item.copy_primary}\n\n${item.copy_hashtags?.map(h => `#${h}`).join(" ") || ""}`,
                         item.id
                       )}
                     >
                       {copiedId === item.id ? (
-                        <>
-                          <Check className="mr-2 h-4 w-4" />
-                          Copied!
-                        </>
+                        <Check className="h-4 w-4 text-emerald-500" />
                       ) : (
-                        <>
-                          <Copy className="mr-2 h-4 w-4" />
-                          Copy
-                        </>
+                        <Copy className="h-4 w-4" />
                       )}
                     </Button>
-                    {item.status === "draft" && (
-                      <Button
-                        size="sm"
-                        className="flex-1 bg-emerald-500 hover:bg-emerald-600"
-                        onClick={() => handleApprove(item.id)}
-                        disabled={hasCarousel && !allSlidesApproved}
-                        title={hasCarousel && !allSlidesApproved ? "Approve all slides first" : "Approve post"}
-                      >
-                        <Check className="mr-2 h-4 w-4" />
-                        {hasCarousel && !allSlidesApproved
-                          ? `Approve All Slides First (${approvedSlides[item.id]?.length || 0}/${totalSlides})`
-                          : "Approve Post"
-                        }
-                      </Button>
-                    )}
-                    <Button variant="outline" size="sm" className="flex-1">
-                      <Clock className="mr-2 h-4 w-4" />
-                      Schedule
-                    </Button>
-                    <Button size="sm" className="flex-1">
-                      <Send className="mr-2 h-4 w-4" />
-                      Publish
-                    </Button>
                   </div>
-                </CardContent>
+                </div>
+
+                {/* Expanded Content */}
+                {isExpanded && (
+                  <CardContent className="border-t pt-4">
+                    <div className="grid lg:grid-cols-2 gap-6">
+                      {/* Left Column: Text Content */}
+                      <div className="space-y-4">
+                        {/* Caption Editor */}
+                        <div>
+                          <p className="text-sm font-medium mb-2">Caption</p>
+                          {editingId === item.id ? (
+                            <div className="space-y-2">
+                              <Textarea
+                                value={editedCopy}
+                                onChange={(e) => setEditedCopy(e.target.value)}
+                                className="min-h-[150px] font-mono text-sm"
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleUpdateContent(item.id, { copy_primary: editedCopy })}
+                                >
+                                  Save
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setEditingId(null)}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              className="rounded-lg border bg-muted/30 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                              onClick={() => {
+                                setEditingId(item.id);
+                                setEditedCopy(item.copy_primary);
+                              }}
+                            >
+                              <p className="text-sm whitespace-pre-wrap">{item.copy_primary}</p>
+                              {item.copy_hashtags && item.copy_hashtags.length > 0 && (
+                                <p className="text-sm text-primary mt-2">
+                                  {item.copy_hashtags.map((h) => `#${h}`).join(" ")}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Carousel Slides Text (if carousel) */}
+                        {carouselSlides && carouselSlides.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Slide {currentSlide + 1} Text</p>
+                            <div className="rounded-lg border bg-muted/30 p-4">
+                              <p className="text-sm">{carouselSlides[currentSlide]?.text}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              <span className="font-medium">Image Prompt:</span> {carouselSlides[currentSlide]?.imagePrompt}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex gap-2 pt-2">
+                          {item.status === "draft" && (
+                            <Button
+                              size="sm"
+                              className="flex-1 bg-emerald-500 hover:bg-emerald-600"
+                              onClick={() => handleApprove(item.id)}
+                              disabled={hasCarousel && !allSlidesApproved}
+                            >
+                              <Check className="mr-2 h-4 w-4" />
+                              Approve
+                            </Button>
+                          )}
+                          <Button variant="outline" size="sm" className="flex-1">
+                            <Clock className="mr-2 h-4 w-4" />
+                            Schedule
+                          </Button>
+                          <Button size="sm" className="flex-1">
+                            <Send className="mr-2 h-4 w-4" />
+                            Publish
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Right Column: Image in Platform Mockup */}
+                      <div className="space-y-4">
+                        {/* Carousel Post */}
+                        {carouselSlides && carouselSlides.length > 0 ? (
+                          <div className="space-y-4">
+                            <PlatformPostMockup platform={item.platform}>
+                              <div className="relative">
+                                {/* Main Carousel Image */}
+                                <div className="relative aspect-[4/5] bg-black/10">
+                                  {(() => {
+                                    const slideImgs = getSlideImages(item.id, carouselSlides[currentSlide]?.slideNumber || 1);
+                                    if (slideImgs.length > 0) {
+                                      return (
+                                        <ImageCarousel
+                                          images={slideImgs}
+                                          aspectRatio="aspect-[4/5]"
+                                          showThumbnails={false}
+                                          onDownload={(url) => handleDownloadImage(url, item.platform, currentSlide + 1)}
+                                          modelBadge={renderModelBadge}
+                                        />
+                                      );
+                                    }
+                                    return (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <div className="text-center">
+                                          <ImageIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                                          <p className="text-xs text-muted-foreground">No image for Slide {currentSlide + 1}</p>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+
+                                {/* Carousel Navigation (Big Arrows) */}
+                                {totalSlides > 1 && (
+                                  <>
+                                    <Button
+                                      size="icon"
+                                      variant="secondary"
+                                      className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-black/70 hover:bg-black/90 text-white border-0 z-10"
+                                      onClick={() => setCurrentSlide(item.id, currentSlide > 0 ? currentSlide - 1 : totalSlides - 1)}
+                                    >
+                                      <ChevronLeft className="h-6 w-6" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="secondary"
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 bg-black/70 hover:bg-black/90 text-white border-0 z-10"
+                                      onClick={() => setCurrentSlide(item.id, currentSlide < totalSlides - 1 ? currentSlide + 1 : 0)}
+                                    >
+                                      <ChevronRight className="h-6 w-6" />
+                                    </Button>
+                                  </>
+                                )}
+
+                                {/* Slide Counter */}
+                                {totalSlides > 1 && (
+                                  <Badge className="absolute top-2 right-2 bg-black/70 text-white border-0 z-10">
+                                    Slide {currentSlide + 1} / {totalSlides}
+                                  </Badge>
+                                )}
+                              </div>
+                            </PlatformPostMockup>
+
+                            {/* Slide Thumbnails */}
+                            <div className="flex gap-2 overflow-x-auto pb-2">
+                              {carouselSlides.map((slide, idx) => {
+                                const slideImgs = getSlideImages(item.id, slide.slideNumber);
+                                const hasImage = slideImgs.length > 0;
+                                return (
+                                  <button
+                                    key={slide.slideNumber}
+                                    onClick={() => setCurrentSlide(item.id, idx)}
+                                    className={cn(
+                                      "flex-shrink-0 w-16 h-20 rounded-lg overflow-hidden border-2 transition-all",
+                                      idx === currentSlide
+                                        ? "border-primary ring-2 ring-primary/30"
+                                        : "border-transparent opacity-60 hover:opacity-100"
+                                    )}
+                                  >
+                                    {hasImage ? (
+                                      <img
+                                        src={slideImgs[0].url}
+                                        alt={`Slide ${slide.slideNumber}`}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                                        <span className="text-xs text-muted-foreground">{slide.slideNumber}</span>
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            {/* Generate Image Button */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => {
+                                const slide = carouselSlides[currentSlide];
+                                if (slide) {
+                                  handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber);
+                                }
+                              }}
+                              disabled={isSlideGenerating(item.id, carouselSlides[currentSlide]?.slideNumber || 1)}
+                            >
+                              {isSlideGenerating(item.id, carouselSlides[currentSlide]?.slideNumber || 1) ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <ImageIcon className="mr-2 h-4 w-4" />
+                                  Generate Image for Slide {currentSlide + 1}
+                                </>
+                              )}
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
+                              disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
+                              className="w-full"
+                            >
+                              <Images className="mr-2 h-4 w-4" />
+                              Generate All Slide Images
+                            </Button>
+                          </div>
+                        ) : (
+                          /* Single Post */
+                          <div className="space-y-4">
+                            <PlatformPostMockup platform={item.platform}>
+                              {allImages.length > 0 ? (
+                                <ImageCarousel
+                                  images={allImages}
+                                  aspectRatio={item.platform === "instagram" ? "aspect-[4/5]" : "aspect-video"}
+                                  onDownload={(url) => handleDownloadImage(url, item.platform)}
+                                  modelBadge={renderModelBadge}
+                                />
+                              ) : (
+                                <div className={cn(
+                                  "flex items-center justify-center bg-muted/10",
+                                  item.platform === "instagram" ? "aspect-[4/5]" : "aspect-video"
+                                )}>
+                                  <div className="text-center p-4">
+                                    <ImageIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                                    <p className="text-sm text-muted-foreground">No image generated</p>
+                                  </div>
+                                </div>
+                              )}
+                            </PlatformPostMockup>
+
+                            {item.metadata?.imagePrompt && (
+                              <div className="space-y-2">
+                                <p className="text-xs text-muted-foreground">
+                                  <span className="font-medium">Image Prompt:</span> {item.metadata.imagePrompt}
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => handleGenerateImage(item.id, item.metadata.imagePrompt!)}
+                                  disabled={generatingImage === item.id}
+                                >
+                                  {generatingImage === item.id ? (
+                                    <>
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      Generating...
+                                    </>
+                                  ) : allImages.length > 0 ? (
+                                    <>
+                                      <ImageIcon className="mr-2 h-4 w-4" />
+                                      Generate Another
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ImageIcon className="mr-2 h-4 w-4" />
+                                      Generate Image
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             );
           })}

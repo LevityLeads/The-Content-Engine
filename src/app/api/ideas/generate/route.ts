@@ -87,13 +87,24 @@ export async function POST(request: NextRequest) {
       ? `Brand Voice: ${JSON.stringify(inputData.brands.voice_config)}`
       : "";
 
+    // Truncate very long content (e.g., from large PDFs) to avoid context limits
+    // Keep first ~15000 chars which is roughly ~4000 tokens
+    const MAX_CONTENT_LENGTH = 15000;
+    let contentForPrompt = inputData.raw_content;
+    let truncationNote = "";
+
+    if (contentForPrompt.length > MAX_CONTENT_LENGTH) {
+      contentForPrompt = contentForPrompt.slice(0, MAX_CONTENT_LENGTH);
+      truncationNote = `\n\n[Note: This content was truncated from ${inputData.raw_content.length} characters. Focus on generating ideas from the available excerpt.]`;
+    }
+
     const userPrompt = `${brandContext}
 
 INPUT TO TRANSFORM:
 Type: ${inputData.type}
-Content: ${inputData.raw_content}
+Content: ${contentForPrompt}${truncationNote}
 
-Generate 4 distinct content ideas for social media posts based on this input.`;
+Generate 4 distinct content ideas for social media posts based on this input. Return ONLY valid JSON with no markdown formatting.`;
 
     // Call Claude Opus 4.5
     const message = await anthropic.messages.create({
@@ -115,17 +126,44 @@ Generate 4 distinct content ideas for social media posts based on this input.`;
 
     let ideas;
     try {
-      // Extract JSON from the response (handle markdown code blocks)
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        ideas = parsed.ideas || [];
-      } else {
+      // Extract JSON from the response with multiple strategies
+      let jsonStr = "";
+
+      // Strategy 1: Look for JSON in markdown code blocks
+      const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1].trim();
+      }
+
+      // Strategy 2: Find the outermost JSON object with "ideas" key
+      if (!jsonStr) {
+        const ideasMatch = responseText.match(/\{\s*"ideas"\s*:\s*\[[\s\S]*?\]\s*\}/);
+        if (ideasMatch) {
+          jsonStr = ideasMatch[0];
+        }
+      }
+
+      // Strategy 3: Fallback to finding any JSON object
+      if (!jsonStr) {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonStr = jsonMatch[0];
+        }
+      }
+
+      if (!jsonStr) {
         throw new Error("No JSON found in response");
+      }
+
+      const parsed = JSON.parse(jsonStr);
+      ideas = parsed.ideas || [];
+
+      if (!Array.isArray(ideas) || ideas.length === 0) {
+        throw new Error("No ideas array found in parsed response");
       }
     } catch (parseError) {
       console.error("Error parsing Claude response:", parseError);
-      console.error("Raw response:", responseText);
+      console.error("Raw response (first 2000 chars):", responseText.slice(0, 2000));
       return NextResponse.json(
         { error: "Failed to parse AI response" },
         { status: 500 }
