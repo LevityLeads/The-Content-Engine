@@ -72,8 +72,8 @@ npm run dev          # Start dev server (localhost:3000)
 npm run build        # Production build
 npm run lint         # Run ESLint
 
-# Deployment
-git push origin main # Triggers Vercel deployment automatically
+# Deployment (always use claude/* branches)
+git push -u origin claude/your-branch  # Auto-merges to main → Vercel deploys
 ```
 
 ## Tech Stack
@@ -148,27 +148,34 @@ INPUT → PARSE → IDEATE → [HUMAN REVIEW] → GENERATE → [HUMAN REVIEW] �
 
 ### Branch Strategy
 - **`main`** = production (auto-deploys to Vercel)
-- **`claude/*`** branches auto-merge to main via GitHub Actions
+- **`claude/*`** branches = ALL development (auto-merge to main)
 
-### For Normal Changes (Safe)
-```bash
-# Work directly or use claude/ branch
-git add .
-git commit -m "Clear description of change"
-git push origin main
-# OR
-git push origin claude/feature-name
-# Auto-merges to main → auto-deploys
+### How It Works (Fully Automatic)
+```
+Push to claude/* → GitHub Actions → PR Created → Auto-Merged → Vercel Deploys
 ```
 
-### For Risky Changes (Database migrations, auth, major refactors)
-1. Create branch: `git checkout -b claude/risky-change-name`
-2. Make changes and test thoroughly
-3. Push and create PR manually if auto-merge is concerning
-4. Or push to claude/ branch and monitor deployment
+**Never push directly to main.** Always use `claude/*` branches - they auto-merge within seconds.
+
+### Standard Workflow (All Changes)
+```bash
+# 1. Work on a claude/ branch
+git checkout -b claude/[description]
+
+# 2. Make changes and verify
+npm run build
+npm run lint
+
+# 3. Commit and push
+git add .
+git commit -m "Description of change"
+git push -u origin claude/[description]
+
+# 4. Done! Auto-merge handles the rest automatically
+# Your changes will be on main and deployed within ~2 minutes
+```
 
 ### Verification Before Push
-Every push to main should pass:
 - [ ] `npm run build` succeeds
 - [ ] `npm run lint` passes (or no new errors)
 - [ ] Changed functionality tested manually
