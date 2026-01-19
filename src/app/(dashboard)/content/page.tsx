@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2 } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,9 +84,14 @@ export default function ContentPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectedVersionIndex, setSelectedVersionIndex] = useState<Record<string, number>>({});
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkApproving, setIsBulkApproving] = useState(false);
 
   useEffect(() => {
     fetchContent();
+    setSelectedItems(new Set()); // Clear selections when filter changes
   }, [filter]);
 
   const fetchContent = async () => {
@@ -311,6 +316,7 @@ export default function ContentPage() {
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true);
+    setErrorMessage(null);
     try {
       const res = await fetch(`/api/content?id=${id}`, {
         method: "DELETE",
@@ -319,12 +325,126 @@ export default function ContentPage() {
       if (data.success) {
         setContent((prev) => prev.filter((c) => c.id !== id));
         setDeleteConfirmId(null);
+        setSelectedItems((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
+      } else {
+        setErrorMessage(data.error || "Failed to delete content");
+        setTimeout(() => setErrorMessage(null), 5000);
       }
     } catch (err) {
       console.error("Error deleting content:", err);
+      setErrorMessage("Network error - please try again");
+      setTimeout(() => setErrorMessage(null), 5000);
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const toggleSelectItem = (id: string) => {
+    setSelectedItems((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === content.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(content.map((c) => c.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedItems.size === 0) return;
+    setIsBulkDeleting(true);
+    setErrorMessage(null);
+
+    const results = await Promise.allSettled(
+      Array.from(selectedItems).map((id) =>
+        fetch(`/api/content?id=${id}`, { method: "DELETE" }).then((r) => r.json())
+      )
+    );
+
+    const successfulDeletes: string[] = [];
+    const failedDeletes: string[] = [];
+
+    results.forEach((result, index) => {
+      const id = Array.from(selectedItems)[index];
+      if (result.status === "fulfilled" && result.value.success) {
+        successfulDeletes.push(id);
+      } else {
+        failedDeletes.push(id);
+      }
+    });
+
+    if (successfulDeletes.length > 0) {
+      setContent((prev) => prev.filter((c) => !successfulDeletes.includes(c.id)));
+      setSelectedItems((prev) => {
+        const newSet = new Set(prev);
+        successfulDeletes.forEach((id) => newSet.delete(id));
+        return newSet;
+      });
+    }
+
+    if (failedDeletes.length > 0) {
+      setErrorMessage(`Failed to delete ${failedDeletes.length} item(s). They may have been deleted already.`);
+      setTimeout(() => setErrorMessage(null), 5000);
+    }
+
+    setIsBulkDeleting(false);
+  };
+
+  const handleBulkApprove = async () => {
+    if (selectedItems.size === 0) return;
+    setIsBulkApproving(true);
+    setErrorMessage(null);
+
+    const results = await Promise.allSettled(
+      Array.from(selectedItems).map((id) =>
+        fetch("/api/content", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, status: "approved" }),
+        }).then((r) => r.json())
+      )
+    );
+
+    const successfulApprovals: string[] = [];
+    const failedApprovals: string[] = [];
+
+    results.forEach((result, index) => {
+      const id = Array.from(selectedItems)[index];
+      if (result.status === "fulfilled" && result.value.success) {
+        successfulApprovals.push(id);
+      } else {
+        failedApprovals.push(id);
+      }
+    });
+
+    if (successfulApprovals.length > 0) {
+      setContent((prev) =>
+        prev.map((c) =>
+          successfulApprovals.includes(c.id) ? { ...c, status: "approved" } : c
+        )
+      );
+      setSelectedItems(new Set());
+    }
+
+    if (failedApprovals.length > 0) {
+      setErrorMessage(`Failed to approve ${failedApprovals.length} item(s)`);
+      setTimeout(() => setErrorMessage(null), 5000);
+    }
+
+    setIsBulkApproving(false);
   };
 
   const getContentImages = (contentId: string): ContentImage[] => {
@@ -511,6 +631,74 @@ export default function ContentPage() {
         ))}
       </div>
 
+      {/* Bulk Actions Bar */}
+      {content.length > 0 && (
+        <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-2"
+              onClick={toggleSelectAll}
+            >
+              {selectedItems.size === content.length ? (
+                <CheckSquare className="h-4 w-4" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+              {selectedItems.size === content.length ? "Deselect All" : "Select All"}
+            </Button>
+            {selectedItems.size > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {selectedItems.size} selected
+              </span>
+            )}
+          </div>
+          {selectedItems.size > 0 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                onClick={handleBulkApprove}
+                disabled={isBulkApproving || isBulkDeleting}
+              >
+                {isBulkApproving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Approve ({selectedItems.size})
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
+                onClick={handleBulkDelete}
+                disabled={isBulkApproving || isBulkDeleting}
+              >
+                {isBulkDeleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Delete ({selectedItems.size})
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-400">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            {errorMessage}
+          </div>
+        </div>
+      )}
+
       {/* Image Generation Message */}
       {imageMessage && (
         <div className="rounded-lg border border-primary/20 bg-primary/10 p-4 text-primary">
@@ -551,6 +739,21 @@ export default function ContentPage() {
                   className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => toggleCard(item.id)}
                 >
+                  {/* Selection Checkbox */}
+                  <button
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelectItem(item.id);
+                    }}
+                  >
+                    {selectedItems.has(item.id) ? (
+                      <CheckSquare className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Square className="h-5 w-5" />
+                    )}
+                  </button>
+
                   {/* Expand Icon */}
                   <div className="text-muted-foreground">
                     {isExpanded ? (
