@@ -260,21 +260,34 @@ export default function ContentPage() {
 
   // Helper to normalize a slide - handles objects, JSON strings, or plain strings
   const normalizeSlide = (slide: CarouselSlide | string | unknown): CarouselSlide | null => {
-    // If it's already a proper CarouselSlide object
-    if (slide && typeof slide === "object" && "imagePrompt" in slide && "text" in slide) {
-      return slide as CarouselSlide;
-    }
+    if (!slide) return null;
 
-    // If it's a string, try to parse as JSON
-    if (typeof slide === "string") {
+    // First, ensure we have an object to work with
+    let obj: Record<string, unknown> | null = null;
+
+    if (typeof slide === "object") {
+      // Already an object - use directly
+      obj = slide as Record<string, unknown>;
+    } else if (typeof slide === "string") {
+      // Try to parse JSON string
       try {
         const parsed = JSON.parse(slide);
-        if (parsed && typeof parsed === "object" && "imagePrompt" in parsed && "text" in parsed) {
-          return parsed as CarouselSlide;
+        if (parsed && typeof parsed === "object") {
+          obj = parsed;
         }
       } catch {
-        // Not valid JSON
+        // Not valid JSON - could be legacy plain text
+        return null;
       }
+    }
+
+    // Check if object has required carousel slide properties
+    if (obj && "text" in obj && "imagePrompt" in obj) {
+      return {
+        slideNumber: typeof obj.slideNumber === "number" ? obj.slideNumber : 1,
+        text: String(obj.text || ""),
+        imagePrompt: String(obj.imagePrompt || ""),
+      };
     }
 
     return null;
@@ -285,19 +298,27 @@ export default function ContentPage() {
     if (!slides || slides.length === 0) return { parsed: null, legacy: null };
 
     // Try to normalize all slides
-    const normalizedSlides = slides.map(normalizeSlide);
-    const validSlides = normalizedSlides.filter((s): s is CarouselSlide => s !== null);
+    const validSlides: CarouselSlide[] = [];
+    const legacySlides: string[] = [];
+
+    slides.forEach((slide, index) => {
+      const normalized = normalizeSlide(slide);
+      if (normalized) {
+        // Ensure slideNumber is set correctly
+        normalized.slideNumber = normalized.slideNumber || index + 1;
+        validSlides.push(normalized);
+      } else if (typeof slide === "string" && !slide.trim().startsWith("{")) {
+        // Only treat as legacy if it's not JSON-like
+        legacySlides.push(slide);
+      }
+    });
 
     // If we got valid parsed slides, use them
     if (validSlides.length > 0) {
       return { parsed: validSlides, legacy: null };
     }
 
-    // Otherwise treat as legacy plain text strings
-    const legacySlides = slides
-      .map(s => typeof s === "string" ? s : String(s))
-      .filter(s => !s.startsWith("{"));
-
+    // Otherwise return legacy if we have any
     return { parsed: null, legacy: legacySlides.length > 0 ? legacySlides : null };
   };
 
