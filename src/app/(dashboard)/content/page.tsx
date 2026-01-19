@@ -645,61 +645,63 @@ export default function ContentPage() {
           })}
         </div>
 
-        {/* Selected Slide Detail - Compact two-column layout */}
-        <div className="grid grid-cols-[280px_1fr] gap-4 items-start">
-          {/* Left: Constrained image */}
-          <div className="relative aspect-[4/5] rounded-lg overflow-hidden bg-black/20">
-            {currentImage ? (
-              <>
-                <img
-                  src={currentImage.url}
-                  alt={`Slide ${slide.slideNumber}`}
-                  className="w-full h-full object-cover"
-                />
-                {currentImage.model && (
-                  <div className="absolute top-2 left-2 z-10">
-                    {renderModelBadge(currentImage.model)}
+        {/* Selected Slide Detail - Centered vertical layout */}
+        <div className="space-y-4">
+          {/* Image centered with max-width */}
+          <div className="flex justify-center">
+            <div className="relative w-full max-w-sm aspect-[4/5] rounded-lg overflow-hidden bg-black/20">
+              {currentImage ? (
+                <>
+                  <img
+                    src={currentImage.url}
+                    alt={`Slide ${slide.slideNumber}`}
+                    className="w-full h-full object-cover"
+                  />
+                  {currentImage.model && (
+                    <div className="absolute top-2 left-2 z-10">
+                      {renderModelBadge(currentImage.model)}
+                    </div>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-8 w-8 p-0 z-10"
+                    onClick={() => handleDownloadImage(currentImage.url, item.platform, slide.slideNumber)}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <ImageIcon className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No image generated</p>
                   </div>
-                )}
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-7 w-7 p-0 z-10"
-                  onClick={() => handleDownloadImage(currentImage.url, item.platform, slide.slideNumber)}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                </Button>
-              </>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="text-center">
-                  <ImageIcon className="h-8 w-8 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">No image</p>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          {/* Right: Content panel */}
+          {/* Content below image - full width */}
           <div className="space-y-3">
-            {/* Header */}
+            {/* Header with navigation */}
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">
                 Slide {currentSlideIdx + 1} of {slides.length}
               </h4>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Button
                   size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0"
+                  variant="outline"
+                  className="h-8 w-8 p-0"
                   onClick={() => setCurrentSlide(item.id, currentSlideIdx > 0 ? currentSlideIdx - 1 : slides.length - 1)}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <Button
                   size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0"
+                  variant="outline"
+                  className="h-8 w-8 p-0"
                   onClick={() => setCurrentSlide(item.id, currentSlideIdx < slides.length - 1 ? currentSlideIdx + 1 : 0)}
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -712,38 +714,31 @@ export default function ContentPage() {
               <p className="text-sm leading-relaxed">{slide.text}</p>
             </div>
 
-            {/* Collapsible Image Prompt */}
-            <div>
+            {/* Bottom row: Prompt, Versions, and Actions inline */}
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              {/* Collapsible Image Prompt */}
               <button
                 onClick={() => togglePrompt(promptKey)}
-                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors text-left min-w-0 flex-1"
               >
-                {isPromptExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                Image Prompt
+                {isPromptExpanded ? <ChevronUp className="h-3 w-3 flex-shrink-0" /> : <ChevronDown className="h-3 w-3 flex-shrink-0" />}
+                <span className="flex-shrink-0">Prompt</span>
                 {!isPromptExpanded && (
-                  <span className="text-muted-foreground/60 truncate flex-1">
-                    — {truncateText(slide.imagePrompt, 60)}
+                  <span className="text-muted-foreground/60 truncate">
+                    — {truncateText(slide.imagePrompt, 50)}
                   </span>
                 )}
               </button>
-              {isPromptExpanded && (
-                <p className="text-xs text-muted-foreground mt-2 leading-relaxed pl-5">
-                  {slide.imagePrompt}
-                </p>
-              )}
-            </div>
 
-            {/* Version thumbnails (inline) */}
-            {slideImgs.length > 1 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Versions:</span>
-                <div className="flex gap-1">
+              {/* Version thumbnails (inline) */}
+              {slideImgs.length > 1 && (
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   {slideImgs.map((img, idx) => (
                     <button
                       key={img.id}
                       onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
                       className={cn(
-                        "w-10 h-10 rounded overflow-hidden border-2 transition-all",
+                        "w-8 h-8 rounded overflow-hidden border-2 transition-all",
                         idx === safeVersionIdx
                           ? "border-primary"
                           : "border-transparent opacity-50 hover:opacity-100"
@@ -753,24 +748,32 @@ export default function ContentPage() {
                     </button>
                   ))}
                 </div>
+              )}
+
+              {/* Action button */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-shrink-0"
+                onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
+                ) : currentImage ? (
+                  <><RefreshCw className="mr-2 h-4 w-4" />Regenerate</>
+                ) : (
+                  <><ImageIcon className="mr-2 h-4 w-4" />Generate</>
+                )}
+              </Button>
+            </div>
+
+            {/* Expanded prompt (if open) */}
+            {isPromptExpanded && (
+              <div className="rounded-lg bg-muted/20 p-3 text-xs text-muted-foreground leading-relaxed">
+                {slide.imagePrompt}
               </div>
             )}
-
-            {/* Actions */}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
-              disabled={isGenerating}
-            >
-              {isGenerating ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
-              ) : currentImage ? (
-                <><RefreshCw className="mr-2 h-4 w-4" />Regenerate</>
-              ) : (
-                <><ImageIcon className="mr-2 h-4 w-4" />Generate Image</>
-              )}
-            </Button>
           </div>
         </div>
       </div>
