@@ -618,7 +618,7 @@ export default function ContentPage() {
     );
   };
 
-  // Render card stack view (selected card front, others stacked behind)
+  // Render fanned card deck view (cards fan out and recede into background)
   const renderSlideFilmstripAndDetail = (
     item: Content,
     slides: CarouselSlide[],
@@ -635,9 +635,8 @@ export default function ContentPage() {
     const promptKey = `${item.id}-${slide.slideNumber}`;
     const isPromptExpanded = expandedPrompts.has(promptKey);
 
-    // Get images for stacked cards (next 2 slides)
-    const getStackedSlideImage = (offset: number) => {
-      const idx = (currentSlideIdx + offset) % slides.length;
+    // Get slide image for any index
+    const getSlideImage = (idx: number) => {
       const s = slides[idx];
       if (!s) return null;
       const imgs = getSlideImages(item.id, s.slideNumber);
@@ -645,75 +644,114 @@ export default function ContentPage() {
       return imgs[Math.min(vIdx, imgs.length - 1)] || null;
     };
 
-    const nextImage = slides.length > 1 ? getStackedSlideImage(1) : null;
-    const nextNextImage = slides.length > 2 ? getStackedSlideImage(2) : null;
+    // Calculate position in fan for each card relative to current
+    const getCardTransform = (cardIdx: number) => {
+      const diff = cardIdx - currentSlideIdx;
+      // For cards behind (positive diff), fan to the right and back
+      // For cards ahead (negative diff), fan to the left and back
+      const rotation = diff * 8; // degrees of rotation per card
+      const translateX = diff * 45; // horizontal spread
+      const translateZ = -Math.abs(diff) * 80; // push back into screen
+      const scale = 1 - Math.abs(diff) * 0.08; // shrink as they go back
+      const opacity = Math.max(0.3, 1 - Math.abs(diff) * 0.25);
+      const zIndex = 10 - Math.abs(diff);
+
+      return { rotation, translateX, translateZ, scale, opacity, zIndex };
+    };
+
+    // Get visible cards (current + 2 on each side, wrapping)
+    const visibleCards: { idx: number; offset: number }[] = [];
+    const maxVisible = Math.min(5, slides.length);
+    const halfVisible = Math.floor(maxVisible / 2);
+
+    for (let offset = -halfVisible; offset <= halfVisible; offset++) {
+      let idx = currentSlideIdx + offset;
+      // Wrap around
+      if (idx < 0) idx = slides.length + idx;
+      if (idx >= slides.length) idx = idx - slides.length;
+      // Avoid duplicates for small carousels
+      if (!visibleCards.find(c => c.idx === idx)) {
+        visibleCards.push({ idx, offset });
+      }
+    }
+
+    // Sort by z-index so front card renders last
+    visibleCards.sort((a, b) => Math.abs(b.offset) - Math.abs(a.offset));
 
     return (
       <div className="grid grid-cols-[1fr_1fr] gap-6">
-        {/* Left: Card Stack */}
+        {/* Left: Fanned Card Deck */}
         <div className="space-y-4">
-          {/* Card stack container */}
-          <div className="relative h-[420px] flex items-center justify-center">
-            {/* Third card (back) */}
-            {nextNextImage && (
-              <div
-                className="absolute w-64 aspect-[4/5] rounded-xl overflow-hidden bg-black/30 shadow-lg cursor-pointer transition-all hover:translate-x-1"
-                style={{ transform: 'translateX(24px) translateY(8px) scale(0.92)', zIndex: 1 }}
-                onClick={() => setCurrentSlide(item.id, (currentSlideIdx + 2) % slides.length)}
-              >
-                <img src={nextNextImage.url} alt="Upcoming slide" className="w-full h-full object-cover opacity-60" />
-              </div>
-            )}
+          {/* Card fan container with perspective */}
+          <div
+            className="relative h-[420px] flex items-center justify-center"
+            style={{ perspective: '1000px' }}
+          >
+            {visibleCards.map(({ idx, offset }) => {
+              const cardImage = getSlideImage(idx);
+              const { rotation, translateX, translateZ, scale, opacity, zIndex } = getCardTransform(idx);
+              const isCurrent = idx === currentSlideIdx;
 
-            {/* Second card (middle) */}
-            {nextImage && (
-              <div
-                className="absolute w-64 aspect-[4/5] rounded-xl overflow-hidden bg-black/30 shadow-lg cursor-pointer transition-all hover:translate-x-0.5"
-                style={{ transform: 'translateX(12px) translateY(4px) scale(0.96)', zIndex: 2 }}
-                onClick={() => setCurrentSlide(item.id, (currentSlideIdx + 1) % slides.length)}
-              >
-                <img src={nextImage.url} alt="Next slide" className="w-full h-full object-cover opacity-80" />
-              </div>
-            )}
-
-            {/* Front card (current) */}
-            <div
-              className="relative w-64 aspect-[4/5] rounded-xl overflow-hidden bg-black/20 shadow-2xl ring-2 ring-primary/50"
-              style={{ zIndex: 3 }}
-            >
-              {currentImage ? (
-                <>
-                  <img
-                    src={currentImage.url}
-                    alt={`Slide ${slide.slideNumber}`}
-                    className="w-full h-full object-cover"
-                  />
-                  {currentImage.model && (
-                    <div className="absolute top-2 left-2 z-10">
-                      {renderModelBadge(currentImage.model)}
+              return (
+                <div
+                  key={idx}
+                  className={cn(
+                    "absolute w-56 aspect-[4/5] rounded-xl overflow-hidden shadow-xl cursor-pointer transition-all duration-300",
+                    isCurrent ? "ring-2 ring-primary shadow-2xl" : "hover:opacity-90"
+                  )}
+                  style={{
+                    transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotation}deg) scale(${scale})`,
+                    opacity: isCurrent ? 1 : opacity,
+                    zIndex,
+                    transformStyle: 'preserve-3d',
+                  }}
+                  onClick={() => !isCurrent && setCurrentSlide(item.id, idx)}
+                >
+                  {cardImage ? (
+                    <>
+                      <img
+                        src={cardImage.url}
+                        alt={`Slide ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      {isCurrent && cardImage.model && (
+                        <div className="absolute top-2 left-2 z-10">
+                          {renderModelBadge(cardImage.model)}
+                        </div>
+                      )}
+                      <Badge
+                        className={cn(
+                          "absolute top-2 right-2 border-0 z-10",
+                          isCurrent ? "bg-primary text-primary-foreground" : "bg-black/70 text-white"
+                        )}
+                      >
+                        {idx + 1}
+                      </Badge>
+                      {isCurrent && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-8 w-8 p-0 z-10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadImage(cardImage.url, item.platform, slide.slideNumber);
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <div className="w-full h-full bg-muted/50 flex items-center justify-center">
+                      <div className="text-center">
+                        <ImageIcon className="h-8 w-8 mx-auto mb-1 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">{idx + 1}</span>
+                      </div>
                     </div>
                   )}
-                  <Badge className="absolute top-2 right-2 bg-black/70 text-white border-0 z-10">
-                    {currentSlideIdx + 1} / {slides.length}
-                  </Badge>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-8 w-8 p-0 z-10"
-                    onClick={() => handleDownloadImage(currentImage.url, item.platform, slide.slideNumber)}
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <ImageIcon className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">No image</p>
-                  </div>
                 </div>
-              )}
-            </div>
+              );
+            })}
           </div>
 
           {/* Navigation and version controls under the stack */}
