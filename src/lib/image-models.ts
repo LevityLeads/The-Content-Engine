@@ -2,7 +2,7 @@
 
 export const IMAGE_MODELS = {
   "gemini-flash": {
-    id: "gemini-2.5-flash-image-preview",
+    id: "gemini-2.5-flash-image",
     name: "Gemini Flash",
     description: "Fast generation, good quality",
     speed: "fast" as const,
