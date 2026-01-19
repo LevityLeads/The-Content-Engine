@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-// Using Nano Banana Pro (gemini-3-pro-image-preview) with Thinking for high-quality image generation
-// Note: This model may take longer than Flash but produces better quality
-// See: https://ai.google.dev/gemini-api/docs/image-generation
+import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from "@/lib/image-models";
 
 // Platform-specific image configurations
 // Sources: https://blog.hootsuite.com/social-media-image-sizes-guide/
@@ -46,7 +43,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const body = await request.json();
-    const { contentId, prompt } = body;
+    const { contentId, prompt, model: requestedModel } = body;
 
     if (!contentId || !prompt) {
       return NextResponse.json(
@@ -54,6 +51,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Determine which model to use
+    const modelKey: ImageModelKey = (requestedModel && requestedModel in IMAGE_MODELS)
+      ? requestedModel as ImageModelKey
+      : DEFAULT_MODEL;
+    const modelConfig = IMAGE_MODELS[modelKey];
 
     // Fetch the content to verify it exists and get platform
     const { data: content, error: contentError } = await supabase
@@ -103,9 +106,10 @@ STYLE REQUIREMENTS:
 - Think viral content - what makes someone stop scrolling?
 - Leave safe zones for platform UI elements (profile pics, buttons, etc.)`;
 
-        // Use Nano Banana Pro (Gemini 3 Pro Image) with thinking for higher quality
+        // Use the selected model for image generation
+        console.log(`Using model: ${modelConfig.name} (${modelConfig.id})`);
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${googleApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:generateContent?key=${googleApiKey}`,
           {
             method: "POST",
             headers: {
@@ -135,7 +139,7 @@ STYLE REQUIREMENTS:
           const data = await response.json();
 
           // Log response structure for debugging
-          console.log("Nano Banana response structure:", JSON.stringify({
+          console.log(`${modelConfig.name} response structure:`, JSON.stringify({
             hasCandidates: !!data.candidates,
             candidateCount: data.candidates?.length,
             hasContent: !!data.candidates?.[0]?.content,
@@ -151,8 +155,8 @@ STYLE REQUIREMENTS:
               const mimeType = part.inlineData.mimeType || "image/png";
               imageUrl = `data:${mimeType};base64,${imageBase64}`;
               generationStatus = "generated";
-              generationMessage = `Image generated for ${platform.toUpperCase()} (${imageConfig.width}x${imageConfig.height})`;
-              console.log(`Image generated successfully, base64 length: ${imageBase64.length}`);
+              generationMessage = `Image generated with ${modelConfig.name} for ${platform.toUpperCase()} (${imageConfig.width}x${imageConfig.height})`;
+              console.log(`Image generated successfully with ${modelConfig.name}, base64 length: ${imageBase64.length}`);
               break;
             }
           }
@@ -164,22 +168,22 @@ STYLE REQUIREMENTS:
               hasInlineData: !!p.inlineData,
               textPreview: typeof p.text === 'string' ? p.text.substring(0, 100) : undefined,
             })));
-            generationMessage = "Nano Banana Pro returned no image. The prompt may have been filtered.";
+            generationMessage = `${modelConfig.name} returned no image. The prompt may have been filtered.`;
           }
         } else {
           const errorData = await response.text();
-          console.error("Nano Banana Pro API error:", errorData);
-          generationMessage = `Nano Banana Pro generation failed: ${response.status}. Image prompt saved for retry.`;
+          console.error(`${modelConfig.name} API error:`, errorData);
+          generationMessage = `${modelConfig.name} generation failed: ${response.status}. Image prompt saved for retry.`;
         }
       } catch (err) {
-        console.error("Nano Banana Pro API error:", err);
-        generationMessage = "Nano Banana Pro generation failed. Image prompt saved for manual creation.";
+        console.error(`${modelConfig.name} API error:`, err);
+        generationMessage = `${modelConfig.name} generation failed. Image prompt saved for manual creation.`;
       }
     } else {
       generationMessage = "No image generation API configured. Add GOOGLE_API_KEY for Nano Banana Pro image generation.";
     }
 
-    // Save image record to database with platform-specific dimensions
+    // Save image record to database with platform-specific dimensions and model info
     const { data: savedImage, error: saveError } = await supabase
       .from("images")
       .insert({
@@ -193,6 +197,7 @@ STYLE REQUIREMENTS:
           height: imageConfig.height,
           aspectRatio: imageConfig.aspectRatio,
         },
+        model: modelKey,
       })
       .select()
       .single();
@@ -216,6 +221,11 @@ STYLE REQUIREMENTS:
         width: imageConfig.width,
         height: imageConfig.height,
         aspectRatio: imageConfig.aspectRatio,
+      },
+      model: {
+        key: modelKey,
+        name: modelConfig.name,
+        description: modelConfig.description,
       },
     });
   } catch (error) {

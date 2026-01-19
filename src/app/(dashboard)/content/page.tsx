@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain } from "lucide-react";
+import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ interface ContentImage {
   url: string;
   prompt: string;
   is_primary: boolean;
+  model?: ImageModelKey;
 }
 
 interface CarouselSlide {
@@ -56,7 +58,7 @@ const platformColors: Record<string, string> = {
 export default function ContentPage() {
   const [content, setContent] = useState<Content[]>([]);
   const [images, setImages] = useState<Record<string, ContentImage[]>>({});
-  const [slideImages, setSlideImages] = useState<Record<string, Record<number, string>>>({});
+  const [slideImages, setSlideImages] = useState<Record<string, Record<number, { url: string; model?: ImageModelKey }>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("draft");
   const [generatingImage, setGeneratingImage] = useState<string | null>(null);
@@ -66,6 +68,7 @@ export default function ContentPage() {
   const [editedCopy, setEditedCopy] = useState<string>("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [approvedSlides, setApprovedSlides] = useState<Record<string, number[]>>({});
+  const [selectedModel, setSelectedModel] = useState<ImageModelKey>(DEFAULT_MODEL);
 
   useEffect(() => {
     fetchContent();
@@ -101,13 +104,13 @@ export default function ContentPage() {
           [contentId]: data.images,
         }));
         // Map images to slides by matching prompts
-        const imgMap: Record<number, string> = {};
+        const imgMap: Record<number, { url: string; model?: ImageModelKey }> = {};
         data.images.forEach((img: ContentImage) => {
           if (img.url && !img.url.startsWith("placeholder:")) {
             // Try to match by slide number in prompt
             const slideMatch = img.prompt?.match(/slide\s*(\d+)/i);
             if (slideMatch) {
-              imgMap[parseInt(slideMatch[1])] = img.url;
+              imgMap[parseInt(slideMatch[1])] = { url: img.url, model: img.model };
             }
           }
         });
@@ -137,7 +140,7 @@ export default function ContentPage() {
       const res = await fetch("/api/images/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentId, prompt: slidePrompt }),
+        body: JSON.stringify({ contentId, prompt: slidePrompt, model: selectedModel }),
       });
       const data = await res.json();
       if (data.success) {
@@ -148,7 +151,7 @@ export default function ContentPage() {
             ...prev,
             [contentId]: {
               ...(prev[contentId] || {}),
-              [slideNumber]: data.image.url,
+              [slideNumber]: { url: data.image.url, model: data.image.model || selectedModel },
             },
           }));
         } else if (!slideNumber) {
@@ -253,7 +256,7 @@ export default function ContentPage() {
     return contentImages.some((img) => img.url && !img.url.startsWith("placeholder:"));
   };
 
-  const getSlideImage = (contentId: string, slideNumber: number): string | null => {
+  const getSlideImage = (contentId: string, slideNumber: number): { url: string; model?: ImageModelKey } | null => {
     return slideImages[contentId]?.[slideNumber] || null;
   };
 
@@ -339,6 +342,26 @@ export default function ContentPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Model Selector */}
+          <div className="flex items-center gap-1 rounded-lg border p-1">
+            {MODEL_OPTIONS.map((model) => (
+              <Button
+                key={model.key}
+                variant={selectedModel === model.key ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setSelectedModel(model.key)}
+                className="gap-1"
+                title={model.description}
+              >
+                {model.speed === "fast" ? (
+                  <Zap className="h-3 w-3" />
+                ) : (
+                  <Brain className="h-3 w-3" />
+                )}
+                {model.name}
+              </Button>
+            ))}
+          </div>
           <Button variant="outline" size="sm" onClick={fetchContent}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
@@ -434,6 +457,18 @@ export default function ContentPage() {
                         alt="Generated content image"
                         className="w-full max-h-96 object-contain bg-black/5"
                       />
+                      <div className="absolute top-2 left-2">
+                        {generatedImage.model && IMAGE_MODELS[generatedImage.model] && (
+                          <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
+                            {IMAGE_MODELS[generatedImage.model].speed === "fast" ? (
+                              <Zap className="h-3 w-3 mr-1" />
+                            ) : (
+                              <Brain className="h-3 w-3 mr-1" />
+                            )}
+                            {IMAGE_MODELS[generatedImage.model].name}
+                          </Badge>
+                        )}
+                      </div>
                       <div className="absolute bottom-2 right-2 flex gap-2">
                         <Button
                           size="sm"
@@ -564,16 +599,28 @@ export default function ContentPage() {
                                   {slideImg ? (
                                     <div className="relative rounded-lg overflow-hidden border aspect-[4/5]">
                                       <img
-                                        src={slideImg}
+                                        src={slideImg.url}
                                         alt={`Slide ${slide.slideNumber}`}
                                         className="w-full h-full object-cover"
                                       />
+                                      <div className="absolute top-2 left-2">
+                                        {slideImg.model && IMAGE_MODELS[slideImg.model] && (
+                                          <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
+                                            {IMAGE_MODELS[slideImg.model].speed === "fast" ? (
+                                              <Zap className="h-3 w-3 mr-1" />
+                                            ) : (
+                                              <Brain className="h-3 w-3 mr-1" />
+                                            )}
+                                            {IMAGE_MODELS[slideImg.model].name}
+                                          </Badge>
+                                        )}
+                                      </div>
                                       <div className="absolute bottom-2 right-2 flex gap-1">
                                         <Button
                                           size="sm"
                                           variant="secondary"
                                           className="bg-black/50 hover:bg-black/70 text-white border-0 h-8 w-8 p-0"
-                                          onClick={() => handleDownloadImage(slideImg, item.platform, slide.slideNumber)}
+                                          onClick={() => handleDownloadImage(slideImg.url, item.platform, slide.slideNumber)}
                                         >
                                           <Download className="h-3 w-3" />
                                         </Button>
@@ -714,16 +761,28 @@ export default function ContentPage() {
                                   {slideImg ? (
                                     <div className="relative rounded-lg overflow-hidden border aspect-[4/5]">
                                       <img
-                                        src={slideImg}
+                                        src={slideImg.url}
                                         alt={`Slide ${slideNum}`}
                                         className="w-full h-full object-cover"
                                       />
+                                      <div className="absolute top-2 left-2">
+                                        {slideImg.model && IMAGE_MODELS[slideImg.model] && (
+                                          <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
+                                            {IMAGE_MODELS[slideImg.model].speed === "fast" ? (
+                                              <Zap className="h-3 w-3 mr-1" />
+                                            ) : (
+                                              <Brain className="h-3 w-3 mr-1" />
+                                            )}
+                                            {IMAGE_MODELS[slideImg.model].name}
+                                          </Badge>
+                                        )}
+                                      </div>
                                       <div className="absolute bottom-2 right-2 flex gap-1">
                                         <Button
                                           size="sm"
                                           variant="secondary"
                                           className="bg-black/50 hover:bg-black/70 text-white border-0 h-8 w-8 p-0"
-                                          onClick={() => handleDownloadImage(slideImg, item.platform, slideNum)}
+                                          onClick={() => handleDownloadImage(slideImg.url, item.platform, slideNum)}
                                         >
                                           <Download className="h-3 w-3" />
                                         </Button>

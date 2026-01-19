@@ -36,9 +36,8 @@ All generated images must use the correct aspect ratio for their platform:
 | LinkedIn | 16:9 | 1200x675 | Landscape (optimal professional feed) |
 
 ### Image Model
-- **Current model**: Nano Banana Pro (`gemini-3-pro-image-preview`) with Thinking
-- Higher quality output with AI reasoning
-- May take longer than Flash model (30-60+ seconds)
+- **Current model**: Nano Banana Flash (`gemini-2.5-flash-image`)
+- Fast generation (3-5 seconds)
 - Supports aspect ratios: `1:1`, `4:5`, `16:9`, `9:16`
 
 ### Image Content Requirements
