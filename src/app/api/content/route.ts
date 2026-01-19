@@ -85,3 +85,53 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Content ID is required" },
+        { status: 400 }
+      );
+    }
+
+    // First delete associated images
+    const { error: imagesError } = await supabase
+      .from("images")
+      .delete()
+      .eq("content_id", id);
+
+    if (imagesError) {
+      console.error("Error deleting images:", imagesError);
+      // Continue with content deletion even if images fail
+    }
+
+    // Delete the content
+    const { error } = await supabase
+      .from("content")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error deleting content:", error);
+      return NextResponse.json(
+        { error: "Failed to delete content" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error("Error in DELETE /api/content:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
