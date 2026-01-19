@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
     const body = await request.json();
-    const { ideaId } = body;
+    const { ideaId, platforms: selectedPlatforms } = body;
 
     if (!ideaId) {
       return NextResponse.json(
@@ -130,6 +130,11 @@ export async function POST(request: NextRequest) {
       brands?: { voice_config?: Record<string, unknown>; name?: string } | null;
     };
 
+    // Use selected platforms if provided, otherwise use idea's target platforms
+    const platformsToGenerate = selectedPlatforms && selectedPlatforms.length > 0
+      ? selectedPlatforms
+      : ideaData.target_platforms;
+
     // Build the prompt
     const brandContext = ideaData.brands?.voice_config
       ? `Brand Voice Guidelines: ${JSON.stringify(ideaData.brands.voice_config)}\nBrand Name: ${ideaData.brands.name || "Unknown"}`
@@ -140,14 +145,14 @@ export async function POST(request: NextRequest) {
 CONTENT IDEA TO TRANSFORM:
 Concept: ${ideaData.concept}
 Angle: ${ideaData.angle}
-Target Platforms: ${ideaData.target_platforms?.join(", ")}
+Target Platforms: ${platformsToGenerate?.join(", ")}
 Key Points: ${ideaData.key_points?.join("; ")}
 Suggested Hooks: ${ideaData.potential_hooks?.join("; ")}
 
 ORIGINAL SOURCE CONTENT:
 ${ideaData.inputs?.raw_content || "No source content available"}
 
-Generate optimized posts for each target platform: ${ideaData.target_platforms?.join(", ")}.
+Generate optimized posts for each target platform: ${platformsToGenerate?.join(", ")}.
 
 For Instagram: If the content is educational, informational, or contains multiple tips/points, CREATE A CAROUSEL (4-6 slides max).
 Each post/slide should have a detailed image prompt for generating scroll-stopping visuals with text overlays.`;
