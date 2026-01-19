@@ -176,25 +176,146 @@ Each slide's image prompt must be **fully self-contained** - no references to ot
 
 ## Role-Based Workflow
 
-This project uses specialized roles for parallel development sessions.
+This project uses specialized roles for development. Roles are **automatically detected** from your request - you don't need to specify them.
+
+### How It Works
+
+1. **You describe what you want** (no commands needed)
+2. **System auto-detects the appropriate role**
+3. **Work happens with auto-handover between roles as needed**
+4. **QA automatically verifies and deploys**
+
+### Role Announcements (Visibility)
+
+You'll always see clear announcements when roles are assigned or change:
+
+**When a role is activated:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🎭 ROLE: Frontend Developer                             │
+│                                                         │
+│ Task: Build the calendar page                           │
+│ Detected from: "calendar page" → UI/dashboard work      │
+│                                                         │
+│ I'll be working on: src/app/(dashboard)/calendar/       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**When handing off:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ ✅ HANDOFF: Frontend → QA                               │
+│                                                         │
+│ Completed: Calendar page built                          │
+│ Branch: claude/frontend-calendar                        │
+│ Ready for: Verification and deployment                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+**When escalating:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ ⬆️ ESCALATING: Frontend → Full Stack                    │
+│                                                         │
+│ Reason: Task also needs API endpoint                    │
+│ Continuing as Full Stack role...                        │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Auto-Role Detection
+
+When you start a session, describe your task and the system will detect the right role:
+
+| Your Request | Auto-Detected Role |
+|--------------|-------------------|
+| "Build the calendar page" | Frontend |
+| "Add the publishing API" | Backend |
+| "Improve the hook variety" | AI |
+| "Update the voice guidelines" | Strategist |
+| "Make sure it works and ship it" | QA |
+| "Fix the deployment pipeline" | DevOps |
+| "Add feature X with UI and API" | Full Stack |
+
+**Detection Keywords:**
+- **Frontend**: UI, page, component, button, layout, design, CSS, responsive, dashboard
+- **Backend**: API, database, endpoint, Supabase, query, integration, Late.dev
+- **AI**: prompt, Claude, Gemini, hook, voice, content quality, AI output
+- **Strategist**: brand voice, platform rules, engagement, content strategy, tone
+- **QA**: test, verify, merge, deploy, ship, broken, bug, check
+- **DevOps**: CI/CD, GitHub Actions, deployment, environment, infrastructure
+- **Full Stack**: spans multiple areas, end-to-end, both UI and API
+- **Docs**: update docs, document, what changed, sync documentation, architecture review
+
+### Auto-Handover Rules
+
+The system automatically hands off between roles:
+
+| Situation | Auto-Action |
+|-----------|-------------|
+| Task needs both UI + API | Escalate to **Full Stack** |
+| Work is complete | Hand to **QA** to verify & deploy |
+| Task crosses into prompts/AI | Switch to **AI** role or consult guidelines |
+| Multiple parallel sessions done | **QA** merges all branches |
+| Something is broken | **QA** investigates and coordinates fix |
 
 ### Available Roles
-| Command | Role | Focus |
-|---------|------|-------|
-| `/role:ai` | AI & Intelligence | Prompts, Claude/Gemini, learning system |
-| `/role:strategist` | Content Strategist | Brand voice, platform rules, content quality |
-| `/role:frontend` | Frontend Developer | Dashboard UI, React components |
-| `/role:backend` | Backend Developer | APIs, Supabase, integrations |
-| `/role:fullstack` | Full Stack | Cross-cutting frontend + backend work |
-| `/role:qa` | QA Specialist | Testing, validation, quality |
-| `/role:devops` | DevOps Engineer | CI/CD, deployment, infrastructure |
+
+| Role | Focus | Owns |
+|------|-------|------|
+| **AI** | Prompts, Claude/Gemini, learning system | `src/lib/prompts/`, AI API routes |
+| **Strategist** | Brand voice, platform rules, content quality | Voice system, hook library, RULES.md |
+| **Frontend** | Dashboard UI, React components | `src/app/(dashboard)/`, `src/components/` |
+| **Backend** | APIs, Supabase, integrations | `src/app/api/`, `src/lib/supabase/` |
+| **Full Stack** | Cross-cutting frontend + backend | Both frontend and backend |
+| **QA** | Testing, verification, merge & deploy | Test suite, quality gates |
+| **DevOps** | CI/CD, deployment, infrastructure | `.github/`, deployment config |
+| **Docs** | Documentation sync, architecture review | `CLAUDE.md`, `RULES.md`, `docs/`, `.claude/` |
+
+### Explicit Role Selection (Optional)
+
+You can explicitly select a role if you prefer:
+- `/role:ai` - AI & Intelligence Engineer
+- `/role:strategist` - Content Strategist
+- `/role:frontend` - Frontend Developer
+- `/role:backend` - Backend Developer
+- `/role:fullstack` - Full Stack Developer
+- `/role:qa` - QA & Merge Coordinator
+- `/role:devops` - DevOps Engineer
+- `/role:docs` - Documentation & Sync Specialist
+
+### Parallel Sessions Workflow
+
+When running multiple sessions simultaneously:
+
+```
+Session 1: "Build calendar page"     → Auto: Frontend (uses branch)
+Session 2: "Add publishing API"      → Auto: Backend (uses branch)
+Session 3: "Improve hook variety"    → Auto: AI (uses branch)
+
+When all done:
+Session 4: "Ship everything"         → Auto: QA (merges all, deploys)
+```
+
+Each parallel session works on its own branch. QA merges them all together.
+
+### Single Session Workflow
+
+For single tasks, everything is automatic:
+```
+You: "Build the calendar page"
+→ Auto-detects Frontend
+→ Builds the feature
+→ Auto-hands to QA
+→ Verifies and deploys
+→ "Done! Live at your-domain.com/calendar"
+```
 
 ### Role Files
 - Role definitions: `.claude/roles/`
 - Slash commands: `.claude/commands/`
 
-### Handoff Between Roles
-Use `/role:handoff` to document session state when passing work to another role.
+### Session Handoff
+Use `/role:handoff` to document session state when passing work to another role manually.
 
 ## Key Files Reference
 
