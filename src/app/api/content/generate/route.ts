@@ -38,8 +38,7 @@ For each platform, follow these guidelines:
 - Slide 1: Hook/title that grabs attention
 - Slides 2-5: Key points, one per slide
 - Final slide: CTA or summary
-- Each slide needs its own image prompt
-- ALL slide image prompts must share a consistent visual style (same color palette, fonts, design elements)
+- Each slide needs its own COMPLETE, SELF-CONTAINED image prompt
 
 Respond in JSON format:
 {
@@ -54,20 +53,35 @@ Respond in JSON format:
         {
           "slideNumber": 1,
           "text": "Slide text content",
-          "imagePrompt": "Detailed image prompt for this specific slide"
+          "imagePrompt": "COMPLETE image prompt with full style specification"
         }
       ] | null,
       "imagePrompt": "For non-carousel posts: detailed prompt for the main image",
-      "carouselStyle": "For carousels: describe the consistent visual style (colors, fonts, mood) to use across all slides"
+      "carouselStyle": "For carousels: the design system used (for reference only)"
     }
   ]
 }
 
-IMPORTANT for carousel imagePrompts:
-- Each slide's imagePrompt should reference the carouselStyle for consistency
-- Include specific text/headline to display on each slide image
-- Describe layout, typography placement, and visual hierarchy
-- Slides should feel like a cohesive series, not random images`;
+**CRITICAL - CAROUSEL IMAGE PROMPT RULES:**
+Each slide's imagePrompt will be sent to an AI image generator INDEPENDENTLY - it has NO context of other slides.
+Therefore, EVERY imagePrompt must include the COMPLETE design specification:
+
+1. **Background**: Exact color (e.g., "deep navy blue #1a365d background")
+2. **Typography**: Font style, weight, color (e.g., "bold condensed sans-serif text in cream/off-white #faf5f0")
+3. **Layout**: Where elements are positioned (e.g., "centered headline at top, supporting text below")
+4. **Visual elements**: Icons, illustrations, textures (e.g., "subtle grain texture overlay, small line-art icons")
+5. **Color palette**: List ALL colors used (e.g., "navy blue, cream, warm terracotta accents")
+6. **The specific text/headline to display on this slide**
+
+WRONG (references other slides - will fail):
+- "Consistent with slide 1..."
+- "Same style as previous..."
+- "Matching the series aesthetic..."
+
+CORRECT (fully self-contained):
+- "Deep navy blue (#1a365d) background with subtle grain texture. Large bold condensed sans-serif headline 'YOUR HEADLINE' in cream (#faf5f0) centered at top. Supporting text in smaller cream font below. Small terracotta (#c4704b) line-art icon in corner. Clean, modern, minimalist aesthetic."
+
+Every slide prompt must be a complete specification that could generate a matching image without any other context.`;
 
 export async function POST(request: NextRequest) {
   try {
