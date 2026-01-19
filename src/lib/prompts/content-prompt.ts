@@ -6,6 +6,7 @@
  */
 
 import { MARKETER_PERSONA, MARKETER_CONTEXT } from "./marketer-persona";
+import { STYLE_SELECTION_GUIDANCE, VISUAL_STYLES, type VisualStyle } from "./visual-styles";
 
 export const CONTENT_SYSTEM_PROMPT = `${MARKETER_PERSONA}
 
@@ -182,27 +183,40 @@ Final Slide: THE CTA
 - Text must be readable without zooming
 - Never reference "slide 1" or "previous slide" in prompts
 
+**CRITICAL: Visual Style Selection**:
+Choose the optimal VISUAL STYLE for the carousel based on the content topic:
+
+| Style | Best For | Creates |
+|-------|----------|---------|
+| typography | Stats, quotes, frameworks, lists, advice | Clean, bold text-focused designs |
+| photorealistic | Travel, lifestyle, food, nature, emotions | Photo-quality backgrounds with text overlay |
+| illustration | Stories, explainers, how-to, friendly brands | Hand-drawn/digital illustrated scenes |
+| 3d-render | Tech, futurism, software, innovation | Modern 3D rendered environments |
+| abstract-art | Philosophy, creativity, mindset, opinions | Bold shapes, gradients, artistic compositions |
+| collage | Pop culture, fashion, music, youth content | Mixed media with layered elements |
+
+**Style Selection Process**:
+1. What is the TOPIC? (determines visual metaphor potential)
+2. What EMOTION should viewers feel? (matches style mood)
+3. Who is the AUDIENCE? (matches expectations)
+4. Does style fit the BRAND? (consistency check)
+
 **CRITICAL: Carousel Visual Consistency**:
 ALL slides in a carousel MUST use the EXACT SAME:
-- Background color (same hex code on every slide)
+- Visual style (same style on every slide)
+- Color palette (same hex codes throughout)
 - Font: Inter (or specify ONE font that ALL slides use)
-- Primary text color (same hex)
-- Accent color (same hex)
 - Typography hierarchy (same weight/size rules)
-- Visual treatment (ALL text-only OR ALL with consistent icon style)
+- Text overlay treatment (same method for text readability)
 
 Before writing any slide prompts, FIRST define your carousel design system:
-1. Pick ONE background color (e.g., #1a1a2e)
-2. Pick ONE primary text color (e.g., #ffffff)
-3. Pick ONE accent color (e.g., #ff6b6b)
-4. Use font: Inter (bold for headlines, regular for body)
-5. Pick ONE visual treatment and apply to ALL slides:
-   - "text-only": Pure typography, no icons or illustrations
-   - "text-with-line-icons": Text + simple monoline icons in accent color
-   - "text-with-filled-icons": Text + solid filled icons
-   - "text-with-illustrations": Text + consistent illustration style
+1. Choose ONE visual style (typography, photorealistic, illustration, 3d-render, abstract-art, collage)
+2. Pick ONE background approach based on style
+3. Pick ONE primary text color (e.g., #ffffff)
+4. Pick ONE accent color (e.g., #ff6b6b)
+5. Define text overlay method for readability (transparent box, shadow, placed on dark areas, etc.)
 
-Then EVERY slide prompt MUST start with these EXACT values. No variation.
+Then EVERY slide prompt MUST follow the chosen style's guidelines exactly. No mixing styles.
 
 **What Performs on Instagram**:
 - Educational carousels
@@ -226,26 +240,6 @@ Then EVERY slide prompt MUST start with these EXACT values. No variation.
 ### CRITICAL: Self-Contained Prompts
 Each imagePrompt MUST be 100% self-contained. The image generator has NO context about other slides, brand, or content. Include EVERYTHING needed.
 
-### Required Elements in Every Image Prompt:
-
-1. **Background**: Solid color OR gradient with exact hex codes
-   - Example: "Deep navy blue background (#1a1a2e)"
-
-2. **Typography/Headlines**: Exact text in quotes + style
-   - Example: "Large bold headline reading 'Stop Chasing Metrics' in white (#ffffff) sans-serif font"
-
-3. **Text Hierarchy**: If multiple text elements, specify each
-   - Example: "Subheadline below reading 'Start Building Systems' in lighter gray (#cccccc)"
-
-4. **Layout**: Where elements are positioned
-   - Example: "Text centered vertically, left-aligned with 15% margin"
-
-5. **Supporting Elements**: Icons, shapes, illustrations (optional)
-   - Example: "Minimal line icon of a graph trending upward in the top right corner"
-
-6. **Overall Aesthetic**: Style direction
-   - Example: "Clean, modern, minimalist tech aesthetic"
-
 ### FORBIDDEN in Image Prompts (Will Cause Failures):
 - Platform names: "Instagram", "LinkedIn", "Twitter", "Facebook"
 - Social media terms: "post", "carousel", "story", "feed", "reel"
@@ -254,48 +248,143 @@ Each imagePrompt MUST be 100% self-contained. The image generator has NO context
 - Cross-references: "same style as slide 1", "matching previous slide"
 - App mockups: "phone screen showing", "app interface"
 
-### Good Image Prompt Example (Single Image):
+---
+
+## Style-Specific Image Prompt Guidelines
+
+### TYPOGRAPHY Style Prompts:
+Focus on bold text as the hero element. No background imagery.
+
+**Required elements:**
+- Solid color or subtle gradient background (exact hex)
+- Typography hierarchy (headline size, body size)
+- Accent elements (lines, shapes)
+- Font specification (Inter Bold/Regular)
+- Layout positioning (margins, alignment)
+
+**Example:**
 \`\`\`
-Clean modern graphic with deep teal background (#0d4d4d). Large bold white text (#ffffff) in Inter font reading "The 3-Second Rule" centered in the upper third. Below, smaller cream-colored text (#f5f5dc) in Inter regular reading "How top performers make decisions". Minimal geometric accent shapes in lighter teal (#1a6b6b) in bottom corners. Overall aesthetic: sophisticated, tech-forward, premium feel.
+Bold modern graphic with charcoal black background (#1a1a1a). Large bold white text (#ffffff) in Inter Bold font reading "5:1" centered. Below in coral (#ff6b6b) Inter Regular: "positive interactions needed to offset ONE negative." Subtle coral accent line between numbers and text. Clean minimalist layout with 15% margins. Overall aesthetic: bold, editorial, premium.
 \`\`\`
 
-### CAROUSEL: All Slides Must Match
-When creating carousel slides, EVERY slide prompt must use IDENTICAL:
-- Background color (exact hex)
+---
+
+### PHOTOREALISTIC Style Prompts:
+Photo-quality backgrounds that look like professional photography, with text overlay.
+
+**Required elements:**
+- Detailed scene description (subject, setting, atmosphere)
+- Lighting specification (golden hour, dramatic, soft, etc.)
+- Camera/lens effect (depth of field, 85mm, wide angle)
+- Text overlay with readability solution (semi-transparent box OR natural dark area)
+- Text content, color, and font
+- Quality keywords (photorealistic, professional photography, cinematic)
+
+**Example (Slide 1 - Hook):**
+\`\`\`
+Photorealistic image of a person standing at the edge of a cliff overlooking misty mountains at sunrise. Dramatic warm lighting with golden rays breaking through clouds. Person shown from behind as silhouette, arms slightly raised. In the lower third, semi-transparent dark overlay (#000000 at 60% opacity) with white text (#ffffff) in Inter Bold reading "Your comfort zone is killing your potential." Cinematic composition, professional photography quality, 85mm lens depth of field effect.
+\`\`\`
+
+**Example (Slide 2 - Same carousel):**
+\`\`\`
+Photorealistic close-up of hands holding a worn compass against a blurred forest background. Soft natural lighting with bokeh effect. In the lower third, semi-transparent dark overlay (#000000 at 60% opacity) with white text (#ffffff) in Inter Bold reading "Most people never find their direction." Coral accent (#ff6b6b) thin line above text. Professional photography quality, shallow depth of field, warm color grading.
+\`\`\`
+
+Note: Both use same text treatment (lower third, dark overlay, white Inter Bold), same accent color (#ff6b6b), same photographic quality keywords.
+
+---
+
+### ILLUSTRATION Style Prompts:
+Hand-drawn or digitally illustrated scenes with consistent style throughout.
+
+**Required elements:**
+- Illustration style (flat vector, hand-drawn, watercolor, isometric)
+- Color palette (limited, 4-6 colors with hex codes)
+- Scene/character description
+- Text integration approach
+- Aesthetic direction
+
+**Example (Slide 1):**
+\`\`\`
+Flat vector illustration style. Scene showing a tiny person standing at the base of a giant mountain made of stacked books. Soft muted color palette: dusty blue sky (#8BA4B4), cream mountain/books (#F5E6D3), coral flag at top (#E07A5F), navy person (#1D3557). Character has simple features, no detailed face. Text in upper portion in dark navy (#1D3557) Inter Bold: "The knowledge isn't the hard part." Clean editorial illustration with plenty of negative space.
+\`\`\`
+
+**Example (Slide 2 - Same carousel):**
+\`\`\`
+Flat vector illustration style. Scene showing the same tiny person now climbing the book mountain, halfway up. Same color palette: dusty blue sky (#8BA4B4), cream books (#F5E6D3), coral handholds (#E07A5F), navy person (#1D3557). Simple character design matching previous. Text in upper portion in dark navy (#1D3557) Inter Bold: "It's doing something with it." Clean editorial illustration with plenty of negative space.
+\`\`\`
+
+Note: Both use same illustration style (flat vector), same color palette (exact hex codes), same character design, same text treatment.
+
+---
+
+### 3D-RENDER Style Prompts:
+Modern 3D rendered scenes with depth, lighting, and dimensional elements.
+
+**Required elements:**
+- 3D scene description (shapes, objects, materials)
+- Lighting setup (studio, dramatic, soft)
+- Material specifications (chrome, glass, matte, metallic)
+- Background (gradient, solid, environment)
+- Text treatment (3D effect or flat overlay)
+- Quality keywords (3D render, soft shadows, depth of field)
+
+**Example:**
+\`\`\`
+Modern 3D rendered scene with soft gradient background from deep purple (#2D1B4E) to dark blue (#1A1A3E). Floating geometric shapes: chrome sphere with reflections, translucent glass cube, matte coral cylinder (#FF6B6B) arranged in balanced asymmetric composition. Soft studio lighting with subtle shadows and reflections. White 3D text (#ffffff) reading "Systems beat motivation" with subtle extrusion and shadow. Clean premium tech aesthetic, high-quality render, depth of field blur on distant elements.
+\`\`\`
+
+---
+
+### ABSTRACT-ART Style Prompts:
+Bold artistic compositions with shapes, gradients, and expressive elements.
+
+**Required elements:**
+- Abstract element descriptions (shapes, gradients, brush strokes)
+- Color palette with hex codes
+- Composition direction (asymmetric, balanced, dynamic)
+- Texture or artistic effects
+- Clear text placement area
+- Art style reference (Memphis, Bauhaus, contemporary)
+
+**Example:**
+\`\`\`
+Abstract art composition with bold organic flowing shapes. Deep navy background (#1a1a2e) with large coral organic blob shape (#FF6B6B) flowing from upper right, smaller teal accent shape (#20B2AA) in lower left corner. Subtle grain texture overlay. Dynamic asymmetric composition with clear center space. White text (#ffffff) in Inter Bold positioned center: "Creativity is just connecting things." Small paint-splash accents in coral near edges. Contemporary art aesthetic, bold and expressive.
+\`\`\`
+
+---
+
+### COLLAGE Style Prompts:
+Mixed media compositions with layered photos, textures, and elements.
+
+**Required elements:**
+- Base background (paper texture, color)
+- Layered elements (photo cutouts, shapes, textures)
+- Collage effects (torn edges, stickers, stamps)
+- Text style (handwritten, typewriter, bold modern)
+- Overall aesthetic (zine, editorial, vintage)
+- Organized chaos - busy but intentional
+
+**Example:**
+\`\`\`
+Mixed media collage on off-white textured paper background (#F5F5F0). Central element: desaturated photo cutout of vintage typewriter with torn paper edges. Surrounding elements: torn coral paper shape (#FF6B6B) overlapping corner, black ink scribble marks, small gold star stickers scattered. Bold black text (#1a1a1a) in typewriter font reading "Write it down before you forget." Handwritten annotation "every single idea" in smaller coral script below. Subtle paper grain texture throughout. 90s zine aesthetic with modern sensibility.
+\`\`\`
+
+---
+
+### CAROUSEL: All Slides Must Match Style
+When creating carousel slides, EVERY slide prompt must maintain IDENTICAL:
+- Visual style (don't mix photorealistic with illustration)
+- Color palette (exact hex codes)
+- Text treatment method (same overlay approach)
+- Quality/aesthetic keywords
 - Font family (Inter)
-- Text colors (exact hex codes)
-- Layout margins and spacing rules
-- Visual treatment (text-only OR same icon/illustration style)
-
-### Good Carousel Prompt Example - TEXT-ONLY (Slide 1 of 4):
-\`\`\`
-Bold modern graphic with charcoal black background (#1a1a1a). Large bold white text (#ffffff) in Inter Bold font reading "This Changed Everything" centered vertically. Subtle coral accent line (#ff6b6b) below the text. Clean minimalist layout with 15% margins. TEXT-ONLY design - no icons, illustrations, or imagery. Overall aesthetic: bold, editorial, premium.
-\`\`\`
-
-### Good Carousel Prompt Example - TEXT-ONLY (Slide 2 of same carousel):
-\`\`\`
-Bold modern graphic with charcoal black background (#1a1a1a). Header text in white (#ffffff) Inter Bold reading "The Problem" at top. Body text in coral (#ff6b6b) Inter Regular reading "Most people chase metrics instead of building systems." Text left-aligned with 15% margins. TEXT-ONLY design - no icons, illustrations, or imagery. Overall aesthetic: bold, editorial, premium.
-\`\`\`
-
-Note: Both slides use IDENTICAL: background (#1a1a1a), font (Inter), colors (#ffffff, #ff6b6b), margins (15%), aesthetic (bold, editorial, premium), visual treatment (text-only).
-
-### Good Carousel Prompt Example - WITH ICONS (Slide 1 of 4):
-\`\`\`
-Bold modern graphic with charcoal black background (#1a1a1a). Large bold white text (#ffffff) in Inter Bold font reading "3 Systems You Need" centered vertically. Subtle coral accent line (#ff6b6b) below the text. Small monoline icon of three stacked boxes in coral (#ff6b6b) above the headline. Clean minimalist layout with 15% margins. CONSISTENT STYLE: all icons are simple monoline drawings in coral. Overall aesthetic: bold, editorial, premium.
-\`\`\`
-
-### Good Carousel Prompt Example - WITH ICONS (Slide 2 of same carousel):
-\`\`\`
-Bold modern graphic with charcoal black background (#1a1a1a). Header text in white (#ffffff) Inter Bold reading "1. The Capture System" at top. Body text in coral (#ff6b6b) Inter Regular reading "Never lose another idea." Text left-aligned with 15% margins. Small monoline icon of an inbox/tray in coral (#ff6b6b) to the right of the headline. CONSISTENT STYLE: all icons are simple monoline drawings in coral, same weight and style as slide 1. Overall aesthetic: bold, editorial, premium.
-\`\`\`
-
-Note: Both slides use IDENTICAL icon style (monoline, coral color, same line weight) in addition to matching background, font, colors, and margins.
 
 ### Bad Image Prompt Example:
 \`\`\`
 Instagram carousel slide about productivity tips with engaging design
 \`\`\`
-(This will fail - no colors, no text, no layout, contains forbidden terms)
+(This will fail - no style, no colors, no text, no layout, contains forbidden terms)
 
 ---
 
@@ -333,23 +422,24 @@ Return a JSON array with content for each requested platform:
       "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],
       "cta": "Save this for later!",
       "carouselStyle": {
-        "backgroundColor": "#1a1a1a",
+        "visualStyle": "photorealistic",
+        "styleRationale": "Travel content benefits from photo-quality imagery that evokes emotion and wanderlust",
         "primaryColor": "#ffffff",
         "accentColor": "#ff6b6b",
         "font": "Inter",
-        "aesthetic": "bold, editorial, premium",
-        "visualTreatment": "text-only"
+        "aesthetic": "cinematic, aspirational, premium",
+        "textOverlayMethod": "semi-transparent dark box in lower third"
       },
       "carouselSlides": [
         {
           "slideNumber": 1,
           "text": "Hook text for slide 1",
-          "imagePrompt": "MUST include: background (#1a1a1a), Inter font, colors (#ffffff, #ff6b6b), aesthetic (bold, editorial, premium), visualTreatment (text-only = no icons/illustrations) - exactly matching carouselStyle above"
+          "imagePrompt": "Full self-contained prompt following the chosen visualStyle guidelines. For photorealistic: include scene, lighting, camera effects, text overlay treatment, quality keywords. For typography: include background color, text hierarchy, accent elements."
         },
         {
           "slideNumber": 2,
           "text": "Content for slide 2",
-          "imagePrompt": "MUST include: background (#1a1a1a), Inter font, colors (#ffffff, #ff6b6b), aesthetic (bold, editorial, premium), visualTreatment (text-only = no icons/illustrations) - exactly matching carouselStyle above"
+          "imagePrompt": "Full self-contained prompt matching the same visualStyle, color palette, and text treatment as slide 1. Maintain visual consistency across all slides."
         }
       ]
     }
@@ -388,10 +478,13 @@ Before returning any content, verify:
 - [ ] Caption hook before fold (~125 chars)
 - [ ] 5-10 targeted hashtags
 - [ ] All image prompts are fully self-contained
-- [ ] ALL carousel slides use IDENTICAL: background color, font (Inter), text colors, accent color, aesthetic
-- [ ] carouselStyle is defined BEFORE slides and ALL slide prompts match it exactly
-- [ ] visualTreatment is defined (text-only, text-with-line-icons, etc.) and EVERY slide follows it
-- [ ] If using icons/illustrations, EVERY slide specifies the same icon style, color, and line weight
+- [ ] visualStyle is chosen appropriately for the content topic (typography for data, photorealistic for lifestyle, etc.)
+- [ ] styleRationale explains WHY this style fits the content
+- [ ] ALL carousel slides use the SAME visualStyle (no mixing styles)
+- [ ] ALL carousel slides use IDENTICAL: color palette, font (Inter), text treatment method
+- [ ] For photorealistic: every slide has consistent text overlay treatment and photography style
+- [ ] For illustration: every slide has same illustration style, color palette, and character design
+- [ ] For typography: every slide has same background, colors, and typographic hierarchy
 
 ---
 
@@ -411,8 +504,14 @@ export const buildContentUserPrompt = (
   sourceContent: string,
   platforms: string[],
   brandVoicePrompt: string,
-  additionalInstructions?: string
+  additionalInstructions?: string,
+  visualStyleOverride?: VisualStyle
 ): string => {
+  // Build visual style instruction
+  const visualStyleInstruction = visualStyleOverride
+    ? `**REQUIRED Visual Style**: Use "${visualStyleOverride}" style for all carousel images. Follow the style-specific guidelines in the prompt system.`
+    : `**Visual Style Selection**: Analyze the content topic and choose the optimal visual style (typography, photorealistic, illustration, 3d-render, abstract-art, or collage). Include your styleRationale explaining why this style fits the content.`;
+
   return `## The Idea to Transform
 
 **Concept**: ${idea.concept}
@@ -440,7 +539,17 @@ ${sourceContent.substring(0, 3000)}${sourceContent.length > 3000 ? "\n\n[Content
 
 Generate content for: ${platforms.map((p) => p.toUpperCase()).join(", ")}
 
-${platforms.includes("instagram") ? "For Instagram: Create a carousel with 4-6 slides. Remember slide 1 is HOOK ONLY. CRITICAL: Define carouselStyle FIRST (background, colors, font: Inter, aesthetic, visualTreatment), then ensure EVERY slide imagePrompt uses those EXACT same values for visual consistency. Visual treatment must be consistent: if text-only, NO slide gets icons; if using icons, EVERY slide must specify the same icon style." : ""}
+${platforms.includes("instagram") ? `For Instagram: Create a carousel with 4-6 slides. Remember slide 1 is HOOK ONLY.
+
+${visualStyleInstruction}
+
+CRITICAL: Define carouselStyle FIRST with:
+- visualStyle (the chosen style)
+- styleRationale (why this style fits)
+- Color palette (primaryColor, accentColor)
+- textOverlayMethod (how text remains readable)
+
+Then ensure EVERY slide imagePrompt follows the chosen style's guidelines with IDENTICAL treatment across all slides.` : ""}
 ${platforms.includes("twitter") ? "For Twitter: If the idea warrants depth, create a thread. Otherwise, a powerful single tweet." : ""}
 
 ---
