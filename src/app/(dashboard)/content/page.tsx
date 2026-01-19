@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageCarousel, type CarouselImage } from "@/components/ui/image-carousel";
 
 interface ContentImage {
   id: string;
@@ -58,7 +59,8 @@ const platformColors: Record<string, string> = {
 export default function ContentPage() {
   const [content, setContent] = useState<Content[]>([]);
   const [images, setImages] = useState<Record<string, ContentImage[]>>({});
-  const [slideImages, setSlideImages] = useState<Record<string, Record<number, { url: string; model?: ImageModelKey }>>>({});
+  // Store ALL images per slide (not just the latest), keyed by contentId -> slideNumber -> array of images
+  const [slideImages, setSlideImages] = useState<Record<string, Record<number, CarouselImage[]>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("draft");
   const [generatingImage, setGeneratingImage] = useState<string | null>(null);
@@ -103,14 +105,24 @@ export default function ContentPage() {
           ...prev,
           [contentId]: data.images,
         }));
-        // Map images to slides by matching prompts
-        const imgMap: Record<number, { url: string; model?: ImageModelKey }> = {};
-        data.images.forEach((img: ContentImage) => {
+        // Map ALL images to slides by matching prompts - build arrays instead of overwriting
+        const imgMap: Record<number, CarouselImage[]> = {};
+        // Images come sorted by created_at DESC (newest first), so we build arrays with newest at index 0
+        data.images.forEach((img: ContentImage & { created_at?: string }) => {
           if (img.url && !img.url.startsWith("placeholder:")) {
             // Try to match by slide number in prompt
             const slideMatch = img.prompt?.match(/slide\s*(\d+)/i);
             if (slideMatch) {
-              imgMap[parseInt(slideMatch[1])] = { url: img.url, model: img.model };
+              const slideNum = parseInt(slideMatch[1]);
+              if (!imgMap[slideNum]) {
+                imgMap[slideNum] = [];
+              }
+              imgMap[slideNum].push({
+                id: img.id,
+                url: img.url,
+                model: img.model,
+                createdAt: img.created_at,
+              });
             }
           }
         });
@@ -146,16 +158,22 @@ export default function ContentPage() {
       if (data.success) {
         setImageMessage(data.message);
         if (slideNumber && data.image?.url && !data.image.url.startsWith("placeholder:")) {
-          // For slide images, set directly - don't refetch as it may overwrite with stale data
+          // For slide images, prepend to the array (newest first) instead of replacing
+          const newImage: CarouselImage = {
+            id: data.image.id,
+            url: data.image.url,
+            model: data.image.model || selectedModel,
+            createdAt: new Date().toISOString(),
+          };
           setSlideImages((prev) => ({
             ...prev,
             [contentId]: {
               ...(prev[contentId] || {}),
-              [slideNumber]: { url: data.image.url, model: data.image.model || selectedModel },
+              [slideNumber]: [newImage, ...(prev[contentId]?.[slideNumber] || [])],
             },
           }));
         } else if (!slideNumber) {
-          // Only refetch for non-slide (primary) images
+          // For non-slide (primary) images, refetch to get updated list
           fetchImagesForContent(contentId);
         }
       } else {
@@ -256,8 +274,8 @@ export default function ContentPage() {
     return contentImages.some((img) => img.url && !img.url.startsWith("placeholder:"));
   };
 
-  const getSlideImage = (contentId: string, slideNumber: number): { url: string; model?: ImageModelKey } | null => {
-    return slideImages[contentId]?.[slideNumber] || null;
+  const getSlideImages = (contentId: string, slideNumber: number): CarouselImage[] => {
+    return slideImages[contentId]?.[slideNumber] || [];
   };
 
   const isSlideGenerating = (contentId: string, slideNumber: number): boolean => {
@@ -410,9 +428,6 @@ export default function ContentPage() {
         <div className="grid gap-4">
           {content.map((item) => {
             const contentImages = getContentImages(item.id);
-            const generatedImage = contentImages.find(
-              (img) => img.url && !img.url.startsWith("placeholder:")
-            );
             const hasCarousel = !!(item.copy_carousel_slides && item.copy_carousel_slides.length > 0);
             const { parsed: carouselSlides, legacy: legacySlides } = parseCarouselSlides(item.copy_carousel_slides);
             const totalSlides = carouselSlides?.length || legacySlides?.length || 0;
@@ -449,36 +464,39 @@ export default function ContentPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Non-carousel Generated Image Display */}
-                  {!hasCarousel && generatedImage && (
-                    <div className="relative rounded-lg overflow-hidden border">
-                      <img
-                        src={generatedImage.url}
-                        alt="Generated content image"
-                        className="w-full max-h-96 object-contain bg-black/5"
-                      />
-                      <div className="absolute top-2 left-2">
-                        {generatedImage.model && IMAGE_MODELS[generatedImage.model] && (
-                          <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
-                            {IMAGE_MODELS[generatedImage.model].speed === "fast" ? (
-                              <Zap className="h-3 w-3 mr-1" />
-                            ) : (
-                              <Brain className="h-3 w-3 mr-1" />
-                            )}
-                            {IMAGE_MODELS[generatedImage.model].name}
+                  {/* Non-carousel Generated Image Display - Now with carousel for all versions */}
+                  {!hasCarousel && contentImages.length > 0 && (
+                    <div className="space-y-2">
+                      {contentImages.filter(img => img.url && !img.url.startsWith("placeholder:")).length > 1 && (
+                        <div className="flex items-center justify-between">
+                          <Badge variant="secondary" className="text-xs">
+                            {contentImages.filter(img => img.url && !img.url.startsWith("placeholder:")).length} image versions
                           </Badge>
-                        )}
-                      </div>
-                      <div className="absolute bottom-2 right-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="bg-black/50 hover:bg-black/70 text-white border-0"
-                          onClick={() => handleDownloadImage(generatedImage.url, item.platform)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
+                        </div>
+                      )}
+                      <ImageCarousel
+                        images={contentImages.filter(img => img.url && !img.url.startsWith("placeholder:")).map(img => ({
+                          id: img.id,
+                          url: img.url,
+                          model: img.model,
+                        }))}
+                        aspectRatio="aspect-video max-h-96"
+                        onDownload={(url) => handleDownloadImage(url, item.platform)}
+                        modelBadge={(model) => {
+                          const modelKey = model as ImageModelKey;
+                          if (!IMAGE_MODELS[modelKey]) return null;
+                          return (
+                            <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
+                              {IMAGE_MODELS[modelKey].speed === "fast" ? (
+                                <Zap className="h-3 w-3 mr-1" />
+                              ) : (
+                                <Brain className="h-3 w-3 mr-1" />
+                              )}
+                              {IMAGE_MODELS[modelKey].name}
+                            </Badge>
+                          );
+                        }}
+                      />
                     </div>
                   )}
 
@@ -549,9 +567,10 @@ export default function ContentPage() {
 
                       <div className="grid gap-4">
                         {carouselSlides.map((slide) => {
-                          const slideImg = getSlideImage(item.id, slide.slideNumber);
+                          const slideImgs = getSlideImages(item.id, slide.slideNumber);
                           const isGenerating = isSlideGenerating(item.id, slide.slideNumber);
                           const isApproved = isSlideApproved(item.id, slide.slideNumber);
+                          const hasImages = slideImgs.length > 0;
 
                           return (
                             <div
@@ -563,6 +582,11 @@ export default function ContentPage() {
                                   <Badge variant="outline" className="text-xs">
                                     Slide {slide.slideNumber}
                                   </Badge>
+                                  {hasImages && slideImgs.length > 1 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {slideImgs.length} versions
+                                    </Badge>
+                                  )}
                                   {isApproved && (
                                     <Badge className="bg-emerald-500 text-xs">
                                       <Check className="mr-1 h-3 w-3" />
@@ -594,49 +618,38 @@ export default function ContentPage() {
                               </div>
 
                               <div className="grid md:grid-cols-2 gap-4">
-                                {/* Slide Image */}
+                                {/* Slide Image Carousel */}
                                 <div className="space-y-2">
-                                  {slideImg ? (
-                                    <div className="relative rounded-lg overflow-hidden border aspect-[4/5]">
-                                      <img
-                                        src={slideImg.url}
-                                        alt={`Slide ${slide.slideNumber}`}
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <div className="absolute top-2 left-2">
-                                        {slideImg.model && IMAGE_MODELS[slideImg.model] && (
-                                          <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
-                                            {IMAGE_MODELS[slideImg.model].speed === "fast" ? (
-                                              <Zap className="h-3 w-3 mr-1" />
-                                            ) : (
-                                              <Brain className="h-3 w-3 mr-1" />
-                                            )}
-                                            {IMAGE_MODELS[slideImg.model].name}
-                                          </Badge>
-                                        )}
+                                  <ImageCarousel
+                                    images={slideImgs}
+                                    aspectRatio="aspect-[4/5]"
+                                    onDownload={(url) => handleDownloadImage(url, item.platform, slide.slideNumber)}
+                                    modelBadge={(model) => {
+                                      const modelKey = model as ImageModelKey;
+                                      if (!IMAGE_MODELS[modelKey]) return null;
+                                      return (
+                                        <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
+                                          {IMAGE_MODELS[modelKey].speed === "fast" ? (
+                                            <Zap className="h-3 w-3 mr-1" />
+                                          ) : (
+                                            <Brain className="h-3 w-3 mr-1" />
+                                          )}
+                                          {IMAGE_MODELS[modelKey].name}
+                                        </Badge>
+                                      );
+                                    }}
+                                    emptyState={
+                                      <div className="rounded-lg border border-dashed aspect-[4/5] flex items-center justify-center bg-muted/10">
+                                        <div className="text-center p-4">
+                                          <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                                          <p className="text-xs text-muted-foreground">No image yet</p>
+                                        </div>
                                       </div>
-                                      <div className="absolute bottom-2 right-2 flex gap-1">
-                                        <Button
-                                          size="sm"
-                                          variant="secondary"
-                                          className="bg-black/50 hover:bg-black/70 text-white border-0 h-8 w-8 p-0"
-                                          onClick={() => handleDownloadImage(slideImg.url, item.platform, slide.slideNumber)}
-                                        >
-                                          <Download className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="rounded-lg border border-dashed aspect-[4/5] flex items-center justify-center bg-muted/10">
-                                      <div className="text-center p-4">
-                                        <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                                        <p className="text-xs text-muted-foreground">No image yet</p>
-                                      </div>
-                                    </div>
-                                  )}
+                                    }
+                                  />
                                   <Button
                                     size="sm"
-                                    variant={slideImg ? "outline" : "default"}
+                                    variant={hasImages ? "outline" : "default"}
                                     className="w-full"
                                     onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
                                     disabled={isGenerating}
@@ -647,10 +660,10 @@ export default function ContentPage() {
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                         Generating...
                                       </>
-                                    ) : slideImg ? (
+                                    ) : hasImages ? (
                                       <>
                                         <ImageIcon className="mr-2 h-4 w-4" />
-                                        Regenerate
+                                        Generate Another
                                       </>
                                     ) : (
                                       <>
@@ -708,9 +721,10 @@ export default function ContentPage() {
                       <div className="grid gap-4">
                         {legacySlides.map((slideText, i) => {
                           const slideNum = i + 1;
-                          const slideImg = getSlideImage(item.id, slideNum);
+                          const slideImgs = getSlideImages(item.id, slideNum);
                           const isGenerating = isSlideGenerating(item.id, slideNum);
                           const isApproved = isSlideApproved(item.id, slideNum);
+                          const hasImages = slideImgs.length > 0;
                           const slideImagePrompt = item.metadata?.imagePrompt
                             ? `${item.metadata.imagePrompt} - Slide ${slideNum}: ${slideText.slice(0, 100)}`
                             : `Create an image for: ${slideText}`;
@@ -725,6 +739,11 @@ export default function ContentPage() {
                                   <Badge variant="outline" className="text-xs">
                                     Slide {slideNum}
                                   </Badge>
+                                  {hasImages && slideImgs.length > 1 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {slideImgs.length} versions
+                                    </Badge>
+                                  )}
                                   {isApproved && (
                                     <Badge className="bg-emerald-500 text-xs">
                                       <Check className="mr-1 h-3 w-3" />
@@ -756,49 +775,38 @@ export default function ContentPage() {
                               </div>
 
                               <div className="grid md:grid-cols-2 gap-4">
-                                {/* Slide Image */}
+                                {/* Slide Image Carousel */}
                                 <div className="space-y-2">
-                                  {slideImg ? (
-                                    <div className="relative rounded-lg overflow-hidden border aspect-[4/5]">
-                                      <img
-                                        src={slideImg.url}
-                                        alt={`Slide ${slideNum}`}
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <div className="absolute top-2 left-2">
-                                        {slideImg.model && IMAGE_MODELS[slideImg.model] && (
-                                          <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
-                                            {IMAGE_MODELS[slideImg.model].speed === "fast" ? (
-                                              <Zap className="h-3 w-3 mr-1" />
-                                            ) : (
-                                              <Brain className="h-3 w-3 mr-1" />
-                                            )}
-                                            {IMAGE_MODELS[slideImg.model].name}
-                                          </Badge>
-                                        )}
+                                  <ImageCarousel
+                                    images={slideImgs}
+                                    aspectRatio="aspect-[4/5]"
+                                    onDownload={(url) => handleDownloadImage(url, item.platform, slideNum)}
+                                    modelBadge={(model) => {
+                                      const modelKey = model as ImageModelKey;
+                                      if (!IMAGE_MODELS[modelKey]) return null;
+                                      return (
+                                        <Badge variant="secondary" className="bg-black/50 text-white border-0 text-xs">
+                                          {IMAGE_MODELS[modelKey].speed === "fast" ? (
+                                            <Zap className="h-3 w-3 mr-1" />
+                                          ) : (
+                                            <Brain className="h-3 w-3 mr-1" />
+                                          )}
+                                          {IMAGE_MODELS[modelKey].name}
+                                        </Badge>
+                                      );
+                                    }}
+                                    emptyState={
+                                      <div className="rounded-lg border border-dashed aspect-[4/5] flex items-center justify-center bg-muted/10">
+                                        <div className="text-center p-4">
+                                          <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                                          <p className="text-xs text-muted-foreground">No image yet</p>
+                                        </div>
                                       </div>
-                                      <div className="absolute bottom-2 right-2 flex gap-1">
-                                        <Button
-                                          size="sm"
-                                          variant="secondary"
-                                          className="bg-black/50 hover:bg-black/70 text-white border-0 h-8 w-8 p-0"
-                                          onClick={() => handleDownloadImage(slideImg.url, item.platform, slideNum)}
-                                        >
-                                          <Download className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="rounded-lg border border-dashed aspect-[4/5] flex items-center justify-center bg-muted/10">
-                                      <div className="text-center p-4">
-                                        <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                                        <p className="text-xs text-muted-foreground">No image yet</p>
-                                      </div>
-                                    </div>
-                                  )}
+                                    }
+                                  />
                                   <Button
                                     size="sm"
-                                    variant={slideImg ? "outline" : "default"}
+                                    variant={hasImages ? "outline" : "default"}
                                     className="w-full"
                                     onClick={() => handleGenerateImage(item.id, slideImagePrompt, slideNum)}
                                     disabled={isGenerating}
@@ -809,10 +817,10 @@ export default function ContentPage() {
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                         Generating...
                                       </>
-                                    ) : slideImg ? (
+                                    ) : hasImages ? (
                                       <>
                                         <ImageIcon className="mr-2 h-4 w-4" />
-                                        Regenerate
+                                        Generate Another
                                       </>
                                     ) : (
                                       <>
