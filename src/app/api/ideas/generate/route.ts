@@ -213,8 +213,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error in POST /api/ideas/generate:", error);
+    // Return more specific error message for debugging
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: errorMessage },
       { status: 500 }
     );
   }
