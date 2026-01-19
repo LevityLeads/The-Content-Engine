@@ -143,6 +143,7 @@ export default function ContentPage() {
       if (data.success) {
         setImageMessage(data.message);
         if (slideNumber && data.image?.url && !data.image.url.startsWith("placeholder:")) {
+          // For slide images, set directly - don't refetch as it may overwrite with stale data
           setSlideImages((prev) => ({
             ...prev,
             [contentId]: {
@@ -150,8 +151,10 @@ export default function ContentPage() {
               [slideNumber]: data.image.url,
             },
           }));
+        } else if (!slideNumber) {
+          // Only refetch for non-slide (primary) images
+          fetchImagesForContent(contentId);
         }
-        fetchImagesForContent(contentId);
       } else {
         setImageMessage(data.error || "Failed to generate image");
       }
