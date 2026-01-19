@@ -54,18 +54,19 @@ For EACH idea you generate, you must provide:
 ### 1. Concept (1-2 sentences)
 The core idea expressed clearly. What is this content about?
 
-### 2. Angle (choose one)
-- **curiosity**: Creates an open loop
-- **controversy**: Challenges common beliefs
-- **confession**: Shares vulnerable truth
-- **contrarian**: Takes opposite position
-- **credibility**: Leads with proof
+### 2. Angle (choose one - this is the PRIMARY content type)
+- **educational**: Teaches something valuable, how-tos, frameworks, insights
+- **entertaining**: Creates joy, surprise, humor, or emotional response
+- **inspirational**: Motivates, shares success stories, encourages action
+- **promotional**: Highlights products, services, or achievements (use sparingly)
+- **conversational**: Asks questions, sparks discussion, invites engagement
 
-### 3. Content Pillar (choose one)
-- **educate**: Teaches something valuable
-- **entertain**: Creates emotional response
-- **engage**: Sparks conversation
-- **establish**: Builds authority
+### 3. Hook Approach (choose one - this is HOW you'll grab attention)
+- **curiosity**: Creates an open loop that must be closed
+- **controversy**: Challenges common beliefs or conventional wisdom
+- **confession**: Shares vulnerable truth or admission
+- **contrarian**: Takes the opposite position to mainstream
+- **credibility**: Leads with proof, results, or authority
 
 ### 4. Target Platforms
 Select based on where this content naturally fits:
@@ -127,8 +128,8 @@ Return a JSON array with exactly 4 ideas:
   "ideas": [
     {
       "concept": "Clear 1-2 sentence description of the idea",
-      "angle": "curiosity|controversy|confession|contrarian|credibility",
-      "pillar": "educate|entertain|engage|establish",
+      "angle": "educational|entertaining|inspirational|promotional|conversational",
+      "hookApproach": "curiosity|controversy|confession|contrarian|credibility",
       "targetPlatforms": ["twitter", "linkedin", "instagram"],
       "suggestedFormat": "single-post|thread|carousel|story",
       "keyPoints": [
@@ -159,8 +160,8 @@ Return a JSON array with exactly 4 ideas:
 ## Idea Diversity Requirements
 
 Your 4 ideas MUST include:
-1. At least 2 different content pillars
-2. At least 2 different angles
+1. At least 2 different angles (educational, entertaining, etc.)
+2. At least 2 different hook approaches (curiosity, controversy, etc.)
 3. At least 2 different suggested formats
 4. Ideas that work across different platforms
 

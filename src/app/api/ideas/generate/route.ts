@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     const ideasToInsert = ideas.map((idea: {
       concept: string;
       angle: string;
-      pillar?: string;
+      hookApproach?: string;
       targetPlatforms: string[];
       suggestedFormat?: string;
       keyPoints: string[];
@@ -159,8 +159,15 @@ export async function POST(request: NextRequest) {
         ? idea.confidenceScore
         : idea.confidenceScore?.overall ?? 75;
 
-      // Build enhanced reasoning with confidence breakdown if available
+      // Build enhanced reasoning with hook approach and confidence breakdown
       let enhancedReasoning = idea.reasoning;
+
+      // Add hook approach to reasoning if provided
+      if (idea.hookApproach) {
+        enhancedReasoning = `Hook Approach: ${idea.hookApproach}\n\n${enhancedReasoning}`;
+      }
+
+      // Add confidence breakdown if available
       if (typeof idea.confidenceScore === "object" && idea.confidenceScore !== null) {
         const scores = idea.confidenceScore;
         enhancedReasoning += `\n\nConfidence Breakdown:\n- Hook Strength: ${scores.hookStrength ?? "N/A"}\n- Value Density: ${scores.valueDensity ?? "N/A"}\n- Shareability: ${scores.shareability ?? "N/A"}\n- Platform Fit: ${scores.platformFit ?? "N/A"}`;
