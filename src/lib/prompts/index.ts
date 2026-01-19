@@ -48,3 +48,13 @@ export {
   CONTENT_SYSTEM_PROMPT,
   buildContentUserPrompt,
 } from "./content-prompt";
+
+// Visual styles system
+export {
+  VISUAL_STYLES,
+  STYLE_SELECTION_GUIDANCE,
+  getStylePromptTemplate,
+  getStylesReference,
+  type VisualStyle,
+  type StyleDefinition,
+} from "./visual-styles";

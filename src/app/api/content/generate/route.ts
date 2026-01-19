@@ -6,6 +6,7 @@ import {
   buildContentUserPrompt,
   buildVoicePrompt,
   type VoiceConfig,
+  type VisualStyle,
 } from "@/lib/prompts";
 
 const anthropic = new Anthropic({
@@ -23,7 +24,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
     const body = await request.json();
-    const { ideaId, platforms: selectedPlatforms } = body;
+    const { ideaId, platforms: selectedPlatforms, visualStyle } = body as {
+      ideaId: string;
+      platforms?: string[];
+      visualStyle?: VisualStyle;
+    };
 
     if (!ideaId) {
       return NextResponse.json(
@@ -78,7 +83,9 @@ export async function POST(request: NextRequest) {
       },
       ideaData.inputs?.raw_content || "No source content available",
       platformsToGenerate || [],
-      brandVoicePrompt
+      brandVoicePrompt,
+      undefined, // additionalInstructions
+      visualStyle // visual style override (optional)
     );
 
     // Call Claude Opus 4.5
