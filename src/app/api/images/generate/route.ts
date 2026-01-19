@@ -102,9 +102,9 @@ STYLE REQUIREMENTS:
 - Think viral content - what makes someone stop scrolling?
 - Leave safe zones for platform UI elements (profile pics, buttons, etc.)`;
 
-        // Use Nano Banana Pro (Gemini 3 Pro Image Preview) with Thinking
+        // Use Nano Banana (Gemini 2.5 Flash Image) - faster than Pro, avoids timeout
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${googleApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${googleApiKey}`,
           {
             method: "POST",
             headers: {
@@ -134,7 +134,7 @@ STYLE REQUIREMENTS:
           const data = await response.json();
 
           // Log response structure for debugging
-          console.log("Nano Banana Pro response structure:", JSON.stringify({
+          console.log("Nano Banana response structure:", JSON.stringify({
             hasCandidates: !!data.candidates,
             candidateCount: data.candidates?.length,
             hasContent: !!data.candidates?.[0]?.content,
