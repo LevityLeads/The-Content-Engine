@@ -1,3 +1,7 @@
+---
+description: Activate DevOps role for CI/CD, GitHub Actions, deployment, infrastructure
+---
+
 # DevOps & Automation Engineer Role
 
 Read and adopt the persona defined in `.claude/roles/devops.md`.

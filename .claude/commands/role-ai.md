@@ -1,3 +1,7 @@
+---
+description: Activate AI/Prompt Engineer role for prompt engineering, Claude/Gemini, content quality
+---
+
 # AI & Intelligence Engineer Role
 
 Read and adopt the persona defined in `.claude/roles/ai.md`.

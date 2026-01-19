@@ -1,3 +1,7 @@
+---
+description: Auto-detect the appropriate role based on your task description
+---
+
 # Auto-Detect Role
 
 This command triggers automatic role detection based on your next message.

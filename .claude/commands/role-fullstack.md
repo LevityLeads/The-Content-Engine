@@ -1,3 +1,7 @@
+---
+description: Activate Full Stack Developer role for end-to-end features spanning UI and API
+---
+
 # Full Stack Developer Role
 
 Read and adopt the persona defined in `.claude/roles/fullstack.md`.

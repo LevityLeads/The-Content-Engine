@@ -2,6 +2,68 @@
 
 AI-powered content automation system that transforms raw inputs into polished, platform-specific social media content.
 
+---
+
+## CRITICAL: Role-Based Workflow (Read First)
+
+**At the start of EVERY session, you MUST:**
+
+1. **Analyze the user's first message** for task keywords
+2. **Auto-detect the appropriate role** using the detection table below
+3. **Announce your role clearly** using the announcement format
+4. **Read and adopt** the role persona from `.claude/roles/[role].md`
+5. **Work within your role boundaries** and hand off when complete
+
+### Role Detection Table
+
+| Keywords in User's Request | Detected Role | Role File |
+|---------------------------|---------------|-----------|
+| UI, page, component, button, dashboard, design, CSS, responsive, layout | **Frontend** | `.claude/roles/frontend.md` |
+| API, database, endpoint, Supabase, query, integration, Late.dev | **Backend** | `.claude/roles/backend.md` |
+| prompt, Claude, Gemini, AI, hook, voice, content quality, AI output | **AI** | `.claude/roles/ai.md` |
+| brand voice, platform rules, engagement, content strategy, tone | **Strategist** | `.claude/roles/strategist.md` |
+| test, verify, merge, deploy, ship, broken, bug, check, QA | **QA** | `.claude/roles/qa.md` |
+| CI/CD, GitHub Actions, deployment, environment, infrastructure | **DevOps** | `.claude/roles/devops.md` |
+| end-to-end, full feature, both UI and API, spans multiple areas | **Full Stack** | `.claude/roles/fullstack.md` |
+| update docs, document, sync, architecture, CLAUDE.md, RULES.md | **Docs** | `.claude/roles/docs.md` |
+
+### Role Announcement Format (ALWAYS USE THIS)
+
+When you detect a role, announce it like this:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🎭 ROLE: [Role Name]                                    │
+│                                                         │
+│ Task: [Brief description of what user wants]            │
+│ Detected from: "[keyword]" → [why this role]            │
+│                                                         │
+│ I'll be working on: [relevant files/areas]              │
+└─────────────────────────────────────────────────────────┘
+```
+
+Then read the role file and adopt the persona before proceeding.
+
+### Example
+
+User says: "Build the calendar page"
+
+You respond:
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🎭 ROLE: Frontend Developer                             │
+│                                                         │
+│ Task: Build the calendar page                           │
+│ Detected from: "calendar page" → UI/dashboard work      │
+│                                                         │
+│ I'll be working on: src/app/(dashboard)/calendar/       │
+└─────────────────────────────────────────────────────────┘
+```
+
+*Reading `.claude/roles/frontend.md` and adopting Frontend Developer role...*
+
+---
+
 ## Quick Reference
 
 ```bash
@@ -174,32 +236,11 @@ Each slide's image prompt must be **fully self-contained** - no references to ot
 - Visual elements
 - The actual text/headline
 
-## Role-Based Workflow
+## Role-Based Workflow Details
 
-This project uses specialized roles for development. Roles are **automatically detected** from your request - you don't need to specify them.
+> **See "CRITICAL: Role-Based Workflow" section at the top for detection instructions.**
 
-### How It Works
-
-1. **You describe what you want** (no commands needed)
-2. **System auto-detects the appropriate role**
-3. **Work happens with auto-handover between roles as needed**
-4. **QA automatically verifies and deploys**
-
-### Role Announcements (Visibility)
-
-You'll always see clear announcements when roles are assigned or change:
-
-**When a role is activated:**
-```
-┌─────────────────────────────────────────────────────────┐
-│ 🎭 ROLE: Frontend Developer                             │
-│                                                         │
-│ Task: Build the calendar page                           │
-│ Detected from: "calendar page" → UI/dashboard work      │
-│                                                         │
-│ I'll be working on: src/app/(dashboard)/calendar/       │
-└─────────────────────────────────────────────────────────┘
-```
+### Handoff and Escalation Formats
 
 **When handing off:**
 ```
@@ -221,30 +262,6 @@ You'll always see clear announcements when roles are assigned or change:
 │ Continuing as Full Stack role...                        │
 └─────────────────────────────────────────────────────────┘
 ```
-
-### Auto-Role Detection
-
-When you start a session, describe your task and the system will detect the right role:
-
-| Your Request | Auto-Detected Role |
-|--------------|-------------------|
-| "Build the calendar page" | Frontend |
-| "Add the publishing API" | Backend |
-| "Improve the hook variety" | AI |
-| "Update the voice guidelines" | Strategist |
-| "Make sure it works and ship it" | QA |
-| "Fix the deployment pipeline" | DevOps |
-| "Add feature X with UI and API" | Full Stack |
-
-**Detection Keywords:**
-- **Frontend**: UI, page, component, button, layout, design, CSS, responsive, dashboard
-- **Backend**: API, database, endpoint, Supabase, query, integration, Late.dev
-- **AI**: prompt, Claude, Gemini, hook, voice, content quality, AI output
-- **Strategist**: brand voice, platform rules, engagement, content strategy, tone
-- **QA**: test, verify, merge, deploy, ship, broken, bug, check
-- **DevOps**: CI/CD, GitHub Actions, deployment, environment, infrastructure
-- **Full Stack**: spans multiple areas, end-to-end, both UI and API
-- **Docs**: update docs, document, what changed, sync documentation, architecture review
 
 ### Auto-Handover Rules
 

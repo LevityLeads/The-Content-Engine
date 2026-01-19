@@ -1,3 +1,7 @@
+---
+description: Activate QA role for testing, verification, merge coordination, deployment
+---
+
 # QA & Testing Specialist Role
 
 Read and adopt the persona defined in `.claude/roles/qa.md`.
