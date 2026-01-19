@@ -133,6 +133,15 @@ STYLE REQUIREMENTS:
         if (response.ok) {
           const data = await response.json();
 
+          // Log response structure for debugging
+          console.log("Nano Banana Pro response structure:", JSON.stringify({
+            hasCandidates: !!data.candidates,
+            candidateCount: data.candidates?.length,
+            hasContent: !!data.candidates?.[0]?.content,
+            partsCount: data.candidates?.[0]?.content?.parts?.length,
+            partTypes: data.candidates?.[0]?.content?.parts?.map((p: Record<string, unknown>) => Object.keys(p)),
+          }));
+
           // Extract base64 image from response
           const parts = data.candidates?.[0]?.content?.parts || [];
           for (const part of parts) {
@@ -142,11 +151,18 @@ STYLE REQUIREMENTS:
               imageUrl = `data:${mimeType};base64,${imageBase64}`;
               generationStatus = "generated";
               generationMessage = `Image generated for ${platform.toUpperCase()} (${imageConfig.width}x${imageConfig.height})`;
+              console.log(`Image generated successfully, base64 length: ${imageBase64.length}`);
               break;
             }
           }
 
           if (!imageUrl) {
+            // Log what we got instead
+            console.log("No image in response. Parts received:", parts.map((p: Record<string, unknown>) => ({
+              hasText: !!p.text,
+              hasInlineData: !!p.inlineData,
+              textPreview: typeof p.text === 'string' ? p.text.substring(0, 100) : undefined,
+            })));
             generationMessage = "Nano Banana Pro returned no image. The prompt may have been filtered.";
           }
         } else {
