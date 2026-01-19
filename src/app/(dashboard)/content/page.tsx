@@ -618,7 +618,7 @@ export default function ContentPage() {
     );
   };
 
-  // Render compact slide detail (filmstrip + single slide view)
+  // Render card stack view (selected card front, others stacked behind)
   const renderSlideFilmstripAndDetail = (
     item: Content,
     slides: CarouselSlide[],
@@ -635,61 +635,52 @@ export default function ContentPage() {
     const promptKey = `${item.id}-${slide.slideNumber}`;
     const isPromptExpanded = expandedPrompts.has(promptKey);
 
+    // Get images for stacked cards (next 2 slides)
+    const getStackedSlideImage = (offset: number) => {
+      const idx = (currentSlideIdx + offset) % slides.length;
+      const s = slides[idx];
+      if (!s) return null;
+      const imgs = getSlideImages(item.id, s.slideNumber);
+      const vIdx = getVersionIndex(item.id, s.slideNumber);
+      return imgs[Math.min(vIdx, imgs.length - 1)] || null;
+    };
+
+    const nextImage = slides.length > 1 ? getStackedSlideImage(1) : null;
+    const nextNextImage = slides.length > 2 ? getStackedSlideImage(2) : null;
+
     return (
-      <div className="space-y-4">
-        {/* Filmstrip - Horizontal slide navigator */}
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 overflow-x-auto">
-          {slides.map((s, idx) => {
-            const sImgs = getSlideImages(item.id, s.slideNumber);
-            const vIdx = getVersionIndex(item.id, s.slideNumber);
-            const displayImg = sImgs[Math.min(vIdx, sImgs.length - 1)];
-            const hasImage = sImgs.length > 0;
-            const isActive = idx === currentSlideIdx;
-
-            return (
-              <button
-                key={s.slideNumber}
-                onClick={() => setCurrentSlide(item.id, idx)}
-                className={cn(
-                  "relative flex-shrink-0 rounded-lg overflow-hidden transition-all",
-                  "w-16 h-20",
-                  isActive
-                    ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                    : "opacity-60 hover:opacity-100"
-                )}
-              >
-                {hasImage && displayImg ? (
-                  <img
-                    src={displayImg.url}
-                    alt={`Slide ${s.slideNumber}`}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                )}
-                <span className={cn(
-                  "absolute bottom-0.5 left-0.5 text-[10px] font-medium px-1 rounded",
-                  isActive ? "bg-primary text-primary-foreground" : "bg-black/60 text-white"
-                )}>
-                  {idx + 1}
-                </span>
-                {sImgs.length > 1 && (
-                  <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[9px] px-1 rounded">
-                    {sImgs.length}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Selected Slide Detail - Centered vertical layout */}
+      <div className="grid grid-cols-[1fr_1fr] gap-6">
+        {/* Left: Card Stack */}
         <div className="space-y-4">
-          {/* Image centered with max-width */}
-          <div className="flex justify-center">
-            <div className="relative w-full max-w-sm aspect-[4/5] rounded-lg overflow-hidden bg-black/20">
+          {/* Card stack container */}
+          <div className="relative h-[420px] flex items-center justify-center">
+            {/* Third card (back) */}
+            {nextNextImage && (
+              <div
+                className="absolute w-64 aspect-[4/5] rounded-xl overflow-hidden bg-black/30 shadow-lg cursor-pointer transition-all hover:translate-x-1"
+                style={{ transform: 'translateX(24px) translateY(8px) scale(0.92)', zIndex: 1 }}
+                onClick={() => setCurrentSlide(item.id, (currentSlideIdx + 2) % slides.length)}
+              >
+                <img src={nextNextImage.url} alt="Upcoming slide" className="w-full h-full object-cover opacity-60" />
+              </div>
+            )}
+
+            {/* Second card (middle) */}
+            {nextImage && (
+              <div
+                className="absolute w-64 aspect-[4/5] rounded-xl overflow-hidden bg-black/30 shadow-lg cursor-pointer transition-all hover:translate-x-0.5"
+                style={{ transform: 'translateX(12px) translateY(4px) scale(0.96)', zIndex: 2 }}
+                onClick={() => setCurrentSlide(item.id, (currentSlideIdx + 1) % slides.length)}
+              >
+                <img src={nextImage.url} alt="Next slide" className="w-full h-full object-cover opacity-80" />
+              </div>
+            )}
+
+            {/* Front card (current) */}
+            <div
+              className="relative w-64 aspect-[4/5] rounded-xl overflow-hidden bg-black/20 shadow-2xl ring-2 ring-primary/50"
+              style={{ zIndex: 3 }}
+            >
               {currentImage ? (
                 <>
                   <img
@@ -702,6 +693,9 @@ export default function ContentPage() {
                       {renderModelBadge(currentImage.model)}
                     </div>
                   )}
+                  <Badge className="absolute top-2 right-2 bg-black/70 text-white border-0 z-10">
+                    {currentSlideIdx + 1} / {slides.length}
+                  </Badge>
                   <Button
                     size="sm"
                     variant="secondary"
@@ -715,106 +709,167 @@ export default function ContentPage() {
                 <div className="w-full h-full flex items-center justify-center">
                   <div className="text-center">
                     <ImageIcon className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">No image generated</p>
+                    <p className="text-sm text-muted-foreground">No image</p>
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Content below image - full width */}
-          <div className="space-y-3">
-            {/* Header with navigation */}
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold">
-                Slide {currentSlideIdx + 1} of {slides.length}
-              </h4>
-              <div className="flex items-center gap-1">
+          {/* Navigation and version controls under the stack */}
+          <div className="flex items-center justify-center gap-4">
+            {/* Slide navigation */}
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 w-9 p-0"
+                onClick={() => setCurrentSlide(item.id, currentSlideIdx > 0 ? currentSlideIdx - 1 : slides.length - 1)}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <span className="text-sm font-medium w-16 text-center">
+                {currentSlideIdx + 1} / {slides.length}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 w-9 p-0"
+                onClick={() => setCurrentSlide(item.id, currentSlideIdx < slides.length - 1 ? currentSlideIdx + 1 : 0)}
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Version selector (if multiple versions) */}
+            {slideImgs.length > 1 && (
+              <div className="flex items-center gap-1 border-l pl-4">
+                <span className="text-xs text-muted-foreground mr-1">v{safeVersionIdx + 1}/{slideImgs.length}</span>
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="h-8 w-8 p-0"
-                  onClick={() => setCurrentSlide(item.id, currentSlideIdx > 0 ? currentSlideIdx - 1 : slides.length - 1)}
+                  variant="ghost"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setVersionIndex(item.id, slide.slideNumber, safeVersionIdx > 0 ? safeVersionIdx - 1 : slideImgs.length - 1)}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <Button
                   size="sm"
-                  variant="outline"
-                  className="h-8 w-8 p-0"
-                  onClick={() => setCurrentSlide(item.id, currentSlideIdx < slides.length - 1 ? currentSlideIdx + 1 : 0)}
+                  variant="ghost"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setVersionIndex(item.id, slide.slideNumber, safeVersionIdx < slideImgs.length - 1 ? safeVersionIdx + 1 : 0)}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Slide text */}
-            <div className="rounded-lg bg-muted/30 p-3">
-              <p className="text-sm leading-relaxed">{slide.text}</p>
-            </div>
+          {/* Filmstrip thumbnails */}
+          <div className="flex items-center justify-center gap-1.5 p-2 rounded-lg bg-muted/30">
+            {slides.map((s, idx) => {
+              const sImgs = getSlideImages(item.id, s.slideNumber);
+              const vIdx = getVersionIndex(item.id, s.slideNumber);
+              const displayImg = sImgs[Math.min(vIdx, sImgs.length - 1)];
+              const hasImage = sImgs.length > 0;
+              const isActive = idx === currentSlideIdx;
 
-            {/* Bottom row: Prompt, Versions, and Actions inline */}
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              {/* Collapsible Image Prompt */}
-              <button
-                onClick={() => togglePrompt(promptKey)}
-                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors text-left min-w-0 flex-1"
-              >
-                {isPromptExpanded ? <ChevronUp className="h-3 w-3 flex-shrink-0" /> : <ChevronDown className="h-3 w-3 flex-shrink-0" />}
-                <span className="flex-shrink-0">Prompt</span>
-                {!isPromptExpanded && (
-                  <span className="text-muted-foreground/60 truncate">
-                    — {truncateText(slide.imagePrompt, 50)}
-                  </span>
-                )}
-              </button>
+              return (
+                <button
+                  key={s.slideNumber}
+                  onClick={() => setCurrentSlide(item.id, idx)}
+                  className={cn(
+                    "relative flex-shrink-0 rounded overflow-hidden transition-all",
+                    "w-10 h-12",
+                    isActive
+                      ? "ring-2 ring-primary"
+                      : "opacity-50 hover:opacity-100"
+                  )}
+                >
+                  {hasImage && displayImg ? (
+                    <img src={displayImg.url} alt={`Slide ${s.slideNumber}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <span className="text-[10px] text-muted-foreground">{idx + 1}</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-              {/* Version thumbnails (inline) */}
-              {slideImgs.length > 1 && (
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {slideImgs.map((img, idx) => (
-                    <button
-                      key={img.id}
-                      onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
-                      className={cn(
-                        "w-8 h-8 rounded overflow-hidden border-2 transition-all",
-                        idx === safeVersionIdx
-                          ? "border-primary"
-                          : "border-transparent opacity-50 hover:opacity-100"
-                      )}
-                    >
-                      <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
+        {/* Right: Content panel */}
+        <div className="space-y-4">
+          {/* Slide header */}
+          <div>
+            <h4 className="text-lg font-semibold">Slide {currentSlideIdx + 1}</h4>
+            <p className="text-xs text-muted-foreground">of {slides.length} slides</p>
+          </div>
 
-              {/* Action button */}
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-shrink-0"
-                onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
-                disabled={isGenerating}
-              >
-                {isGenerating ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
-                ) : currentImage ? (
-                  <><RefreshCw className="mr-2 h-4 w-4" />Regenerate</>
-                ) : (
-                  <><ImageIcon className="mr-2 h-4 w-4" />Generate</>
-                )}
-              </Button>
-            </div>
+          {/* Slide text */}
+          <div className="rounded-lg bg-muted/30 p-4">
+            <p className="text-sm leading-relaxed">{slide.text}</p>
+          </div>
 
-            {/* Expanded prompt (if open) */}
-            {isPromptExpanded && (
+          {/* Image Prompt */}
+          <div className="space-y-2">
+            <button
+              onClick={() => togglePrompt(promptKey)}
+              className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {isPromptExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              Image Prompt
+            </button>
+            {isPromptExpanded ? (
               <div className="rounded-lg bg-muted/20 p-3 text-xs text-muted-foreground leading-relaxed">
                 {slide.imagePrompt}
               </div>
+            ) : (
+              <p className="text-xs text-muted-foreground/60 truncate pl-6">
+                {truncateText(slide.imagePrompt, 80)}
+              </p>
             )}
           </div>
+
+          {/* Version thumbnails grid */}
+          {slideImgs.length > 1 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Versions ({slideImgs.length})</p>
+              <div className="grid grid-cols-4 gap-2">
+                {slideImgs.map((img, idx) => (
+                  <button
+                    key={img.id}
+                    onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
+                    className={cn(
+                      "aspect-[4/5] rounded-lg overflow-hidden border-2 transition-all",
+                      idx === safeVersionIdx
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-transparent opacity-60 hover:opacity-100"
+                    )}
+                  >
+                    <img src={img.url} alt={`Version ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Generate button */}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
+            ) : currentImage ? (
+              <><RefreshCw className="mr-2 h-4 w-4" />Regenerate Image</>
+            ) : (
+              <><ImageIcon className="mr-2 h-4 w-4" />Generate Image</>
+            )}
+          </Button>
         </div>
       </div>
     );
