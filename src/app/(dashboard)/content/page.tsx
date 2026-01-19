@@ -537,6 +537,7 @@ export default function ContentPage() {
                                     className="w-full"
                                     onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
                                     disabled={isGenerating}
+                                    title={slide.imagePrompt}
                                   >
                                     {isGenerating ? (
                                       <>
@@ -576,17 +577,152 @@ export default function ContentPage() {
                     </div>
                   )}
 
-                  {/* LEGACY FORMAT: Old carousel slides (just text) */}
+                  {/* LEGACY FORMAT: Old carousel slides (just text) - with image generation */}
                   {legacySlides && legacySlides.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">Carousel ({legacySlides.length} slides)</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {legacySlides.map((slide, i) => (
-                          <div key={i} className="rounded-lg border bg-muted/20 p-3">
-                            <p className="text-xs text-muted-foreground mb-1">Slide {i + 1}</p>
-                            <p className="text-sm">{slide}</p>
-                          </div>
-                        ))}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Carousel ({legacySlides.length} slides)
+                        </p>
+                        {item.metadata?.imagePrompt && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => {
+                              // Generate all legacy slide images
+                              legacySlides.forEach((slideText, i) => {
+                                const slidePrompt = `${item.metadata?.imagePrompt || ''} - Slide ${i + 1}: ${slideText.slice(0, 100)}`;
+                                handleGenerateImage(item.id, slidePrompt, i + 1);
+                              });
+                            }}
+                            disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
+                          >
+                            <Images className="mr-2 h-4 w-4" />
+                            Generate All Images
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid gap-4">
+                        {legacySlides.map((slideText, i) => {
+                          const slideNum = i + 1;
+                          const slideImg = getSlideImage(item.id, slideNum);
+                          const isGenerating = isSlideGenerating(item.id, slideNum);
+                          const isApproved = isSlideApproved(item.id, slideNum);
+                          const slideImagePrompt = item.metadata?.imagePrompt
+                            ? `${item.metadata.imagePrompt} - Slide ${slideNum}: ${slideText.slice(0, 100)}`
+                            : `Create an image for: ${slideText}`;
+
+                          return (
+                            <div
+                              key={i}
+                              className={`rounded-lg border p-4 ${isApproved ? "border-emerald-500 bg-emerald-500/5" : "bg-muted/20"}`}
+                            >
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    Slide {slideNum}
+                                  </Badge>
+                                  {isApproved && (
+                                    <Badge className="bg-emerald-500 text-xs">
+                                      <Check className="mr-1 h-3 w-3" />
+                                      Approved
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex gap-2">
+                                  {!isApproved ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-emerald-500 border-emerald-500 hover:bg-emerald-500/10"
+                                      onClick={() => handleApproveSlide(item.id, slideNum)}
+                                    >
+                                      <CheckCircle2 className="h-4 w-4" />
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-red-500 border-red-500 hover:bg-red-500/10"
+                                      onClick={() => handleRejectSlide(item.id, slideNum)}
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="grid md:grid-cols-2 gap-4">
+                                {/* Slide Image */}
+                                <div className="space-y-2">
+                                  {slideImg ? (
+                                    <div className="relative rounded-lg overflow-hidden border aspect-[4/5]">
+                                      <img
+                                        src={slideImg}
+                                        alt={`Slide ${slideNum}`}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <div className="absolute bottom-2 right-2 flex gap-1">
+                                        <Button
+                                          size="sm"
+                                          variant="secondary"
+                                          className="bg-black/50 hover:bg-black/70 text-white border-0 h-8 w-8 p-0"
+                                          onClick={() => handleDownloadImage(slideImg, item.platform, slideNum)}
+                                        >
+                                          <Download className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="rounded-lg border border-dashed aspect-[4/5] flex items-center justify-center bg-muted/10">
+                                      <div className="text-center p-4">
+                                        <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                                        <p className="text-xs text-muted-foreground">No image yet</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant={slideImg ? "outline" : "default"}
+                                    className="w-full"
+                                    onClick={() => handleGenerateImage(item.id, slideImagePrompt, slideNum)}
+                                    disabled={isGenerating}
+                                    title={slideImagePrompt}
+                                  >
+                                    {isGenerating ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Generating...
+                                      </>
+                                    ) : slideImg ? (
+                                      <>
+                                        <ImageIcon className="mr-2 h-4 w-4" />
+                                        Regenerate
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ImageIcon className="mr-2 h-4 w-4" />
+                                        Generate Image
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+
+                                {/* Slide Content */}
+                                <div className="space-y-3">
+                                  <div>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">Slide Text</p>
+                                    <p className="text-sm">{slideText}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">Image Prompt</p>
+                                    <p className="text-xs text-muted-foreground italic">{slideImagePrompt}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
