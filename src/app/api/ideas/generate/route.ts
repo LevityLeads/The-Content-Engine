@@ -1,43 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Anthropic from "@anthropic-ai/sdk";
+import {
+  IDEATION_SYSTEM_PROMPT,
+  buildIdeationUserPrompt,
+  buildVoicePrompt,
+  type VoiceConfig,
+} from "@/lib/prompts";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-const IDEATION_SYSTEM_PROMPT = `You are a creative social media strategist helping generate content ideas.
-
-Your task is to take raw input (text, article summary, or notes) and generate compelling content ideas for social media.
-
-For each idea, provide:
-1. A compelling concept (1-2 sentences describing the post idea)
-2. The content angle (one of: educational, entertaining, inspirational, promotional, conversational)
-3. Recommended platforms (array of: twitter, instagram, linkedin)
-4. 3-5 key points to cover in the post
-5. A potential hook/opening line
-6. Brief reasoning for why this will resonate with audiences
-
-Focus on ideas that:
-- Are platform-appropriate
-- Have engagement potential
-- Can be created with text and static images
-- Feel authentic, not generic
-
-Respond in JSON format with an array of ideas:
-{
-  "ideas": [
-    {
-      "concept": "string",
-      "angle": "educational" | "entertaining" | "inspirational" | "promotional" | "conversational",
-      "targetPlatforms": ["twitter", "instagram", "linkedin"],
-      "keyPoints": ["string", "string", "string"],
-      "potentialHooks": ["string"],
-      "reasoning": "string",
-      "confidenceScore": number (0-100)
-    }
-  ]
-}`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,10 +55,9 @@ export async function POST(request: NextRequest) {
       brands?: { voice_config?: Record<string, unknown> } | null;
     };
 
-    // Build the prompt
-    const brandContext = inputData.brands?.voice_config
-      ? `Brand Voice: ${JSON.stringify(inputData.brands.voice_config)}`
-      : "";
+    // Build the voice prompt from brand config
+    const voiceConfig = inputData.brands?.voice_config as VoiceConfig | null;
+    const brandVoicePrompt = buildVoicePrompt(voiceConfig);
 
     // Truncate very long content (e.g., from large PDFs) to avoid context limits
     // Keep first ~15000 chars which is roughly ~4000 tokens
@@ -98,13 +70,12 @@ export async function POST(request: NextRequest) {
       truncationNote = `\n\n[Note: This content was truncated from ${inputData.raw_content.length} characters. Focus on generating ideas from the available excerpt.]`;
     }
 
-    const userPrompt = `${brandContext}
-
-INPUT TO TRANSFORM:
-Type: ${inputData.type}
-Content: ${contentForPrompt}${truncationNote}
-
-Generate 4 distinct content ideas for social media posts based on this input. Return ONLY valid JSON with no markdown formatting.`;
+    // Build the enhanced user prompt using the new prompt system
+    const userPrompt = buildIdeationUserPrompt(
+      contentForPrompt + truncationNote,
+      inputData.type,
+      brandVoicePrompt
+    );
 
     // Call Claude Opus 4.5
     const message = await anthropic.messages.create({
@@ -171,26 +142,44 @@ Generate 4 distinct content ideas for social media posts based on this input. Re
     }
 
     // Save ideas to database
+    // Handle both old format (confidenceScore as number) and new format (as object with overall)
     const ideasToInsert = ideas.map((idea: {
       concept: string;
       angle: string;
+      pillar?: string;
       targetPlatforms: string[];
+      suggestedFormat?: string;
       keyPoints: string[];
       potentialHooks: string[];
       reasoning: string;
-      confidenceScore: number;
-    }) => ({
-      input_id: inputId,
-      brand_id: inputData.brand_id,
-      concept: idea.concept,
-      angle: idea.angle,
-      target_platforms: idea.targetPlatforms,
-      key_points: idea.keyPoints,
-      potential_hooks: idea.potentialHooks,
-      ai_reasoning: idea.reasoning,
-      confidence_score: idea.confidenceScore,
-      status: "pending",
-    }));
+      confidenceScore: number | { overall: number; hookStrength?: number; valueDensity?: number; shareability?: number; platformFit?: number };
+    }) => {
+      // Extract overall confidence score whether it's a number or object
+      const overallConfidence = typeof idea.confidenceScore === "number"
+        ? idea.confidenceScore
+        : idea.confidenceScore?.overall ?? 75;
+
+      // Build enhanced reasoning with confidence breakdown if available
+      let enhancedReasoning = idea.reasoning;
+      if (typeof idea.confidenceScore === "object" && idea.confidenceScore !== null) {
+        const scores = idea.confidenceScore;
+        enhancedReasoning += `\n\nConfidence Breakdown:\n- Hook Strength: ${scores.hookStrength ?? "N/A"}\n- Value Density: ${scores.valueDensity ?? "N/A"}\n- Shareability: ${scores.shareability ?? "N/A"}\n- Platform Fit: ${scores.platformFit ?? "N/A"}`;
+      }
+
+      return {
+        input_id: inputId,
+        brand_id: inputData.brand_id,
+        concept: idea.concept,
+        angle: idea.angle,
+        target_platforms: idea.targetPlatforms,
+        suggested_formats: idea.suggestedFormat ? [idea.suggestedFormat] : null,
+        key_points: idea.keyPoints,
+        potential_hooks: idea.potentialHooks,
+        ai_reasoning: enhancedReasoning,
+        confidence_score: overallConfidence,
+        status: "pending",
+      };
+    });
 
     const { data: savedIdeas, error: saveError } = await supabase
       .from("ideas")
