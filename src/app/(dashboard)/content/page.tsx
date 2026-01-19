@@ -578,14 +578,15 @@ export default function ContentPage() {
     );
   };
 
-  // Render unified slide card (image + text together)
-  const renderUnifiedSlideCard = (
+  // Render compact slide detail (filmstrip + single slide view)
+  const renderSlideFilmstripAndDetail = (
     item: Content,
-    slide: CarouselSlide,
-    slideIndex: number,
-    totalSlides: number,
-    isCurrentSlide: boolean
+    slides: CarouselSlide[],
+    currentSlideIdx: number
   ) => {
+    const slide = slides[currentSlideIdx];
+    if (!slide) return null;
+
     const slideImgs = getSlideImages(item.id, slide.slideNumber);
     const versionIdx = getVersionIndex(item.id, slide.slideNumber);
     const safeVersionIdx = Math.min(versionIdx, Math.max(0, slideImgs.length - 1));
@@ -595,18 +596,59 @@ export default function ContentPage() {
     const isPromptExpanded = expandedPrompts.has(promptKey);
 
     return (
-      <div
-        key={slide.slideNumber}
-        className={cn(
-          "rounded-xl border-2 transition-all overflow-hidden",
-          isCurrentSlide
-            ? "border-primary bg-primary/5"
-            : "border-transparent bg-muted/30 hover:bg-muted/50"
-        )}
-      >
-        <div className="grid md:grid-cols-2 gap-0">
-          {/* Left: Image */}
-          <div className="relative aspect-[4/5] bg-black/20">
+      <div className="space-y-4">
+        {/* Filmstrip - Horizontal slide navigator */}
+        <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 overflow-x-auto">
+          {slides.map((s, idx) => {
+            const sImgs = getSlideImages(item.id, s.slideNumber);
+            const vIdx = getVersionIndex(item.id, s.slideNumber);
+            const displayImg = sImgs[Math.min(vIdx, sImgs.length - 1)];
+            const hasImage = sImgs.length > 0;
+            const isActive = idx === currentSlideIdx;
+
+            return (
+              <button
+                key={s.slideNumber}
+                onClick={() => setCurrentSlide(item.id, idx)}
+                className={cn(
+                  "relative flex-shrink-0 rounded-lg overflow-hidden transition-all",
+                  "w-16 h-20",
+                  isActive
+                    ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    : "opacity-60 hover:opacity-100"
+                )}
+              >
+                {hasImage && displayImg ? (
+                  <img
+                    src={displayImg.url}
+                    alt={`Slide ${s.slideNumber}`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                )}
+                <span className={cn(
+                  "absolute bottom-0.5 left-0.5 text-[10px] font-medium px-1 rounded",
+                  isActive ? "bg-primary text-primary-foreground" : "bg-black/60 text-white"
+                )}>
+                  {idx + 1}
+                </span>
+                {sImgs.length > 1 && (
+                  <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[9px] px-1 rounded">
+                    {sImgs.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Selected Slide Detail - Compact two-column layout */}
+        <div className="grid grid-cols-[280px_1fr] gap-4 items-start">
+          {/* Left: Constrained image */}
+          <div className="relative aspect-[4/5] rounded-lg overflow-hidden bg-black/20">
             {currentImage ? (
               <>
                 <img
@@ -619,127 +661,116 @@ export default function ContentPage() {
                     {renderModelBadge(currentImage.model)}
                   </div>
                 )}
-                {slideImgs.length > 1 && (
-                  <Badge className="absolute top-2 right-2 bg-black/70 text-white border-0 z-10 text-xs">
-                    v{safeVersionIdx + 1}/{slideImgs.length}
-                  </Badge>
-                )}
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-8 w-8 p-0 z-10"
+                  className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-7 w-7 p-0 z-10"
                   onClick={() => handleDownloadImage(currentImage.url, item.platform, slide.slideNumber)}
                 >
-                  <Download className="h-4 w-4" />
+                  <Download className="h-3.5 w-3.5" />
                 </Button>
               </>
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <div className="text-center p-4">
-                  <ImageIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">No image yet</p>
+                <div className="text-center">
+                  <ImageIcon className="h-8 w-8 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">No image</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Content panel */}
+          <div className="space-y-3">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold">
+                Slide {currentSlideIdx + 1} of {slides.length}
+              </h4>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setCurrentSlide(item.id, currentSlideIdx > 0 ? currentSlideIdx - 1 : slides.length - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setCurrentSlide(item.id, currentSlideIdx < slides.length - 1 ? currentSlideIdx + 1 : 0)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Slide text */}
+            <div className="rounded-lg bg-muted/30 p-3">
+              <p className="text-sm leading-relaxed">{slide.text}</p>
+            </div>
+
+            {/* Collapsible Image Prompt */}
+            <div>
+              <button
+                onClick={() => togglePrompt(promptKey)}
+                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+              >
+                {isPromptExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                Image Prompt
+                {!isPromptExpanded && (
+                  <span className="text-muted-foreground/60 truncate flex-1">
+                    — {truncateText(slide.imagePrompt, 60)}
+                  </span>
+                )}
+              </button>
+              {isPromptExpanded && (
+                <p className="text-xs text-muted-foreground mt-2 leading-relaxed pl-5">
+                  {slide.imagePrompt}
+                </p>
+              )}
+            </div>
+
+            {/* Version thumbnails (inline) */}
+            {slideImgs.length > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Versions:</span>
+                <div className="flex gap-1">
+                  {slideImgs.map((img, idx) => (
+                    <button
+                      key={img.id}
+                      onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
+                      className={cn(
+                        "w-10 h-10 rounded overflow-hidden border-2 transition-all",
+                        idx === safeVersionIdx
+                          ? "border-primary"
+                          : "border-transparent opacity-50 hover:opacity-100"
+                      )}
+                    >
+                      <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Slide indicator overlay */}
-            <Badge className="absolute bottom-2 left-2 bg-black/70 text-white border-0 z-10">
-              Slide {slideIndex + 1} / {totalSlides}
-            </Badge>
-          </div>
-
-          {/* Right: Text content */}
-          <div className="p-4 flex flex-col">
-            <div className="flex-1 space-y-3">
-              {/* Slide text */}
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Slide Text</p>
-                <p className="text-sm leading-relaxed">{slide.text}</p>
-              </div>
-
-              {/* Collapsible Image Prompt */}
-              <div className="border-t pt-3">
-                <button
-                  onClick={() => togglePrompt(promptKey)}
-                  className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full text-left"
-                >
-                  {isPromptExpanded ? (
-                    <ChevronUp className="h-3 w-3" />
-                  ) : (
-                    <ChevronDown className="h-3 w-3" />
-                  )}
-                  Image Prompt
-                  {!isPromptExpanded && (
-                    <span className="text-muted-foreground/60 truncate flex-1">
-                      — {truncateText(slide.imagePrompt, 40)}
-                    </span>
-                  )}
-                </button>
-                {isPromptExpanded && (
-                  <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                    {slide.imagePrompt}
-                  </p>
-                )}
-              </div>
-
-              {/* Version thumbnails */}
-              {slideImgs.length > 1 && (
-                <div className="border-t pt-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">
-                    Versions ({slideImgs.length})
-                  </p>
-                  <div className="flex gap-1.5 overflow-x-auto">
-                    {slideImgs.map((img, idx) => (
-                      <button
-                        key={img.id}
-                        onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
-                        className={cn(
-                          "flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all",
-                          idx === safeVersionIdx
-                            ? "border-primary ring-2 ring-primary/30"
-                            : "border-transparent opacity-60 hover:opacity-100"
-                        )}
-                        title={`Version ${idx + 1}${idx === 0 ? " (newest)" : ""}`}
-                      >
-                        <img
-                          src={img.url}
-                          alt={`Version ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            {/* Actions */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
+              ) : currentImage ? (
+                <><RefreshCw className="mr-2 h-4 w-4" />Regenerate</>
+              ) : (
+                <><ImageIcon className="mr-2 h-4 w-4" />Generate Image</>
               )}
-            </div>
-
-            {/* Slide actions */}
-            <div className="pt-3 mt-auto border-t">
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full"
-                onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
-                disabled={isGenerating}
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : currentImage ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Regenerate
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className="mr-2 h-4 w-4" />
-                    Generate Image
-                  </>
-                )}
-              </Button>
-            </div>
+            </Button>
           </div>
         </div>
       </div>
@@ -1338,14 +1369,10 @@ export default function ContentPage() {
                         </div>
                       </TabsContent>
 
-                      {/* Slides Tab - Unified View */}
+                      {/* Slides Tab - Filmstrip + Single Slide Detail */}
                       {hasCarousel && carouselSlides && (
                         <TabsContent value="slides" className="m-0 p-4">
-                          <div className="space-y-4">
-                            {carouselSlides.map((slide, idx) => (
-                              renderUnifiedSlideCard(item, slide, idx, totalSlides, idx === currentSlide)
-                            ))}
-                          </div>
+                          {renderSlideFilmstripAndDetail(item, carouselSlides, currentSlide)}
                         </TabsContent>
                       )}
                     </Tabs>
