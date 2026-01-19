@@ -258,10 +258,38 @@ export default function ContentPage() {
     return (generatingSlides[contentId] || []).includes(slideNumber);
   };
 
-  // Helper to check if carousel slides are in new format
-  const isNewCarouselFormat = (slides: CarouselSlide[] | string[] | null): slides is CarouselSlide[] => {
-    if (!slides || slides.length === 0) return false;
-    return typeof slides[0] === "object" && "imagePrompt" in slides[0];
+  // Helper to parse carousel slides (handles JSON strings from database)
+  const parseCarouselSlides = (slides: CarouselSlide[] | string[] | null): { parsed: CarouselSlide[] | null; legacy: string[] | null } => {
+    if (!slides || slides.length === 0) return { parsed: null, legacy: null };
+
+    // Check if first slide is already an object
+    if (typeof slides[0] === "object" && "imagePrompt" in slides[0]) {
+      return { parsed: slides as CarouselSlide[], legacy: null };
+    }
+
+    // Check if first slide is a JSON string that can be parsed
+    if (typeof slides[0] === "string") {
+      try {
+        const firstParsed = JSON.parse(slides[0] as string);
+        if (firstParsed && typeof firstParsed === "object" && "imagePrompt" in firstParsed) {
+          // All slides are JSON strings - parse them all
+          const parsedSlides = (slides as string[]).map(s => {
+            try {
+              return JSON.parse(s) as CarouselSlide;
+            } catch {
+              return null;
+            }
+          }).filter((s): s is CarouselSlide => s !== null);
+          return { parsed: parsedSlides.length > 0 ? parsedSlides : null, legacy: null };
+        }
+      } catch {
+        // Not JSON, treat as legacy plain text
+      }
+      // Legacy plain text strings
+      return { parsed: null, legacy: slides as string[] };
+    }
+
+    return { parsed: null, legacy: null };
   };
 
   const draftCount = content.filter((c) => c.status === "draft").length;
@@ -330,12 +358,7 @@ export default function ContentPage() {
               (img) => img.url && !img.url.startsWith("placeholder:")
             );
             const hasCarousel = !!(item.copy_carousel_slides && item.copy_carousel_slides.length > 0);
-            const carouselSlides = hasCarousel && isNewCarouselFormat(item.copy_carousel_slides)
-              ? item.copy_carousel_slides
-              : null;
-            const legacySlides = hasCarousel && !isNewCarouselFormat(item.copy_carousel_slides)
-              ? item.copy_carousel_slides as string[]
-              : null;
+            const { parsed: carouselSlides, legacy: legacySlides } = parseCarouselSlides(item.copy_carousel_slides);
             const totalSlides = carouselSlides?.length || legacySlides?.length || 0;
             const allSlidesApproved = totalSlides > 0 ? areAllSlidesApproved(item.id, totalSlides) : true;
 
