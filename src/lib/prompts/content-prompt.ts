@@ -180,8 +180,23 @@ Final Slide: THE CTA
 - Maximum 6 slides (swipe fatigue is real)
 - Each slide must earn the next swipe
 - Text must be readable without zooming
-- Consistent visual style across slides
 - Never reference "slide 1" or "previous slide" in prompts
+
+**CRITICAL: Carousel Visual Consistency**:
+ALL slides in a carousel MUST use the EXACT SAME:
+- Background color (same hex code on every slide)
+- Font: Inter (or specify ONE font that ALL slides use)
+- Primary text color (same hex)
+- Accent color (same hex)
+- Typography hierarchy (same weight/size rules)
+
+Before writing any slide prompts, FIRST define your carousel design system:
+1. Pick ONE background color (e.g., #1a1a2e)
+2. Pick ONE primary text color (e.g., #ffffff)
+3. Pick ONE accent color (e.g., #ff6b6b)
+4. Use font: Inter (bold for headlines, regular for body)
+
+Then EVERY slide prompt MUST start with these EXACT values. No variation.
 
 **What Performs on Instagram**:
 - Educational carousels
@@ -233,10 +248,29 @@ Each imagePrompt MUST be 100% self-contained. The image generator has NO context
 - Cross-references: "same style as slide 1", "matching previous slide"
 - App mockups: "phone screen showing", "app interface"
 
-### Good Image Prompt Example:
+### Good Image Prompt Example (Single Image):
 \`\`\`
-Clean modern graphic with deep teal background (#0d4d4d). Large bold white text (#ffffff) reading "The 3-Second Rule" centered in the upper third. Below, smaller cream-colored text (#f5f5dc) reading "How top performers make decisions". Minimal geometric accent shapes in lighter teal (#1a6b6b) in bottom corners. Overall aesthetic: sophisticated, tech-forward, premium feel.
+Clean modern graphic with deep teal background (#0d4d4d). Large bold white text (#ffffff) in Inter font reading "The 3-Second Rule" centered in the upper third. Below, smaller cream-colored text (#f5f5dc) in Inter regular reading "How top performers make decisions". Minimal geometric accent shapes in lighter teal (#1a6b6b) in bottom corners. Overall aesthetic: sophisticated, tech-forward, premium feel.
 \`\`\`
+
+### CAROUSEL: All Slides Must Match
+When creating carousel slides, EVERY slide prompt must use IDENTICAL:
+- Background color (exact hex)
+- Font family (Inter)
+- Text colors (exact hex codes)
+- Layout margins and spacing rules
+
+### Good Carousel Prompt Example (Slide 1 of 4):
+\`\`\`
+Bold modern graphic with charcoal black background (#1a1a1a). Large bold white text (#ffffff) in Inter Bold font reading "This Changed Everything" centered vertically. Subtle coral accent line (#ff6b6b) below the text. Clean minimalist layout with 15% margins. Overall aesthetic: bold, editorial, premium.
+\`\`\`
+
+### Good Carousel Prompt Example (Slide 2 of same carousel):
+\`\`\`
+Bold modern graphic with charcoal black background (#1a1a1a). Header text in white (#ffffff) Inter Bold reading "The Problem" at top. Body text in coral (#ff6b6b) Inter Regular reading "Most people chase metrics instead of building systems." Text left-aligned with 15% margins. Clean minimalist layout. Overall aesthetic: bold, editorial, premium.
+\`\`\`
+
+Note: Both slides use IDENTICAL: background (#1a1a1a), font (Inter), colors (#ffffff, #ff6b6b), margins (15%), aesthetic (bold, editorial, premium).
 
 ### Bad Image Prompt Example:
 \`\`\`
@@ -279,24 +313,25 @@ Return a JSON array with content for each requested platform:
       "primaryCopy": "Instagram caption text",
       "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],
       "cta": "Save this for later!",
+      "carouselStyle": {
+        "backgroundColor": "#1a1a1a",
+        "primaryColor": "#ffffff",
+        "accentColor": "#ff6b6b",
+        "font": "Inter",
+        "aesthetic": "bold, editorial, premium"
+      },
       "carouselSlides": [
         {
           "slideNumber": 1,
           "text": "Hook text for slide 1",
-          "imagePrompt": "Complete self-contained prompt for slide 1"
+          "imagePrompt": "MUST include: background (#1a1a1a), Inter font, colors (#ffffff, #ff6b6b), aesthetic (bold, editorial, premium) - exactly matching carouselStyle above"
         },
         {
           "slideNumber": 2,
           "text": "Content for slide 2",
-          "imagePrompt": "Complete self-contained prompt for slide 2"
+          "imagePrompt": "MUST include: background (#1a1a1a), Inter font, colors (#ffffff, #ff6b6b), aesthetic (bold, editorial, premium) - exactly matching carouselStyle above"
         }
-      ],
-      "carouselStyle": {
-        "backgroundColor": "#1a1a2e",
-        "primaryColor": "#ffffff",
-        "accentColor": "#64ffda",
-        "fontStyle": "modern sans-serif"
-      }
+      ]
     }
   ]
 }
@@ -333,6 +368,8 @@ Before returning any content, verify:
 - [ ] Caption hook before fold (~125 chars)
 - [ ] 5-10 targeted hashtags
 - [ ] All image prompts are fully self-contained
+- [ ] ALL carousel slides use IDENTICAL: background color, font (Inter), text colors, accent color, aesthetic
+- [ ] carouselStyle is defined BEFORE slides and ALL slide prompts match it exactly
 
 ---
 
@@ -381,7 +418,7 @@ ${sourceContent.substring(0, 3000)}${sourceContent.length > 3000 ? "\n\n[Content
 
 Generate content for: ${platforms.map((p) => p.toUpperCase()).join(", ")}
 
-${platforms.includes("instagram") ? "For Instagram: Create a carousel with 4-6 slides. Remember slide 1 is HOOK ONLY." : ""}
+${platforms.includes("instagram") ? "For Instagram: Create a carousel with 4-6 slides. Remember slide 1 is HOOK ONLY. CRITICAL: Define carouselStyle FIRST (background, colors, font: Inter, aesthetic), then ensure EVERY slide imagePrompt uses those EXACT same values for visual consistency." : ""}
 ${platforms.includes("twitter") ? "For Twitter: If the idea warrants depth, create a thread. Otherwise, a powerful single tweet." : ""}
 
 ---
