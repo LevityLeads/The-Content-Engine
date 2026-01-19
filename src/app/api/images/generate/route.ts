@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// Using Nano Banana Pro (Gemini 3 Pro Image) with Thinking for image generation
+// Using Nano Banana Pro (gemini-3-pro-image-preview) with Thinking for high-quality image generation
+// Note: This model may take longer than Flash but produces better quality
 // See: https://ai.google.dev/gemini-api/docs/image-generation
 
 // Platform-specific image configurations
@@ -102,9 +103,9 @@ STYLE REQUIREMENTS:
 - Think viral content - what makes someone stop scrolling?
 - Leave safe zones for platform UI elements (profile pics, buttons, etc.)`;
 
-        // Use Nano Banana (Gemini 2.5 Flash Image) - faster than Pro, avoids timeout
+        // Use Nano Banana Pro (Gemini 3 Pro Image) with thinking for higher quality
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${googleApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${googleApiKey}`,
           {
             method: "POST",
             headers: {
