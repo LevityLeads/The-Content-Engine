@@ -41,9 +41,9 @@ export async function POST(request: NextRequest) {
 
     if (googleApiKey) {
       try {
-        // Use Nano Banana Pro (Gemini 3 Pro Image) with Thinking for image generation
+        // Use Nano Banana Pro (Gemini 3 Pro Image Preview) with Thinking for image generation
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${googleApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${googleApiKey}`,
           {
             method: "POST",
             headers: {
