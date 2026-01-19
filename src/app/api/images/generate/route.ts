@@ -54,7 +54,17 @@ export async function POST(request: NextRequest) {
                 {
                   parts: [
                     {
-                      text: `${prompt}. Style: Professional, modern, suitable for social media marketing. High quality, visually appealing. No text overlays in the image.`,
+                      text: `${prompt}.
+
+IMPORTANT STYLE REQUIREMENTS:
+- Include a bold, attention-grabbing headline or hook text directly on the image
+- The text should be large, readable, and designed to STOP THE SCROLL
+- Make viewers instantly intrigued and want to learn more
+- Use striking typography that pops against the background
+- High contrast, vibrant colors that demand attention
+- Professional social media aesthetic but with punch
+- The headline should create curiosity and urgency
+- Think viral content - what makes someone stop scrolling?`,
                     },
                   ],
                 },
