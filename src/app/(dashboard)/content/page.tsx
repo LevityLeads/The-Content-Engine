@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Palette } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -89,6 +89,9 @@ export default function ContentPage() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkApproving, setIsBulkApproving] = useState(false);
   const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
+  const [generatingCompositeCarousel, setGeneratingCompositeCarousel] = useState<string | null>(null);
+  const [selectedDesignPreset, setSelectedDesignPreset] = useState<string>("dark-coral");
+  const [selectedBackgroundStyle, setSelectedBackgroundStyle] = useState<string>("gradient-dark");
 
   useEffect(() => {
     fetchContent();
@@ -240,6 +243,43 @@ export default function ContentPage() {
     await Promise.all(promises);
     setImageMessage("All slide images generated!");
     setTimeout(() => setImageMessage(null), 5000);
+  };
+
+  // Generate carousel with composite system (consistent text rendering)
+  const handleGenerateCompositeCarousel = async (contentId: string, slides: CarouselSlide[]) => {
+    setGeneratingCompositeCarousel(contentId);
+    setImageMessage("Generating carousel with consistent styling...");
+    try {
+      const response = await fetch("/api/images/carousel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          slides: slides.map((s) => ({
+            slideNumber: s.slideNumber,
+            text: s.text,
+          })),
+          designPreset: selectedDesignPreset,
+          backgroundStyle: selectedBackgroundStyle,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setImageMessage(`Generated ${data.images.length} slides with consistent styling!`);
+        // Refresh images for this content
+        fetchImagesForContent(contentId);
+      } else {
+        setImageMessage(`Error: ${data.error || "Failed to generate carousel"}`);
+      }
+    } catch (error) {
+      console.error("Error generating composite carousel:", error);
+      setImageMessage("Error generating composite carousel");
+    } finally {
+      setGeneratingCompositeCarousel(null);
+      setTimeout(() => setImageMessage(null), 5000);
+    }
   };
 
   const handleUpdateContent = async (id: string, updates: Partial<Content>) => {
@@ -1085,17 +1125,64 @@ export default function ContentPage() {
                           )}
                         </TabsList>
 
-                        {/* Generate All button for carousels */}
+                        {/* Generate All buttons for carousels */}
                         {hasCarousel && carouselSlides && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
-                            disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
-                          >
-                            <Images className="mr-2 h-4 w-4" />
-                            Generate All Images
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            {/* Composite generation with presets */}
+                            <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1">
+                              <select
+                                className="h-7 text-xs bg-transparent border-0 outline-none cursor-pointer"
+                                value={selectedDesignPreset}
+                                onChange={(e) => setSelectedDesignPreset(e.target.value)}
+                                title="Design Preset"
+                              >
+                                <option value="dark-coral">Dark Coral</option>
+                                <option value="navy-gold">Navy Gold</option>
+                                <option value="light-minimal">Light Minimal</option>
+                                <option value="teal-cream">Teal Cream</option>
+                              </select>
+                              <select
+                                className="h-7 text-xs bg-transparent border-0 outline-none cursor-pointer"
+                                value={selectedBackgroundStyle}
+                                onChange={(e) => setSelectedBackgroundStyle(e.target.value)}
+                                title="Background Style"
+                              >
+                                <option value="gradient-dark">Dark Gradient</option>
+                                <option value="gradient-warm">Warm Gradient</option>
+                                <option value="abstract-shapes">Abstract</option>
+                                <option value="bokeh-dark">Bokeh</option>
+                                <option value="minimal-solid">Solid</option>
+                              </select>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => handleGenerateCompositeCarousel(item.id, carouselSlides)}
+                              disabled={generatingCompositeCarousel === item.id}
+                              title="Generate with consistent text styling"
+                            >
+                              {generatingCompositeCarousel === item.id ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <Layers className="mr-2 h-4 w-4" />
+                                  Composite All
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
+                              disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
+                              title="Generate with AI image prompts"
+                            >
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              AI All
+                            </Button>
+                          </div>
                         )}
                       </div>
 
