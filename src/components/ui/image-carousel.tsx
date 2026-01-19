@@ -22,6 +22,10 @@ interface ImageCarouselProps {
   className?: string;
   emptyState?: React.ReactNode;
   showThumbnails?: boolean;
+  showArrows?: boolean;
+  showCounter?: boolean;
+  currentIndex?: number;
+  onIndexChange?: (index: number) => void;
 }
 
 export function ImageCarousel({
@@ -33,18 +37,36 @@ export function ImageCarousel({
   className,
   emptyState,
   showThumbnails = true,
+  showArrows = true,
+  showCounter = true,
+  currentIndex: controlledIndex,
+  onIndexChange,
 }: ImageCarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [internalIndex, setInternalIndex] = useState(0);
+
+  // Support controlled mode
+  const isControlled = controlledIndex !== undefined;
+  const currentIndex = isControlled ? controlledIndex : internalIndex;
+  const setCurrentIndex = (index: number | ((prev: number) => number)) => {
+    const newIndex = typeof index === 'function' ? index(currentIndex) : index;
+    if (isControlled && onIndexChange) {
+      onIndexChange(newIndex);
+    } else {
+      setInternalIndex(newIndex);
+    }
+  };
 
   // Filter to only valid images (not placeholders)
   const validImages = images.filter(
     (img) => img.url && !img.url.startsWith("placeholder:")
   );
 
-  // Reset to first image when images array changes
+  // Reset to first image when images array changes (only in uncontrolled mode)
   useEffect(() => {
-    setCurrentIndex(0);
-  }, [validImages.length]);
+    if (!isControlled) {
+      setInternalIndex(0);
+    }
+  }, [validImages.length, isControlled]);
 
   // If no valid images, show empty state
   if (validImages.length === 0) {
@@ -56,11 +78,13 @@ export function ImageCarousel({
   const currentImage = validImages[safeIndex];
 
   const goToPrevious = () => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : validImages.length - 1));
+    const newIndex = safeIndex > 0 ? safeIndex - 1 : validImages.length - 1;
+    setCurrentIndex(newIndex);
   };
 
   const goToNext = () => {
-    setCurrentIndex((prev) => (prev < validImages.length - 1 ? prev + 1 : 0));
+    const newIndex = safeIndex < validImages.length - 1 ? safeIndex + 1 : 0;
+    setCurrentIndex(newIndex);
   };
 
   const hasMultiple = validImages.length > 1;
@@ -84,7 +108,7 @@ export function ImageCarousel({
           )}
 
           {/* Image counter - top right */}
-          {hasMultiple && (
+          {hasMultiple && showCounter && (
             <div className="absolute top-2 right-2">
               <Badge
                 variant="secondary"
@@ -95,8 +119,8 @@ export function ImageCarousel({
             </div>
           )}
 
-          {/* Navigation arrows - ALWAYS visible when multiple images */}
-          {hasMultiple && (
+          {/* Navigation arrows - only when enabled and multiple images */}
+          {hasMultiple && showArrows && (
             <>
               <Button
                 size="icon"
