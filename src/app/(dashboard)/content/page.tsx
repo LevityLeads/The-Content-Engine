@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Eye, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,12 @@ interface ContentImage {
   is_primary: boolean;
 }
 
+interface CarouselSlide {
+  slideNumber: number;
+  text: string;
+  imagePrompt: string;
+}
+
 interface Content {
   id: string;
   platform: string;
@@ -21,11 +27,12 @@ interface Content {
   copy_hashtags: string[];
   copy_cta: string | null;
   copy_thread_parts: string[] | null;
-  copy_carousel_slides: string[] | null;
+  copy_carousel_slides: CarouselSlide[] | string[] | null;
   status: string;
   scheduled_for: string | null;
   metadata: {
     imagePrompt?: string;
+    carouselStyle?: string;
   };
   created_at: string;
   ideas?: {
@@ -49,13 +56,16 @@ const platformColors: Record<string, string> = {
 export default function ContentPage() {
   const [content, setContent] = useState<Content[]>([]);
   const [images, setImages] = useState<Record<string, ContentImage[]>>({});
+  const [slideImages, setSlideImages] = useState<Record<string, Record<number, string>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<string>("draft");
   const [generatingImage, setGeneratingImage] = useState<string | null>(null);
+  const [generatingSlides, setGeneratingSlides] = useState<Record<string, number[]>>({});
   const [imageMessage, setImageMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedCopy, setEditedCopy] = useState<string>("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [approvedSlides, setApprovedSlides] = useState<Record<string, number[]>>({});
 
   useEffect(() => {
     fetchContent();
@@ -69,7 +79,6 @@ export default function ContentPage() {
       const data = await res.json();
       if (data.success) {
         setContent(data.content || []);
-        // Fetch images for each content item
         const contentItems = data.content || [];
         for (const item of contentItems) {
           fetchImagesForContent(item.id);
@@ -91,25 +100,57 @@ export default function ContentPage() {
           ...prev,
           [contentId]: data.images,
         }));
+        // Map images to slides by matching prompts
+        const imgMap: Record<number, string> = {};
+        data.images.forEach((img: ContentImage) => {
+          if (img.url && !img.url.startsWith("placeholder:")) {
+            // Try to match by slide number in prompt
+            const slideMatch = img.prompt?.match(/slide\s*(\d+)/i);
+            if (slideMatch) {
+              imgMap[parseInt(slideMatch[1])] = img.url;
+            }
+          }
+        });
+        if (Object.keys(imgMap).length > 0) {
+          setSlideImages((prev) => ({ ...prev, [contentId]: imgMap }));
+        }
       }
     } catch (err) {
       console.error("Error fetching images:", err);
     }
   };
 
-  const handleGenerateImage = async (contentId: string, prompt: string) => {
-    setGeneratingImage(contentId);
+  const handleGenerateImage = async (contentId: string, prompt: string, slideNumber?: number) => {
+    const key = slideNumber ? `${contentId}-${slideNumber}` : contentId;
+    setGeneratingImage(key);
+
+    if (slideNumber) {
+      setGeneratingSlides((prev) => ({
+        ...prev,
+        [contentId]: [...(prev[contentId] || []), slideNumber],
+      }));
+    }
+
     setImageMessage(null);
     try {
+      const slidePrompt = slideNumber ? `[Slide ${slideNumber}] ${prompt}` : prompt;
       const res = await fetch("/api/images/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentId, prompt }),
+        body: JSON.stringify({ contentId, prompt: slidePrompt }),
       });
       const data = await res.json();
       if (data.success) {
         setImageMessage(data.message);
-        // Refresh images for this content
+        if (slideNumber && data.image?.url && !data.image.url.startsWith("placeholder:")) {
+          setSlideImages((prev) => ({
+            ...prev,
+            [contentId]: {
+              ...(prev[contentId] || {}),
+              [slideNumber]: data.image.url,
+            },
+          }));
+        }
         fetchImagesForContent(contentId);
       } else {
         setImageMessage(data.error || "Failed to generate image");
@@ -119,9 +160,24 @@ export default function ContentPage() {
       setImageMessage("Error generating image");
     } finally {
       setGeneratingImage(null);
-      // Clear message after 5 seconds
+      if (slideNumber) {
+        setGeneratingSlides((prev) => ({
+          ...prev,
+          [contentId]: (prev[contentId] || []).filter((n) => n !== slideNumber),
+        }));
+      }
       setTimeout(() => setImageMessage(null), 5000);
     }
+  };
+
+  const handleGenerateAllSlides = async (contentId: string, slides: CarouselSlide[]) => {
+    setImageMessage("Generating all slide images...");
+    const promises = slides.map((slide) =>
+      handleGenerateImage(contentId, slide.imagePrompt, slide.slideNumber)
+    );
+    await Promise.all(promises);
+    setImageMessage("All slide images generated!");
+    setTimeout(() => setImageMessage(null), 5000);
   };
 
   const handleUpdateContent = async (id: string, updates: Partial<Content>) => {
@@ -149,14 +205,37 @@ export default function ContentPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleApproveSlide = (contentId: string, slideNumber: number) => {
+    setApprovedSlides((prev) => ({
+      ...prev,
+      [contentId]: [...(prev[contentId] || []), slideNumber],
+    }));
+  };
+
+  const handleRejectSlide = (contentId: string, slideNumber: number) => {
+    setApprovedSlides((prev) => ({
+      ...prev,
+      [contentId]: (prev[contentId] || []).filter((n) => n !== slideNumber),
+    }));
+  };
+
+  const isSlideApproved = (contentId: string, slideNumber: number) => {
+    return (approvedSlides[contentId] || []).includes(slideNumber);
+  };
+
+  const areAllSlidesApproved = (contentId: string, totalSlides: number) => {
+    const approved = approvedSlides[contentId] || [];
+    return approved.length >= totalSlides;
+  };
+
   const handleApprove = async (id: string) => {
     await handleUpdateContent(id, { status: "approved" });
   };
 
-  const handleDownloadImage = (url: string, platform: string) => {
+  const handleDownloadImage = (url: string, platform: string, slideNumber?: number) => {
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${platform}-image.png`;
+    link.download = slideNumber ? `${platform}-slide-${slideNumber}.png` : `${platform}-image.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -169,6 +248,20 @@ export default function ContentPage() {
   const hasGeneratedImage = (contentId: string): boolean => {
     const contentImages = getContentImages(contentId);
     return contentImages.some((img) => img.url && !img.url.startsWith("placeholder:"));
+  };
+
+  const getSlideImage = (contentId: string, slideNumber: number): string | null => {
+    return slideImages[contentId]?.[slideNumber] || null;
+  };
+
+  const isSlideGenerating = (contentId: string, slideNumber: number): boolean => {
+    return (generatingSlides[contentId] || []).includes(slideNumber);
+  };
+
+  // Helper to check if carousel slides are in new format
+  const isNewCarouselFormat = (slides: CarouselSlide[] | string[] | null): slides is CarouselSlide[] => {
+    if (!slides || slides.length === 0) return false;
+    return typeof slides[0] === "object" && "imagePrompt" in slides[0];
   };
 
   const draftCount = content.filter((c) => c.status === "draft").length;
@@ -236,6 +329,15 @@ export default function ContentPage() {
             const generatedImage = contentImages.find(
               (img) => img.url && !img.url.startsWith("placeholder:")
             );
+            const hasCarousel = item.copy_carousel_slides && item.copy_carousel_slides.length > 0;
+            const carouselSlides = hasCarousel && isNewCarouselFormat(item.copy_carousel_slides)
+              ? item.copy_carousel_slides
+              : null;
+            const legacySlides = hasCarousel && !isNewCarouselFormat(item.copy_carousel_slides)
+              ? item.copy_carousel_slides as string[]
+              : null;
+            const totalSlides = carouselSlides?.length || legacySlides?.length || 0;
+            const allSlidesApproved = totalSlides > 0 ? areAllSlidesApproved(item.id, totalSlides) : true;
 
             return (
               <Card key={item.id} className="overflow-hidden">
@@ -254,14 +356,22 @@ export default function ContentPage() {
                         )}
                       </div>
                     </div>
-                    <Badge variant={item.status === "draft" ? "secondary" : item.status === "approved" ? "default" : "outline"}>
-                      {item.status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {hasCarousel && (
+                        <Badge variant="outline" className="text-xs">
+                          <Images className="mr-1 h-3 w-3" />
+                          Carousel ({totalSlides} slides)
+                        </Badge>
+                      )}
+                      <Badge variant={item.status === "draft" ? "secondary" : item.status === "approved" ? "default" : "outline"}>
+                        {item.status}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Generated Image Display */}
-                  {generatedImage && (
+                  {/* Non-carousel Generated Image Display */}
+                  {!hasCarousel && generatedImage && (
                     <div className="relative rounded-lg overflow-hidden border">
                       <img
                         src={generatedImage.url}
@@ -281,8 +391,9 @@ export default function ContentPage() {
                     </div>
                   )}
 
-                  {/* Post Copy */}
+                  {/* Post Copy / Caption */}
                   <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Caption</p>
                     {editingId === item.id ? (
                       <div className="space-y-2">
                         <Textarea
@@ -324,6 +435,162 @@ export default function ContentPage() {
                     )}
                   </div>
 
+                  {/* NEW FORMAT: Carousel Slides with Individual Image Prompts */}
+                  {carouselSlides && carouselSlides.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Carousel Slides ({carouselSlides.length})
+                          {item.metadata?.carouselStyle && (
+                            <span className="ml-2 text-primary">Style: {item.metadata.carouselStyle.slice(0, 50)}...</span>
+                          )}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
+                          disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
+                        >
+                          <Images className="mr-2 h-4 w-4" />
+                          Generate All Images
+                        </Button>
+                      </div>
+
+                      <div className="grid gap-4">
+                        {carouselSlides.map((slide) => {
+                          const slideImg = getSlideImage(item.id, slide.slideNumber);
+                          const isGenerating = isSlideGenerating(item.id, slide.slideNumber);
+                          const isApproved = isSlideApproved(item.id, slide.slideNumber);
+
+                          return (
+                            <div
+                              key={slide.slideNumber}
+                              className={`rounded-lg border p-4 ${isApproved ? "border-emerald-500 bg-emerald-500/5" : "bg-muted/20"}`}
+                            >
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    Slide {slide.slideNumber}
+                                  </Badge>
+                                  {isApproved && (
+                                    <Badge className="bg-emerald-500 text-xs">
+                                      <Check className="mr-1 h-3 w-3" />
+                                      Approved
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex gap-2">
+                                  {!isApproved ? (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-emerald-500 border-emerald-500 hover:bg-emerald-500/10"
+                                      onClick={() => handleApproveSlide(item.id, slide.slideNumber)}
+                                    >
+                                      <CheckCircle2 className="h-4 w-4" />
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-red-500 border-red-500 hover:bg-red-500/10"
+                                      onClick={() => handleRejectSlide(item.id, slide.slideNumber)}
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="grid md:grid-cols-2 gap-4">
+                                {/* Slide Image */}
+                                <div className="space-y-2">
+                                  {slideImg ? (
+                                    <div className="relative rounded-lg overflow-hidden border aspect-[4/5]">
+                                      <img
+                                        src={slideImg}
+                                        alt={`Slide ${slide.slideNumber}`}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <div className="absolute bottom-2 right-2 flex gap-1">
+                                        <Button
+                                          size="sm"
+                                          variant="secondary"
+                                          className="bg-black/50 hover:bg-black/70 text-white border-0 h-8 w-8 p-0"
+                                          onClick={() => handleDownloadImage(slideImg, item.platform, slide.slideNumber)}
+                                        >
+                                          <Download className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="rounded-lg border border-dashed aspect-[4/5] flex items-center justify-center bg-muted/10">
+                                      <div className="text-center p-4">
+                                        <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                                        <p className="text-xs text-muted-foreground">No image yet</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant={slideImg ? "outline" : "default"}
+                                    className="w-full"
+                                    onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
+                                    disabled={isGenerating}
+                                  >
+                                    {isGenerating ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Generating...
+                                      </>
+                                    ) : slideImg ? (
+                                      <>
+                                        <ImageIcon className="mr-2 h-4 w-4" />
+                                        Regenerate
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ImageIcon className="mr-2 h-4 w-4" />
+                                        Generate Image
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+
+                                {/* Slide Content */}
+                                <div className="space-y-3">
+                                  <div>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">Slide Text</p>
+                                    <p className="text-sm">{slide.text}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1">Image Prompt</p>
+                                    <p className="text-xs text-muted-foreground">{slide.imagePrompt}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* LEGACY FORMAT: Old carousel slides (just text) */}
+                  {legacySlides && legacySlides.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Carousel ({legacySlides.length} slides)</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {legacySlides.map((slide, i) => (
+                          <div key={i} className="rounded-lg border bg-muted/20 p-3">
+                            <p className="text-xs text-muted-foreground mb-1">Slide {i + 1}</p>
+                            <p className="text-sm">{slide}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Thread Parts for Twitter */}
                   {item.copy_thread_parts && item.copy_thread_parts.length > 0 && (
                     <div className="space-y-2">
@@ -339,23 +606,8 @@ export default function ContentPage() {
                     </div>
                   )}
 
-                  {/* Carousel Slides for Instagram */}
-                  {item.copy_carousel_slides && item.copy_carousel_slides.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">Carousel ({item.copy_carousel_slides.length} slides)</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {item.copy_carousel_slides.map((slide, i) => (
-                          <div key={i} className="rounded-lg border bg-muted/20 p-3">
-                            <p className="text-xs text-muted-foreground mb-1">Slide {i + 1}</p>
-                            <p className="text-sm">{slide}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Image Generation */}
-                  {item.metadata?.imagePrompt && (
+                  {/* Non-carousel Image Generation */}
+                  {!hasCarousel && item.metadata?.imagePrompt && (
                     <div className="rounded-lg border border-dashed p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
@@ -417,9 +669,14 @@ export default function ContentPage() {
                         size="sm"
                         className="flex-1 bg-emerald-500 hover:bg-emerald-600"
                         onClick={() => handleApprove(item.id)}
+                        disabled={hasCarousel && !allSlidesApproved}
+                        title={hasCarousel && !allSlidesApproved ? "Approve all slides first" : "Approve post"}
                       >
                         <Check className="mr-2 h-4 w-4" />
-                        Approve
+                        {hasCarousel && !allSlidesApproved
+                          ? `Approve All Slides First (${approvedSlides[item.id]?.length || 0}/${totalSlides})`
+                          : "Approve Post"
+                        }
                       </Button>
                     )}
                     <Button variant="outline" size="sm" className="flex-1">

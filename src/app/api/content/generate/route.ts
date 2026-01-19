@@ -30,22 +30,44 @@ For each platform, follow these guidelines:
 - Strong hook in first line (before "more" cutoff)
 - Include CTA
 - 5-10 relevant hashtags (can be more)
-- Consider carousel slides if applicable
+- For educational/list content, CREATE A CAROUSEL with 4-6 slides max
+- Each carousel slide should be concise and impactful
+
+**CAROUSEL RULES (Instagram):**
+- Maximum 6 slides per carousel
+- Slide 1: Hook/title that grabs attention
+- Slides 2-5: Key points, one per slide
+- Final slide: CTA or summary
+- Each slide needs its own image prompt
+- ALL slide image prompts must share a consistent visual style (same color palette, fonts, design elements)
 
 Respond in JSON format:
 {
   "posts": [
     {
       "platform": "twitter" | "linkedin" | "instagram",
-      "primaryCopy": "The main post text",
+      "primaryCopy": "The main post text/caption",
       "hashtags": ["hashtag1", "hashtag2"],
       "cta": "Optional call to action",
       "threadParts": ["For Twitter threads - array of tweets"] | null,
-      "carouselSlides": ["For Instagram carousels - array of slide texts"] | null,
-      "imagePrompt": "Detailed prompt for generating an accompanying image"
+      "carouselSlides": [
+        {
+          "slideNumber": 1,
+          "text": "Slide text content",
+          "imagePrompt": "Detailed image prompt for this specific slide"
+        }
+      ] | null,
+      "imagePrompt": "For non-carousel posts: detailed prompt for the main image",
+      "carouselStyle": "For carousels: describe the consistent visual style (colors, fonts, mood) to use across all slides"
     }
   ]
-}`;
+}
+
+IMPORTANT for carousel imagePrompts:
+- Each slide's imagePrompt should reference the carouselStyle for consistency
+- Include specific text/headline to display on each slide image
+- Describe layout, typography placement, and visual hierarchy
+- Slides should feel like a cohesive series, not random images`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -112,7 +134,9 @@ ORIGINAL SOURCE CONTENT:
 ${ideaData.inputs?.raw_content || "No source content available"}
 
 Generate optimized posts for each target platform: ${ideaData.target_platforms?.join(", ")}.
-Each post should have a detailed image prompt that would create a compelling visual to accompany the post.`;
+
+For Instagram: If the content is educational, informational, or contains multiple tips/points, CREATE A CAROUSEL (4-6 slides max).
+Each post/slide should have a detailed image prompt for generating scroll-stopping visuals with text overlays.`;
 
     // Call Claude Opus 4.5
     const message = await anthropic.messages.create({
@@ -157,8 +181,9 @@ Each post should have a detailed image prompt that would create a compelling vis
       hashtags?: string[];
       cta?: string;
       threadParts?: string[] | null;
-      carouselSlides?: string[] | null;
+      carouselSlides?: Array<{ slideNumber: number; text: string; imagePrompt: string }> | null;
       imagePrompt?: string;
+      carouselStyle?: string;
     }) => ({
       idea_id: ideaId,
       brand_id: ideaData.brand_id,
@@ -171,6 +196,7 @@ Each post should have a detailed image prompt that would create a compelling vis
       status: "draft",
       metadata: {
         imagePrompt: post.imagePrompt || null,
+        carouselStyle: post.carouselStyle || null,
       },
     }));
 
