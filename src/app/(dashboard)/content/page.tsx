@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2 } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,6 +81,8 @@ export default function ContentPage() {
   const [selectedModel, setSelectedModel] = useState<ImageModelKey>(DEFAULT_MODEL);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [currentSlideIndex, setCurrentSlideIndex] = useState<Record<string, number>>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchContent();
@@ -304,6 +306,24 @@ export default function ContentPage() {
       }
       return newSet;
     });
+  };
+
+  const handleDelete = async (id: string) => {
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/content?id=${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setContent((prev) => prev.filter((c) => c.id !== id));
+        setDeleteConfirmId(null);
+      }
+    } catch (err) {
+      console.error("Error deleting content:", err);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const getContentImages = (contentId: string): ContentImage[] => {
@@ -580,6 +600,41 @@ export default function ContentPage() {
                         <Copy className="h-4 w-4" />
                       )}
                     </Button>
+                    {deleteConfirmId === item.id ? (
+                      <div className="flex items-center gap-1 rounded-lg border border-red-500/50 bg-red-500/10 px-2">
+                        <span className="text-xs text-red-400">Delete?</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-500/20"
+                          onClick={() => handleDelete(item.id)}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Check className="h-3 w-3" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-white"
+                          onClick={() => setDeleteConfirmId(null)}
+                        >
+                          <XCircle className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                        onClick={() => setDeleteConfirmId(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
 
