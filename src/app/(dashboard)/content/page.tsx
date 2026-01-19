@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageCarousel, type CarouselImage } from "@/components/ui/image-carousel";
 import { PlatformPostMockup } from "@/components/ui/platform-mockups";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 interface ContentImage {
@@ -77,7 +78,6 @@ export default function ContentPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedCopy, setEditedCopy] = useState<string>("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [approvedSlides, setApprovedSlides] = useState<Record<string, number[]>>({});
   const [selectedModel, setSelectedModel] = useState<ImageModelKey>(DEFAULT_MODEL);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [currentSlideIndex, setCurrentSlideIndex] = useState<Record<string, number>>({});
@@ -88,10 +88,11 @@ export default function ContentPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkApproving, setIsBulkApproving] = useState(false);
+  const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchContent();
-    setSelectedItems(new Set()); // Clear selections when filter changes
+    setSelectedItems(new Set());
   }, [filter]);
 
   const fetchContent = async () => {
@@ -266,27 +267,10 @@ export default function ContentPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleApproveSlide = (contentId: string, slideNumber: number) => {
-    setApprovedSlides((prev) => ({
-      ...prev,
-      [contentId]: [...(prev[contentId] || []), slideNumber],
-    }));
-  };
-
-  const handleRejectSlide = (contentId: string, slideNumber: number) => {
-    setApprovedSlides((prev) => ({
-      ...prev,
-      [contentId]: (prev[contentId] || []).filter((n) => n !== slideNumber),
-    }));
-  };
-
-  const isSlideApproved = (contentId: string, slideNumber: number) => {
-    return (approvedSlides[contentId] || []).includes(slideNumber);
-  };
-
-  const areAllSlidesApproved = (contentId: string, totalSlides: number) => {
-    const approved = approvedSlides[contentId] || [];
-    return approved.length >= totalSlides;
+  const areAllSlidesApproved = (_contentId: string, _totalSlides: number) => {
+    // Slide-by-slide approval can be implemented in the future
+    // For now, allow approval of all carousels
+    return true;
   };
 
   const handleApprove = async (id: string) => {
@@ -309,6 +293,18 @@ export default function ContentPage() {
         newSet.delete(id);
       } else {
         newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const togglePrompt = (key: string) => {
+    setExpandedPrompts((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
       }
       return newSet;
     });
@@ -541,7 +537,7 @@ export default function ContentPage() {
     return "Single Post";
   };
 
-  const getCurrentSlide = (contentId: string, totalSlides: number): number => {
+  const getCurrentSlide = (contentId: string): number => {
     return currentSlideIndex[contentId] || 0;
   };
 
@@ -559,6 +555,11 @@ export default function ContentPage() {
     setSelectedVersionIndex((prev) => ({ ...prev, [key]: index }));
   };
 
+  const truncateText = (text: string, maxLength: number) => {
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength) + "...";
+  };
+
   const draftCount = content.filter((c) => c.status === "draft").length;
   const approvedCount = content.filter((c) => c.status === "approved").length;
 
@@ -574,6 +575,174 @@ export default function ContentPage() {
         )}
         {IMAGE_MODELS[modelKey].name}
       </Badge>
+    );
+  };
+
+  // Render unified slide card (image + text together)
+  const renderUnifiedSlideCard = (
+    item: Content,
+    slide: CarouselSlide,
+    slideIndex: number,
+    totalSlides: number,
+    isCurrentSlide: boolean
+  ) => {
+    const slideImgs = getSlideImages(item.id, slide.slideNumber);
+    const versionIdx = getVersionIndex(item.id, slide.slideNumber);
+    const safeVersionIdx = Math.min(versionIdx, Math.max(0, slideImgs.length - 1));
+    const currentImage = slideImgs[safeVersionIdx];
+    const isGenerating = isSlideGenerating(item.id, slide.slideNumber);
+    const promptKey = `${item.id}-${slide.slideNumber}`;
+    const isPromptExpanded = expandedPrompts.has(promptKey);
+
+    return (
+      <div
+        key={slide.slideNumber}
+        className={cn(
+          "rounded-xl border-2 transition-all overflow-hidden",
+          isCurrentSlide
+            ? "border-primary bg-primary/5"
+            : "border-transparent bg-muted/30 hover:bg-muted/50"
+        )}
+      >
+        <div className="grid md:grid-cols-2 gap-0">
+          {/* Left: Image */}
+          <div className="relative aspect-[4/5] bg-black/20">
+            {currentImage ? (
+              <>
+                <img
+                  src={currentImage.url}
+                  alt={`Slide ${slide.slideNumber}`}
+                  className="w-full h-full object-cover"
+                />
+                {currentImage.model && (
+                  <div className="absolute top-2 left-2 z-10">
+                    {renderModelBadge(currentImage.model)}
+                  </div>
+                )}
+                {slideImgs.length > 1 && (
+                  <Badge className="absolute top-2 right-2 bg-black/70 text-white border-0 z-10 text-xs">
+                    v{safeVersionIdx + 1}/{slideImgs.length}
+                  </Badge>
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-8 w-8 p-0 z-10"
+                  onClick={() => handleDownloadImage(currentImage.url, item.platform, slide.slideNumber)}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-center p-4">
+                  <ImageIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No image yet</p>
+                </div>
+              </div>
+            )}
+
+            {/* Slide indicator overlay */}
+            <Badge className="absolute bottom-2 left-2 bg-black/70 text-white border-0 z-10">
+              Slide {slideIndex + 1} / {totalSlides}
+            </Badge>
+          </div>
+
+          {/* Right: Text content */}
+          <div className="p-4 flex flex-col">
+            <div className="flex-1 space-y-3">
+              {/* Slide text */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Slide Text</p>
+                <p className="text-sm leading-relaxed">{slide.text}</p>
+              </div>
+
+              {/* Collapsible Image Prompt */}
+              <div className="border-t pt-3">
+                <button
+                  onClick={() => togglePrompt(promptKey)}
+                  className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+                >
+                  {isPromptExpanded ? (
+                    <ChevronUp className="h-3 w-3" />
+                  ) : (
+                    <ChevronDown className="h-3 w-3" />
+                  )}
+                  Image Prompt
+                  {!isPromptExpanded && (
+                    <span className="text-muted-foreground/60 truncate flex-1">
+                      — {truncateText(slide.imagePrompt, 40)}
+                    </span>
+                  )}
+                </button>
+                {isPromptExpanded && (
+                  <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                    {slide.imagePrompt}
+                  </p>
+                )}
+              </div>
+
+              {/* Version thumbnails */}
+              {slideImgs.length > 1 && (
+                <div className="border-t pt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">
+                    Versions ({slideImgs.length})
+                  </p>
+                  <div className="flex gap-1.5 overflow-x-auto">
+                    {slideImgs.map((img, idx) => (
+                      <button
+                        key={img.id}
+                        onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
+                        className={cn(
+                          "flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all",
+                          idx === safeVersionIdx
+                            ? "border-primary ring-2 ring-primary/30"
+                            : "border-transparent opacity-60 hover:opacity-100"
+                        )}
+                        title={`Version ${idx + 1}${idx === 0 ? " (newest)" : ""}`}
+                      >
+                        <img
+                          src={img.url}
+                          alt={`Version ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Slide actions */}
+            <div className="pt-3 mt-auto border-t">
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : currentImage ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Regenerate
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className="mr-2 h-4 w-4" />
+                    Generate Image
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -730,11 +899,12 @@ export default function ContentPage() {
             const allSlidesApproved = totalSlides > 0 ? areAllSlidesApproved(item.id, totalSlides) : true;
             const postType = getPostType(item);
             const allImages = getAllContentImages(item.id);
-            const currentSlide = getCurrentSlide(item.id, totalSlides);
+            const currentSlide = getCurrentSlide(item.id);
+            const hasImages = hasGeneratedImage(item.id);
 
             return (
               <Card key={item.id} className="overflow-hidden">
-                {/* Collapsed Header Row */}
+                {/* Collapsed Header Row - Enhanced with quick actions */}
                 <div
                   className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => toggleCard(item.id)}
@@ -768,6 +938,17 @@ export default function ContentPage() {
                     {platformIcons[item.platform] || <FileText className="h-4 w-4 text-white" />}
                   </div>
 
+                  {/* Image thumbnail preview */}
+                  {hasImages && (
+                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                      <img
+                        src={allImages[0]?.url}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+
                   {/* Title/Concept */}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">
@@ -785,6 +966,21 @@ export default function ContentPage() {
                     {hasCarousel && ` (${totalSlides})`}
                   </Badge>
 
+                  {/* Image status indicator */}
+                  <div className="flex-shrink-0">
+                    {hasImages ? (
+                      <Badge variant="secondary" className="text-xs bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                        <ImageIcon className="mr-1 h-3 w-3" />
+                        {allImages.length}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground">
+                        <ImageIcon className="mr-1 h-3 w-3" />
+                        0
+                      </Badge>
+                    )}
+                  </div>
+
                   {/* Theme Badge */}
                   {item.ideas?.angle && (
                     <Badge variant="secondary" className="text-xs capitalize shrink-0">
@@ -799,6 +995,18 @@ export default function ContentPage() {
 
                   {/* Quick Actions */}
                   <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                    {/* Quick Approve (only for drafts) */}
+                    {item.status === "draft" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/20"
+                        onClick={() => handleApprove(item.id)}
+                        title="Quick Approve"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -807,6 +1015,7 @@ export default function ContentPage() {
                         `${item.copy_primary}\n\n${item.copy_hashtags?.map(h => `#${h}`).join(" ") || ""}`,
                         item.id
                       )}
+                      title="Copy to clipboard"
                     >
                       {copiedId === item.id ? (
                         <Check className="h-4 w-4 text-emerald-500" />
@@ -845,6 +1054,7 @@ export default function ContentPage() {
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-red-500"
                         onClick={() => setDeleteConfirmId(item.id)}
+                        title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -852,101 +1062,49 @@ export default function ContentPage() {
                   </div>
                 </div>
 
-                {/* Expanded Content */}
+                {/* Expanded Content - Redesigned with Tabs */}
                 {isExpanded && (
-                  <CardContent className="border-t pt-4">
-                    <div className="grid lg:grid-cols-2 gap-6">
-                      {/* Left Column: Text Content */}
-                      <div className="space-y-4">
-                        {/* Caption Editor */}
-                        <div>
-                          <p className="text-sm font-medium mb-2">Caption</p>
-                          {editingId === item.id ? (
-                            <div className="space-y-2">
-                              <Textarea
-                                value={editedCopy}
-                                onChange={(e) => setEditedCopy(e.target.value)}
-                                className="min-h-[150px] font-mono text-sm"
-                              />
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleUpdateContent(item.id, { copy_primary: editedCopy })}
-                                >
-                                  Save
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setEditingId(null)}
-                                >
-                                  Cancel
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div
-                              className="rounded-lg border bg-muted/30 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                              onClick={() => {
-                                setEditingId(item.id);
-                                setEditedCopy(item.copy_primary);
-                              }}
-                            >
-                              <p className="text-sm whitespace-pre-wrap">{item.copy_primary}</p>
-                              {item.copy_hashtags && item.copy_hashtags.length > 0 && (
-                                <p className="text-sm text-primary mt-2">
-                                  {item.copy_hashtags.map((h) => `#${h}`).join(" ")}
-                                </p>
-                              )}
-                            </div>
+                  <div className="border-t">
+                    <Tabs defaultValue={hasCarousel ? "slides" : "preview"} className="w-full">
+                      {/* Tab Navigation */}
+                      <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+                        <TabsList>
+                          <TabsTrigger value="preview">
+                            <Eye className="h-4 w-4 mr-2" />
+                            Preview
+                          </TabsTrigger>
+                          <TabsTrigger value="caption">
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Caption
+                          </TabsTrigger>
+                          {hasCarousel && carouselSlides && (
+                            <TabsTrigger value="slides">
+                              <Images className="h-4 w-4 mr-2" />
+                              Slides ({totalSlides})
+                            </TabsTrigger>
                           )}
-                        </div>
+                        </TabsList>
 
-                        {/* Carousel Slides Text (if carousel) */}
-                        {carouselSlides && carouselSlides.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="text-sm font-medium">Slide {currentSlide + 1} Text</p>
-                            <div className="rounded-lg border bg-muted/30 p-4">
-                              <p className="text-sm">{carouselSlides[currentSlide]?.text}</p>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              <span className="font-medium">Image Prompt:</span> {carouselSlides[currentSlide]?.imagePrompt}
-                            </p>
-                          </div>
+                        {/* Generate All button for carousels */}
+                        {hasCarousel && carouselSlides && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
+                            disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
+                          >
+                            <Images className="mr-2 h-4 w-4" />
+                            Generate All Images
+                          </Button>
                         )}
-
-                        {/* Actions */}
-                        <div className="flex gap-2 pt-2">
-                          {item.status === "draft" && (
-                            <Button
-                              size="sm"
-                              className="flex-1 bg-emerald-500 hover:bg-emerald-600"
-                              onClick={() => handleApprove(item.id)}
-                              disabled={hasCarousel && !allSlidesApproved}
-                            >
-                              <Check className="mr-2 h-4 w-4" />
-                              Approve
-                            </Button>
-                          )}
-                          <Button variant="outline" size="sm" className="flex-1">
-                            <Clock className="mr-2 h-4 w-4" />
-                            Schedule
-                          </Button>
-                          <Button size="sm" className="flex-1">
-                            <Send className="mr-2 h-4 w-4" />
-                            Publish
-                          </Button>
-                        </div>
                       </div>
 
-                      {/* Right Column: Image in Platform Mockup */}
-                      <div className="space-y-4">
-                        {/* Carousel Post */}
-                        {carouselSlides && carouselSlides.length > 0 ? (
-                          <div className="space-y-4">
+                      {/* Preview Tab - Platform Mockup */}
+                      <TabsContent value="preview" className="m-0 p-4">
+                        <div className="max-w-md mx-auto">
+                          {hasCarousel && carouselSlides ? (
                             <PlatformPostMockup platform={item.platform}>
                               <div className="relative">
-                                {/* Main Carousel Image */}
                                 <div className="relative aspect-[4/5] bg-black/10">
                                   {(() => {
                                     const slideNum = carouselSlides[currentSlide]?.slideNumber || 1;
@@ -961,30 +1119,11 @@ export default function ContentPage() {
                                             alt={`Slide ${currentSlide + 1}`}
                                             className="w-full h-full object-cover"
                                           />
-                                          {/* Model badge */}
                                           {slideImgs[safeVersionIdx].model && (
                                             <div className="absolute top-2 left-2 z-10">
                                               {renderModelBadge(slideImgs[safeVersionIdx].model!)}
                                             </div>
                                           )}
-                                          {/* Version counter badge (if multiple versions) */}
-                                          {slideImgs.length > 1 && (
-                                            <Badge className="absolute bottom-2 left-2 bg-black/70 text-white border-0 z-10 text-xs">
-                                              v{safeVersionIdx + 1}/{slideImgs.length}
-                                            </Badge>
-                                          )}
-                                          {/* Download button */}
-                                          <Button
-                                            size="sm"
-                                            variant="secondary"
-                                            className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-8 w-8 p-0 z-10"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDownloadImage(slideImgs[safeVersionIdx].url, item.platform, currentSlide + 1);
-                                            }}
-                                          >
-                                            <Download className="h-4 w-4" />
-                                          </Button>
                                         </>
                                       );
                                     }
@@ -999,7 +1138,7 @@ export default function ContentPage() {
                                   })()}
                                 </div>
 
-                                {/* Carousel Navigation (Big Arrows) */}
+                                {/* Carousel Navigation */}
                                 {totalSlides > 1 && (
                                   <>
                                     <Button
@@ -1018,139 +1157,14 @@ export default function ContentPage() {
                                     >
                                       <ChevronRight className="h-6 w-6" />
                                     </Button>
+                                    <Badge className="absolute top-2 right-2 bg-black/70 text-white border-0 z-10">
+                                      {currentSlide + 1} / {totalSlides}
+                                    </Badge>
                                   </>
-                                )}
-
-                                {/* Slide Counter */}
-                                {totalSlides > 1 && (
-                                  <Badge className="absolute top-2 right-2 bg-black/70 text-white border-0 z-10">
-                                    Slide {currentSlide + 1} / {totalSlides}
-                                  </Badge>
                                 )}
                               </div>
                             </PlatformPostMockup>
-
-                            {/* Slide Thumbnails */}
-                            <div className="space-y-2">
-                              <p className="text-xs font-medium text-muted-foreground">Slides</p>
-                              <div className="flex gap-2 overflow-x-auto pb-2">
-                                {carouselSlides.map((slide, idx) => {
-                                  const slideImgs = getSlideImages(item.id, slide.slideNumber);
-                                  const versionIdx = getVersionIndex(item.id, slide.slideNumber);
-                                  const displayImg = slideImgs[Math.min(versionIdx, slideImgs.length - 1)];
-                                  const hasImage = slideImgs.length > 0;
-                                  return (
-                                    <button
-                                      key={slide.slideNumber}
-                                      onClick={() => setCurrentSlide(item.id, idx)}
-                                      className={cn(
-                                        "relative flex-shrink-0 w-16 h-20 rounded-lg overflow-hidden border-2 transition-all",
-                                        idx === currentSlide
-                                          ? "border-primary ring-2 ring-primary/30"
-                                          : "border-transparent opacity-60 hover:opacity-100"
-                                      )}
-                                    >
-                                      {hasImage && displayImg ? (
-                                        <>
-                                          <img
-                                            src={displayImg.url}
-                                            alt={`Slide ${slide.slideNumber}`}
-                                            className="w-full h-full object-cover"
-                                          />
-                                          {slideImgs.length > 1 && (
-                                            <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded">
-                                              {slideImgs.length}
-                                            </span>
-                                          )}
-                                        </>
-                                      ) : (
-                                        <div className="w-full h-full bg-muted flex items-center justify-center">
-                                          <span className="text-xs text-muted-foreground">{slide.slideNumber}</span>
-                                        </div>
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            {/* Version Thumbnails for Current Slide */}
-                            {(() => {
-                              const slideNum = carouselSlides[currentSlide]?.slideNumber || 1;
-                              const slideImgs = getSlideImages(item.id, slideNum);
-                              const versionIdx = getVersionIndex(item.id, slideNum);
-                              if (slideImgs.length > 1) {
-                                return (
-                                  <div className="space-y-2">
-                                    <p className="text-xs font-medium text-muted-foreground">
-                                      Versions for Slide {currentSlide + 1} ({slideImgs.length} generated)
-                                    </p>
-                                    <div className="flex gap-1.5 overflow-x-auto pb-1">
-                                      {slideImgs.map((img, idx) => (
-                                        <button
-                                          key={img.id}
-                                          onClick={() => setVersionIndex(item.id, slideNum, idx)}
-                                          className={cn(
-                                            "flex-shrink-0 w-12 h-12 rounded-md overflow-hidden border-2 transition-all",
-                                            idx === versionIdx
-                                              ? "border-emerald-500 ring-2 ring-emerald-500/30"
-                                              : "border-transparent opacity-60 hover:opacity-100"
-                                          )}
-                                          title={`Version ${idx + 1}${idx === 0 ? " (newest)" : ""}`}
-                                        >
-                                          <img
-                                            src={img.url}
-                                            alt={`Version ${idx + 1}`}
-                                            className="w-full h-full object-cover"
-                                          />
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })()}
-
-                            {/* Generate Image Button */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full"
-                              onClick={() => {
-                                const slide = carouselSlides[currentSlide];
-                                if (slide) {
-                                  handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber);
-                                }
-                              }}
-                              disabled={isSlideGenerating(item.id, carouselSlides[currentSlide]?.slideNumber || 1)}
-                            >
-                              {isSlideGenerating(item.id, carouselSlides[currentSlide]?.slideNumber || 1) ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Generating...
-                                </>
-                              ) : (
-                                <>
-                                  <ImageIcon className="mr-2 h-4 w-4" />
-                                  Generate Image for Slide {currentSlide + 1}
-                                </>
-                              )}
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
-                              disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
-                              className="w-full"
-                            >
-                              <Images className="mr-2 h-4 w-4" />
-                              Generate All Slide Images
-                            </Button>
-                          </div>
-                        ) : (
-                          /* Single Post */
-                          <div className="space-y-4">
+                          ) : (
                             <PlatformPostMockup platform={item.platform}>
                               {allImages.length > 0 ? (
                                 <ImageCarousel
@@ -1171,43 +1185,207 @@ export default function ContentPage() {
                                 </div>
                               )}
                             </PlatformPostMockup>
+                          )}
 
-                            {item.metadata?.imagePrompt && (
-                              <div className="space-y-2">
-                                <p className="text-xs text-muted-foreground">
-                                  <span className="font-medium">Image Prompt:</span> {item.metadata.imagePrompt}
+                          {/* Slide Thumbnails for Preview */}
+                          {hasCarousel && carouselSlides && (
+                            <div className="mt-4">
+                              <p className="text-xs font-medium text-muted-foreground mb-2">Slides</p>
+                              <div className="flex gap-2 overflow-x-auto pb-2">
+                                {carouselSlides.map((slide, idx) => {
+                                  const slideImgs = getSlideImages(item.id, slide.slideNumber);
+                                  const versionIdx = getVersionIndex(item.id, slide.slideNumber);
+                                  const displayImg = slideImgs[Math.min(versionIdx, slideImgs.length - 1)];
+                                  const hasImage = slideImgs.length > 0;
+                                  return (
+                                    <button
+                                      key={slide.slideNumber}
+                                      onClick={() => setCurrentSlide(item.id, idx)}
+                                      className={cn(
+                                        "relative flex-shrink-0 w-20 h-24 rounded-lg overflow-hidden border-2 transition-all",
+                                        idx === currentSlide
+                                          ? "border-primary ring-2 ring-primary/30"
+                                          : "border-transparent opacity-60 hover:opacity-100"
+                                      )}
+                                    >
+                                      {hasImage && displayImg ? (
+                                        <>
+                                          <img
+                                            src={displayImg.url}
+                                            alt={`Slide ${slide.slideNumber}`}
+                                            className="w-full h-full object-cover"
+                                          />
+                                          {slideImgs.length > 1 && (
+                                            <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded">
+                                              {slideImgs.length}
+                                            </span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                                          <span className="text-sm text-muted-foreground">{slide.slideNumber}</span>
+                                        </div>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Single post image generation */}
+                          {!hasCarousel && item.metadata?.imagePrompt && (
+                            <div className="mt-4 space-y-2">
+                              <button
+                                onClick={() => togglePrompt(`single-${item.id}`)}
+                                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+                              >
+                                {expandedPrompts.has(`single-${item.id}`) ? (
+                                  <ChevronUp className="h-3 w-3" />
+                                ) : (
+                                  <ChevronDown className="h-3 w-3" />
+                                )}
+                                Image Prompt
+                                {!expandedPrompts.has(`single-${item.id}`) && (
+                                  <span className="text-muted-foreground/60 truncate flex-1">
+                                    — {truncateText(item.metadata.imagePrompt, 50)}
+                                  </span>
+                                )}
+                              </button>
+                              {expandedPrompts.has(`single-${item.id}`) && (
+                                <p className="text-xs text-muted-foreground leading-relaxed pl-5">
+                                  {item.metadata.imagePrompt}
                                 </p>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => handleGenerateImage(item.id, item.metadata.imagePrompt!)}
+                                disabled={generatingImage === item.id}
+                              >
+                                {generatingImage === item.id ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Generating...
+                                  </>
+                                ) : allImages.length > 0 ? (
+                                  <>
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                    Generate Another
+                                  </>
+                                ) : (
+                                  <>
+                                    <ImageIcon className="mr-2 h-4 w-4" />
+                                    Generate Image
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </TabsContent>
+
+                      {/* Caption Tab */}
+                      <TabsContent value="caption" className="m-0 p-4">
+                        <div className="max-w-2xl mx-auto space-y-4">
+                          {editingId === item.id ? (
+                            <div className="space-y-3">
+                              <p className="text-sm font-medium">Edit Caption</p>
+                              <Textarea
+                                value={editedCopy}
+                                onChange={(e) => setEditedCopy(e.target.value)}
+                                className="min-h-[200px] font-mono text-sm"
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleUpdateContent(item.id, { copy_primary: editedCopy })}
+                                >
+                                  <Check className="mr-2 h-4 w-4" />
+                                  Save Changes
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="w-full"
-                                  onClick={() => handleGenerateImage(item.id, item.metadata.imagePrompt!)}
-                                  disabled={generatingImage === item.id}
+                                  onClick={() => setEditingId(null)}
                                 >
-                                  {generatingImage === item.id ? (
-                                    <>
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                      Generating...
-                                    </>
-                                  ) : allImages.length > 0 ? (
-                                    <>
-                                      <ImageIcon className="mr-2 h-4 w-4" />
-                                      Generate Another
-                                    </>
-                                  ) : (
-                                    <>
-                                      <ImageIcon className="mr-2 h-4 w-4" />
-                                      Generate Image
-                                    </>
-                                  )}
+                                  Cancel
                                 </Button>
                               </div>
-                            )}
+                            </div>
+                          ) : (
+                            <div
+                              className="rounded-lg border bg-muted/30 p-4 cursor-pointer hover:bg-muted/50 transition-colors group"
+                              onClick={() => {
+                                setEditingId(item.id);
+                                setEditedCopy(item.copy_primary);
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{item.copy_primary}</p>
+                                  {item.copy_hashtags && item.copy_hashtags.length > 0 && (
+                                    <p className="text-sm text-primary mt-3">
+                                      {item.copy_hashtags.map((h) => `#${h}`).join(" ")}
+                                    </p>
+                                  )}
+                                </div>
+                                <Pencil className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </TabsContent>
+
+                      {/* Slides Tab - Unified View */}
+                      {hasCarousel && carouselSlides && (
+                        <TabsContent value="slides" className="m-0 p-4">
+                          <div className="space-y-4">
+                            {carouselSlides.map((slide, idx) => (
+                              renderUnifiedSlideCard(item, slide, idx, totalSlides, idx === currentSlide)
+                            ))}
                           </div>
+                        </TabsContent>
+                      )}
+                    </Tabs>
+
+                    {/* Sticky Action Bar */}
+                    <div className="sticky bottom-0 flex items-center justify-between gap-3 p-4 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span className="capitalize">{item.platform}</span>
+                        <span>•</span>
+                        <span>{postType}</span>
+                        {hasCarousel && totalSlides > 0 && (
+                          <>
+                            <span>•</span>
+                            <span>{totalSlides} slides</span>
+                          </>
                         )}
                       </div>
+                      <div className="flex gap-2">
+                        {item.status === "draft" && (
+                          <Button
+                            size="sm"
+                            className="bg-emerald-500 hover:bg-emerald-600"
+                            onClick={() => handleApprove(item.id)}
+                            disabled={hasCarousel && !allSlidesApproved}
+                          >
+                            <Check className="mr-2 h-4 w-4" />
+                            Approve
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm">
+                          <Clock className="mr-2 h-4 w-4" />
+                          Schedule
+                        </Button>
+                        <Button size="sm">
+                          <Send className="mr-2 h-4 w-4" />
+                          Publish
+                        </Button>
+                      </div>
                     </div>
-                  </CardContent>
+                  </div>
                 )}
               </Card>
             );
