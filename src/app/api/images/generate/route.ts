@@ -26,10 +26,10 @@ const PLATFORM_IMAGE_CONFIG: Record<string, {
     description: "Twitter/X feed post (16:9 landscape - optimal display in timeline)",
   },
   linkedin: {
-    aspectRatio: "1.91:1",
+    aspectRatio: "16:9",
     width: 1200,
-    height: 627,
-    description: "LinkedIn feed post (1.91:1 landscape - optimal for professional feed)",
+    height: 675,
+    description: "LinkedIn feed post (16:9 landscape - optimal for professional feed)",
   },
 };
 
@@ -122,7 +122,9 @@ STYLE REQUIREMENTS:
               ],
               generationConfig: {
                 responseModalities: ["TEXT", "IMAGE"],
-                aspectRatio: imageConfig.aspectRatio,
+                imageConfig: {
+                  aspectRatio: imageConfig.aspectRatio,
+                },
               },
             }),
           }
