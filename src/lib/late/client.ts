@@ -92,7 +92,21 @@ export class LateClient {
     if (!response.ok) {
       let errorData: LateApiError;
       try {
-        errorData = await response.json();
+        const responseText = await response.text();
+        console.error('Late.dev API error response:', response.status, responseText);
+        try {
+          const parsed = JSON.parse(responseText);
+          errorData = {
+            code: parsed.code || parsed.error || 'API_ERROR',
+            message: parsed.message || parsed.error || responseText || `Request failed with status ${response.status}`,
+            details: parsed,
+          };
+        } catch {
+          errorData = {
+            code: 'UNKNOWN_ERROR',
+            message: responseText || `Request failed with status ${response.status}`,
+          };
+        }
       } catch {
         errorData = {
           code: 'UNKNOWN_ERROR',

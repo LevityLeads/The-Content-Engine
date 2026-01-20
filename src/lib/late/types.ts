@@ -61,20 +61,40 @@ export interface PlatformSpecificData {
 export interface LatePostContent {
   /** Main text/caption for the post */
   text: string;
-  /** Media attachments (images/videos) */
-  media?: LateMedia[];
-  /** First comment (Instagram only, for hashtags) */
-  firstComment?: string;
+}
+
+/**
+ * Platform target with account ID
+ */
+export interface LatePlatformTarget {
+  /** Platform name */
+  platform: LatePlatform;
+  /** Late.dev account ID for this platform */
+  accountId: string;
+}
+
+/**
+ * Media item for Late.dev API
+ */
+export interface LateMediaItem {
+  /** URL to the media file (must be publicly accessible) */
+  url: string;
+  /** Type of media */
+  type: MediaType;
+  /** Alt text for accessibility (optional) */
+  altText?: string;
 }
 
 /**
  * Request to create a new post
  */
 export interface CreatePostRequest {
-  /** Target platforms for this post */
-  platforms: LatePlatform[];
+  /** Target platforms with account IDs */
+  platforms: LatePlatformTarget[];
   /** The content to post */
   content: LatePostContent;
+  /** Media items (images/videos) */
+  mediaItems?: LateMediaItem[];
   /** ISO 8601 timestamp for scheduled posting (optional) */
   scheduledFor?: string;
   /** Platform-specific configuration */
