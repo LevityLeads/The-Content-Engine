@@ -98,36 +98,76 @@ function extractStylesheetUrls(html: string, baseUrl: string): string[] {
   return urls.slice(0, 5); // Limit to 5 stylesheets
 }
 
+// Extract font name from file path (e.g., "/fonts/Montserrat-Bold.woff2" -> "Montserrat")
+function extractFontNameFromPath(path: string): string | null {
+  // Get filename without extension
+  const filename = path.split('/').pop()?.split('.')[0] || '';
+  // Remove common suffixes like -Bold, -Regular, -Italic, etc.
+  const cleaned = filename.replace(/[-_](Bold|Regular|Italic|Light|Medium|SemiBold|ExtraBold|Thin|Black|Variable|VF|wght).*$/i, '');
+  // Convert camelCase or PascalCase to spaces if needed
+  const withSpaces = cleaned.replace(/([a-z])([A-Z])/g, '$1 $2');
+  return withSpaces.length > 2 ? withSpaces : null;
+}
+
 // Extract fonts from CSS/HTML (async to fetch external stylesheets)
 async function extractFonts(html: string, baseUrl: string): Promise<{ heading: string; body: string; detected: string[] }> {
   const fonts = new Set<string>();
 
-  // 1. Extract from Google Fonts links (most reliable for identifying brand fonts)
-  const googleFontsMatches = html.match(/fonts\.googleapis\.com\/css2?\?family=([^"'&\s]+)/gi) || [];
-  googleFontsMatches.forEach((match) => {
-    const familyMatch = match.match(/family=([^"'&\s]+)/i);
-    if (familyMatch) {
-      // Decode URL encoding and extract font names
-      const decoded = decodeURIComponent(familyMatch[1]);
-      // Handle format: "Poppins:wght@400;700|Roboto:wght@300" or "Poppins:wght@400;700&family=Roboto"
-      const fontFamilies = decoded.split(/[|&]/).map(f => {
-        // Remove 'family=' prefix if present
-        const clean = f.replace(/^family=/i, '');
-        return clean.split(':')[0].replace(/\+/g, ' ');
+  // 1. Extract from Google Fonts links - handle full URLs with multiple family params
+  // Match the entire Google Fonts URL to capture all family parameters
+  const googleFontsUrls = html.match(/https?:\/\/fonts\.googleapis\.com\/css2?\?[^"'\s>]+/gi) || [];
+  googleFontsUrls.forEach((url) => {
+    try {
+      const urlObj = new URL(url);
+      // Get all 'family' parameters
+      const families = urlObj.searchParams.getAll('family');
+      families.forEach(family => {
+        // Handle format: "Poppins:wght@400;700" or "Poppins"
+        const fontName = family.split(':')[0].replace(/\+/g, ' ').trim();
+        if (fontName && fontName.length > 1) {
+          fonts.add(fontName);
+        }
       });
-      fontFamilies.forEach(f => {
-        const trimmed = f.trim();
-        if (trimmed && trimmed.length > 1) {
-          fonts.add(trimmed);
+    } catch {
+      // Fallback to regex parsing if URL parsing fails
+      const familyMatches = url.match(/family=([^&"']+)/gi) || [];
+      familyMatches.forEach(match => {
+        const family = match.replace(/^family=/i, '');
+        const fontName = decodeURIComponent(family).split(':')[0].replace(/\+/g, ' ').trim();
+        if (fontName && fontName.length > 1) {
+          fonts.add(fontName);
         }
       });
     }
   });
 
-  // 2. Extract from Adobe Fonts/Typekit
+  // 2. Extract from font preload links (very reliable - these are intentional font choices)
+  const preloadMatches = html.match(/<link[^>]*rel=["']preload["'][^>]*as=["']font["'][^>]*>/gi) || [];
+  preloadMatches.forEach((link) => {
+    const hrefMatch = link.match(/href=["']([^"']+)["']/i);
+    if (hrefMatch) {
+      const fontName = extractFontNameFromPath(hrefMatch[1]);
+      if (fontName && !SYSTEM_FONTS.has(fontName.toLowerCase())) {
+        fonts.add(fontName);
+      }
+    }
+  });
+
+  // 3. Extract from @font-face src URLs in inline styles
+  const fontFaceSrcMatches = html.match(/src\s*:\s*url\(['"]?([^'")]+\.(?:woff2?|ttf|otf|eot))['"]?\)/gi) || [];
+  fontFaceSrcMatches.forEach((match) => {
+    const urlMatch = match.match(/url\(['"]?([^'")]+)['"]?\)/i);
+    if (urlMatch) {
+      const fontName = extractFontNameFromPath(urlMatch[1]);
+      if (fontName && !SYSTEM_FONTS.has(fontName.toLowerCase())) {
+        fonts.add(fontName);
+      }
+    }
+  });
+
+  // 4. Extract from Adobe Fonts/Typekit
   const adobeFontsMatch = html.match(/use\.typekit\.net\/([a-z0-9]+)\.css/i);
   if (adobeFontsMatch) {
-    // Try to fetch and parse Adobe Fonts CSS
     try {
       const adobeUrl = `https://use.typekit.net/${adobeFontsMatch[1]}.css`;
       const response = await fetch(adobeUrl, { signal: AbortSignal.timeout(3000) });
@@ -140,15 +180,15 @@ async function extractFonts(html: string, baseUrl: string): Promise<{ heading: s
     }
   }
 
-  // 3. Extract from inline CSS in HTML
+  // 5. Extract from inline CSS in HTML
   extractFontsFromCSS(html, fonts);
 
-  // 4. Extract from CSS variables (--font-heading, --font-body, etc.)
-  const fontVarMatches = html.match(/--font[^:]*:\s*([^;}{]+)/gi) || [];
+  // 6. Extract from CSS variables (--font-heading, --font-body, --font-sans, etc.)
+  const fontVarMatches = html.match(/--font[-\w]*:\s*["']?([^;}{}"']+)/gi) || [];
   fontVarMatches.forEach((match) => {
-    const value = match.split(':')[1]?.trim();
+    const value = match.split(':')[1]?.trim().replace(/["']/g, '');
     if (value) {
-      const families = value.split(',').map(f => f.trim().replace(/["']/g, ''));
+      const families = value.split(',').map(f => f.trim());
       families.forEach(f => {
         const normalized = f.toLowerCase().trim();
         if (normalized && !SYSTEM_FONTS.has(normalized) && !normalized.startsWith('var(') && f.length > 1) {
@@ -161,19 +201,40 @@ async function extractFonts(html: string, baseUrl: string): Promise<{ heading: s
     }
   });
 
-  // 5. Fetch and parse external stylesheets (limited to avoid slowdowns)
+  // 7. Extract from Next.js/Vercel font class patterns (e.g., className="__className_abc123")
+  // These often have associated CSS with font-family declarations
+  const nextFontMatches = html.match(/font-family:\s*["']?(__[a-zA-Z0-9_]+)[,\s]/gi) || [];
+  nextFontMatches.forEach((match) => {
+    // Next.js fonts usually have a readable name in a nearby CSS variable or comment
+    // For now, log these for debugging
+    console.log('Found Next.js font pattern:', match);
+  });
+
+  // 8. Fetch and parse external stylesheets (limited to avoid slowdowns)
   const stylesheetUrls = extractStylesheetUrls(html, baseUrl);
   const cssPromises = stylesheetUrls.map(async (url) => {
     try {
       const response = await fetch(url, {
         signal: AbortSignal.timeout(3000),
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; ContentEngine/1.0)",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         },
       });
       if (response.ok) {
         const css = await response.text();
         extractFontsFromCSS(css, fonts);
+
+        // Also extract from @font-face src in external CSS
+        const srcMatches = css.match(/src\s*:\s*url\(['"]?([^'")]+\.(?:woff2?|ttf|otf|eot))['"]?\)/gi) || [];
+        srcMatches.forEach((match) => {
+          const urlMatch = match.match(/url\(['"]?([^'")]+)['"]?\)/i);
+          if (urlMatch) {
+            const fontName = extractFontNameFromPath(urlMatch[1]);
+            if (fontName && !SYSTEM_FONTS.has(fontName.toLowerCase())) {
+              fonts.add(fontName);
+            }
+          }
+        });
       }
     } catch {
       // Ignore individual stylesheet fetch errors
@@ -181,6 +242,8 @@ async function extractFonts(html: string, baseUrl: string): Promise<{ heading: s
   });
 
   await Promise.allSettled(cssPromises);
+
+  console.log('All detected fonts before filtering:', Array.from(fonts));
 
   const detectedFonts = Array.from(fonts).filter(f => !f.startsWith('[') && f.length > 1).slice(0, 10);
 
