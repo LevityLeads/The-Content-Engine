@@ -220,9 +220,7 @@ export async function POST(request: NextRequest) {
           accountId: accountId,
         },
       ],
-      content: {
-        text: caption.trim(),
-      },
+      content: caption.trim(),
       mediaItems: mediaItems.length > 0 ? mediaItems : undefined,
       externalId: contentId,
     };
