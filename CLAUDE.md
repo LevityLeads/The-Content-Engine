@@ -105,14 +105,20 @@ src/
 │   │   ├── analytics/        # Analytics (stub)
 │   │   └── settings/         # Brand & account settings
 │   ├── api/                  # API routes
+│   │   ├── brands/           # Brand CRUD + website analyzer
 │   │   ├── inputs/           # POST/GET inputs
 │   │   ├── ideas/            # Ideas CRUD + generate
 │   │   ├── content/          # Content CRUD + generate
-│   │   └── images/generate/  # Image generation
+│   │   └── images/           # Image generation routes
 │   └── layout.tsx            # Root layout
 ├── components/
+│   ├── brand/                # Brand switcher, creation dialog
 │   ├── ui/                   # Base components (button, card, etc.)
 │   └── layout/               # Layout components (sidebar)
+├── contexts/
+│   └── brand-context.tsx     # Multi-client brand state management
+├── hooks/
+│   └── use-brand-api.ts      # Brand-aware API helpers
 ├── lib/
 │   ├── prompts/              # AI prompt system (~1300 lines)
 │   │   ├── ideation-prompt.ts
@@ -132,6 +138,48 @@ docs/
 └── PRD.md                    # Product Requirements Document
 ```
 
+## Multi-Client System
+
+The dashboard supports multiple clients/brands with isolated data and customizable style guides.
+
+### How It Works
+1. **Brand Switcher**: Dropdown in sidebar to switch between clients
+2. **Add New Client**: Enter name + website URL → AI extracts brand guidelines
+3. **Website Analysis**: Claude analyzes the site for voice/tone, Gemini extracts colors
+4. **Style Guide**: Editable brand voice, colors, and strictness settings
+5. **Data Isolation**: Each client's inputs, ideas, and content are separate
+
+### Brand Configuration
+```typescript
+// Voice Config (stored in brands.voice_config)
+{
+  tone_keywords: ["professional", "friendly"],
+  words_to_avoid: ["leverage", "synergy"],
+  strictness: 0.7,  // 0-1 scale for AI adherence
+  source_url: "https://example.com",
+  extracted_voice: { ... }
+}
+
+// Visual Config (stored in brands.visual_config)
+{
+  primary_color: "#1a1a1a",
+  accent_color: "#3b82f6",
+  color_palette: [...],
+  image_style: "minimalist"
+}
+```
+
+### Brand Strictness Scale
+| Value | Label | Behavior |
+|-------|-------|----------|
+| 0-30% | Flexible | AI has creative freedom |
+| 30-60% | Balanced | Mix of brand consistency and variety |
+| 60-80% | Consistent | Closely follows brand voice |
+| 80-100% | Strict | Minimal variation from guidelines |
+
+### API Filtering
+All data endpoints support `?brandId=xxx` query param for filtering by client.
+
 ## Content Pipeline
 
 ```
@@ -143,7 +191,7 @@ INPUT → PARSE → IDEATE → [HUMAN REVIEW] → GENERATE → [HUMAN REVIEW] �
 3. **Review**: User approves/rejects ideas
 4. **Generation**: Claude writes copy, Gemini creates images
 5. **Review**: User edits/approves content
-6. **Publish**: Schedule or post via Late.dev
+6. **Publish**: Schedule or post via Late.dev (Coming Soon)
 
 ## Git Workflow
 
@@ -349,6 +397,11 @@ Use `/role:handoff` to document session state when passing work to another role 
 
 | Purpose | File |
 |---------|------|
+| Brand context | `src/contexts/brand-context.tsx` |
+| Brand switcher | `src/components/brand/brand-switcher.tsx` |
+| Brand creation | `src/components/brand/brand-creation-dialog.tsx` |
+| Website analyzer API | `src/app/api/brands/analyze/route.ts` |
+| Brands API | `src/app/api/brands/route.ts` |
 | Ideation prompts | `src/lib/prompts/ideation-prompt.ts` |
 | Content prompts | `src/lib/prompts/content-prompt.ts` |
 | Voice system | `src/lib/prompts/voice-system.ts` |
@@ -363,13 +416,13 @@ Use `/role:handoff` to document session state when passing work to another role 
 
 | Table | Purpose |
 |-------|---------|
-| `organizations` | Multi-tenant support |
-| `brands` | Brand voice/visual config |
-| `social_accounts` | Connected platforms |
-| `inputs` | Raw content capture |
-| `ideas` | Generated content ideas |
-| `content` | Platform-specific posts |
-| `images` | Generated images |
+| `organizations` | Multi-tenant support (parent of brands) |
+| `brands` | Client/brand config with `voice_config` and `visual_config` JSON |
+| `social_accounts` | Connected platforms per brand (Coming Soon) |
+| `inputs` | Raw content capture (filtered by `brand_id`) |
+| `ideas` | Generated content ideas (filtered by `brand_id`) |
+| `content` | Platform-specific posts (filtered by `brand_id`) |
+| `images` | Generated images (linked to content) |
 | `analytics` | Post performance metrics |
 | `feedback_events` | Learning system data |
 
