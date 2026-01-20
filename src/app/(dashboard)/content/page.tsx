@@ -1086,7 +1086,7 @@ export default function ContentPage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium line-clamp-2">
-              {item.ideas?.concept || item.copy_primary.slice(0, 60)}
+              {String(item.ideas?.concept || item.copy_primary?.slice(0, 60) || "")}
             </p>
           </div>
         </div>
@@ -1840,10 +1840,10 @@ export default function ContentPage() {
                   {/* Title/Concept */}
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">
-                      {item.ideas?.concept || item.copy_primary.slice(0, 60) + "..."}
+                      {String(item.ideas?.concept || item.copy_primary?.slice(0, 60) || "")}...
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {item.copy_primary.slice(0, 100)}...
+                      {String(item.copy_primary?.slice(0, 100) || "")}...
                     </p>
                   </div>
 
@@ -1894,9 +1894,9 @@ export default function ContentPage() {
                   </div>
 
                   {/* Theme Badge */}
-                  {item.ideas?.angle && (
+                  {item.ideas?.angle && typeof item.ideas.angle === 'string' && (
                     <Badge variant="secondary" className="text-xs capitalize shrink-0">
-                      {item.ideas?.angle}
+                      {item.ideas.angle}
                     </Badge>
                   )}
 
