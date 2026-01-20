@@ -1231,26 +1231,6 @@ export default function ContentPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Model Selector */}
-          <div className="flex items-center gap-1 rounded-lg border p-1">
-            {MODEL_OPTIONS.map((model) => (
-              <Button
-                key={model.key}
-                variant={selectedModel === model.key ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setSelectedModel(model.key)}
-                className="gap-1"
-                title={model.description}
-              >
-                {model.speed === "fast" ? (
-                  <Zap className="h-3 w-3" />
-                ) : (
-                  <Brain className="h-3 w-3" />
-                )}
-                {model.name}
-              </Button>
-            ))}
-          </div>
           <Button variant="outline" size="sm" onClick={fetchContent}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
