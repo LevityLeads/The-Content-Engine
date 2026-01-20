@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from "@/lib/image-models";
+import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/video-models";
+import { BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
 
 // Helper to update job status
 async function updateJobStatus(
@@ -79,10 +81,10 @@ export async function POST(request: NextRequest) {
       : DEFAULT_MODEL;
     const modelConfig = IMAGE_MODELS[modelKey];
 
-    // Fetch the content to verify it exists and get platform
+    // Fetch the content to verify it exists and get platform, metadata, and brand info
     const { data: content, error: contentError } = await supabase
       .from("content")
-      .select("id, platform")
+      .select("id, platform, metadata, brand_id, brands(video_config)")
       .eq("id", contentId)
       .single();
 
@@ -91,6 +93,117 @@ export async function POST(request: NextRequest) {
         { error: "Content not found" },
         { status: 404 }
       );
+    }
+
+    // Check if this content should generate video instead of image
+    const metadata = content.metadata as { visualStyle?: string; imagePrompt?: string } | null;
+    if (metadata?.visualStyle === "video") {
+      // Handle Supabase join which returns array or single object
+      const brandsResult = content.brands;
+      const brandData = Array.isArray(brandsResult) ? brandsResult[0] : brandsResult;
+      const videoConfig = (brandData?.video_config as BrandVideoConfig) || DEFAULT_VIDEO_CONFIG;
+
+      if (!videoConfig.enabled) {
+        return NextResponse.json(
+          { error: "Video generation is not enabled for this brand. Enable it in Settings." },
+          { status: 400 }
+        );
+      }
+
+      // Generate video instead of image - call video generation API
+      const videoModel = videoConfig.default_model || DEFAULT_VIDEO_MODEL;
+      const duration = videoConfig.default_duration || 5;
+      const includeAudio = videoConfig.include_audio || false;
+
+      // Create a video generation job
+      const { data: job, error: jobError } = await supabase
+        .from('generation_jobs')
+        .insert({
+          content_id: contentId,
+          type: 'video',
+          status: 'generating',
+          progress: 0,
+          total_items: 1,
+          completed_items: 0,
+          current_step: 'Generating video',
+          metadata: { model: videoModel, prompt: prompt.substring(0, 200), duration },
+        })
+        .select()
+        .single();
+
+      if (jobError) {
+        console.error('Error creating video job:', jobError);
+      }
+      const videoJobId = job?.id;
+
+      try {
+        // Call internal video generation endpoint
+        const videoResponse = await fetch(new URL('/api/videos/generate', request.url).toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contentId,
+            prompt,
+            model: videoModel,
+            duration,
+            includeAudio,
+            slideNumber: 1, // Primary media
+          }),
+        });
+
+        const videoResult = await videoResponse.json();
+
+        if (!videoResponse.ok) {
+          if (videoJobId) {
+            await updateJobStatus(supabase, videoJobId, {
+              status: 'failed',
+              progress: 100,
+              errorMessage: videoResult.error || 'Video generation failed',
+              errorCode: 'VIDEO_ERROR',
+            });
+          }
+          return NextResponse.json(
+            { error: videoResult.error || 'Video generation failed', jobId: videoJobId },
+            { status: videoResponse.status }
+          );
+        }
+
+        if (videoJobId) {
+          await updateJobStatus(supabase, videoJobId, {
+            status: 'completed',
+            progress: 100,
+            completedItems: 1,
+          });
+        }
+
+        return NextResponse.json({
+          success: true,
+          image: videoResult.video,
+          generated: true,
+          status: 'generated',
+          message: `Video generated with ${VIDEO_MODELS[videoModel]?.name || videoModel}`,
+          mediaType: 'video',
+          model: {
+            key: videoModel,
+            name: VIDEO_MODELS[videoModel]?.name || videoModel,
+          },
+          jobId: videoJobId,
+        });
+      } catch (videoError) {
+        console.error('Video generation error:', videoError);
+        if (videoJobId) {
+          await updateJobStatus(supabase, videoJobId, {
+            status: 'failed',
+            progress: 100,
+            errorMessage: 'Video generation failed',
+            errorCode: 'INTERNAL_ERROR',
+          });
+        }
+        return NextResponse.json(
+          { error: 'Video generation failed', jobId: videoJobId },
+          { status: 500 }
+        );
+      }
     }
 
     // Create a generation job

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Download, Zap, Brain } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Zap, Brain, Video, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,8 @@ export interface CarouselImage {
   url: string;
   model?: string;
   createdAt?: string;
+  mediaType?: "image" | "video";
+  durationSeconds?: number;
 }
 
 interface ImageCarouselProps {
@@ -91,14 +93,23 @@ export function ImageCarousel({
 
   return (
     <div className={cn("space-y-2", className)}>
-      {/* Main image container */}
+      {/* Main image/video container */}
       <div className="relative rounded-lg overflow-hidden border bg-black/5">
         <div className={cn("relative", aspectRatio)}>
-          <img
-            src={currentImage.url}
-            alt={`Generated image ${safeIndex + 1} of ${validImages.length}`}
-            className="w-full h-full object-cover"
-          />
+          {currentImage.mediaType === "video" ? (
+            <video
+              src={currentImage.url}
+              controls
+              className="w-full h-full object-cover"
+              poster={undefined}
+            />
+          ) : (
+            <img
+              src={currentImage.url}
+              alt={`Generated image ${safeIndex + 1} of ${validImages.length}`}
+              className="w-full h-full object-cover"
+            />
+          )}
 
           {/* Model badge - top left */}
           {currentImage.model && modelBadge && (
@@ -165,19 +176,32 @@ export function ImageCarousel({
             <button
               key={img.id}
               className={cn(
-                "flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border-2 transition-all",
+                "relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border-2 transition-all",
                 idx === safeIndex
                   ? "border-primary ring-2 ring-primary/30"
                   : "border-transparent opacity-60 hover:opacity-100"
               )}
               onClick={() => setCurrentIndex(idx)}
-              title={`Version ${idx + 1}${idx === 0 ? " (newest)" : ""}`}
+              title={`${img.mediaType === "video" ? "Video" : "Image"} ${idx + 1}${idx === 0 ? " (newest)" : ""}`}
             >
-              <img
-                src={img.url}
-                alt={`Thumbnail ${idx + 1}`}
-                className="w-full h-full object-cover"
-              />
+              {img.mediaType === "video" ? (
+                <>
+                  <video
+                    src={img.url}
+                    className="w-full h-full object-cover"
+                    muted
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                    <Play className="h-4 w-4 text-white" />
+                  </div>
+                </>
+              ) : (
+                <img
+                  src={img.url}
+                  alt={`Thumbnail ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              )}
             </button>
           ))}
         </div>

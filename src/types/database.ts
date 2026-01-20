@@ -298,6 +298,13 @@ export type Database = {
           format: string | null;
           is_primary: boolean;
           platform_crops: Json | null;
+          media_type: "image" | "video";
+          duration_seconds: number | null;
+          has_audio: boolean;
+          file_size_bytes: number | null;
+          generation_model: string | null;
+          generation_cost: number | null;
+          slide_number: number | null;
           created_at: string;
         };
         Insert: {
@@ -310,6 +317,13 @@ export type Database = {
           format?: string | null;
           is_primary?: boolean;
           platform_crops?: Json | null;
+          media_type?: "image" | "video";
+          duration_seconds?: number | null;
+          has_audio?: boolean;
+          file_size_bytes?: number | null;
+          generation_model?: string | null;
+          generation_cost?: number | null;
+          slide_number?: number | null;
           created_at?: string;
         };
         Update: {
@@ -322,6 +336,13 @@ export type Database = {
           format?: string | null;
           is_primary?: boolean;
           platform_crops?: Json | null;
+          media_type?: "image" | "video";
+          duration_seconds?: number | null;
+          has_audio?: boolean;
+          file_size_bytes?: number | null;
+          generation_model?: string | null;
+          generation_cost?: number | null;
+          slide_number?: number | null;
           created_at?: string;
         };
       };
@@ -407,6 +428,41 @@ export type Database = {
           created_at?: string;
         };
       };
+      video_usage: {
+        Row: {
+          id: string;
+          brand_id: string;
+          content_id: string | null;
+          image_id: string | null;
+          model: string;
+          duration_seconds: number;
+          has_audio: boolean;
+          cost_usd: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          brand_id: string;
+          content_id?: string | null;
+          image_id?: string | null;
+          model: string;
+          duration_seconds: number;
+          has_audio?: boolean;
+          cost_usd: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          brand_id?: string;
+          content_id?: string | null;
+          image_id?: string | null;
+          model?: string;
+          duration_seconds?: number;
+          has_audio?: boolean;
+          cost_usd?: number;
+          created_at?: string;
+        };
+      };
     };
     Views: {};
     Functions: {};
@@ -432,3 +488,29 @@ export type Content = Tables<"content">;
 export type Image = Tables<"images">;
 export type Analytics = Tables<"analytics">;
 export type SocialAccount = Tables<"social_accounts">;
+export type VideoUsage = Tables<"video_usage">;
+
+// Media type (alias for Image that supports both images and videos)
+export type Media = Tables<"images">;
+
+// Video configuration for brands
+export interface BrandVideoConfig {
+  enabled: boolean;
+  monthly_budget_usd: number | null;
+  default_model: "veo-3.1-fast" | "veo-3.0";
+  default_duration: number;
+  max_duration: number;
+  include_audio: boolean;
+  daily_limit: number | null;
+}
+
+// Default video configuration
+export const DEFAULT_VIDEO_CONFIG: BrandVideoConfig = {
+  enabled: false,
+  monthly_budget_usd: 50,
+  default_model: "veo-3.1-fast",
+  default_duration: 5,
+  max_duration: 8,
+  include_audio: false,
+  daily_limit: 10,
+};
