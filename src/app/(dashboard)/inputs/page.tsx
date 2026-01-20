@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useBrand } from "@/contexts/brand-context";
 
 type InputType = "text" | "link" | "document";
 
@@ -20,6 +21,7 @@ interface InputRecord {
 }
 
 export default function InputsPage() {
+  const { selectedBrand } = useBrand();
   const [inputType, setInputType] = useState<InputType>("text");
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,14 +31,16 @@ export default function InputsPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Fetch recent inputs on mount
+  // Fetch recent inputs on mount and when brand changes
   useEffect(() => {
     fetchRecentInputs();
-  }, []);
+  }, [selectedBrand?.id]);
 
   const fetchRecentInputs = async () => {
     try {
-      const res = await fetch("/api/inputs?limit=10");
+      const params = new URLSearchParams({ limit: "10" });
+      if (selectedBrand?.id) params.set("brandId", selectedBrand.id);
+      const res = await fetch(`/api/inputs?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         setRecentInputs(data.inputs || []);
@@ -60,7 +64,7 @@ export default function InputsPage() {
       const inputRes = await fetch("/api/inputs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: inputType, content }),
+        body: JSON.stringify({ type: inputType, content, brandId: selectedBrand?.id }),
       });
 
       const inputData = await inputRes.json();
