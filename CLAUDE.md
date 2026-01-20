@@ -27,6 +27,7 @@ AI-powered content automation system that transforms raw inputs into polished, p
 | end-to-end, full feature, both UI and API, spans multiple areas | **Full Stack** | `.claude/roles/fullstack.md` |
 | update docs, document, sync, architecture, CLAUDE.md, RULES.md | **Docs** | `.claude/roles/docs.md` |
 | debug, investigate, root cause, stack trace, performance issue, race condition, why is this | **Debug** | `.claude/roles/debug.md` |
+| research, explore options, validate idea, feasibility, best practices, cutting edge, trends, what if, could we, should we, alternatives, before we build | **Researcher** | `.claude/roles/researcher.md` |
 
 ### Role Announcement Format (ALWAYS USE THIS)
 
@@ -331,6 +332,8 @@ The system automatically hands off between roles:
 | Multiple parallel sessions done | **QA** merges all branches |
 | Something is broken | **QA** investigates and coordinates fix |
 | Complex bug needs deep investigation | **QA** hands to **Debug** for root cause analysis |
+| Need to validate idea or explore options | Hand to **Researcher** before implementing |
+| Research complete with recommendation | **Researcher** hands to implementation role |
 
 ### Available Roles
 
@@ -345,6 +348,7 @@ The system automatically hands off between roles:
 | **Debug** | Deep investigation, root cause analysis | All files (investigation access) |
 | **DevOps** | CI/CD, deployment, infrastructure | `.github/`, deployment config |
 | **Docs** | Documentation sync, architecture review | `CLAUDE.md`, `RULES.md`, `docs/`, `.claude/` |
+| **Researcher** | Product research, idea validation, tech exploration | Research outputs, feasibility assessments |
 
 ### Explicit Role Selection (Optional)
 
@@ -358,6 +362,7 @@ You can explicitly select a role if you prefer:
 - `/role:debug` - Expert Debug Specialist
 - `/role:devops` - DevOps Engineer
 - `/role:docs` - Documentation & Sync Specialist
+- `/role:researcher` - Researcher & Innovation Specialist
 
 ### Parallel Sessions Workflow
 
