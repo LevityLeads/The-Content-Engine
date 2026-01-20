@@ -312,12 +312,19 @@ function SettingsPageContent() {
 
   // Link a specific Late.dev account to this brand
   const linkAccount = async (lateAccount: LateAccount) => {
-    if (!selectedBrand?.id) return;
+    console.log("linkAccount called with:", lateAccount);
+    console.log("selectedBrand:", selectedBrand);
+
+    if (!selectedBrand?.id) {
+      console.error("No brand selected!");
+      return;
+    }
 
     setShowAccountPicker(null);
     setLoadingAccounts(true);
 
     try {
+      console.log("Making request to /api/social-accounts/link...");
       const res = await fetch("/api/social-accounts/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -329,7 +336,9 @@ function SettingsPageContent() {
         }),
       });
 
+      console.log("Response status:", res.status);
       const data = await res.json();
+      console.log("Response data:", data);
 
       if (data.success) {
         setSocialAccounts((prev) => [...prev.filter(a => a.platform !== lateAccount.platform), data.account]);
@@ -947,7 +956,10 @@ function SettingsPageContent() {
                 availableLateAccounts.map((account) => (
                   <button
                     key={account.id}
-                    onClick={() => linkAccount(account)}
+                    onClick={() => {
+                      console.log("Account clicked:", account);
+                      linkAccount(account);
+                    }}
                     className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors text-left"
                   >
                     <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
