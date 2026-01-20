@@ -435,6 +435,13 @@ export default function ContentPage() {
           textStyle: selectedTextStyle,
           textColor: selectedTextColor,
           backgroundStyle: selectedBackgroundStyle,
+          // Pass brand colors for visual consistency
+          brandColors: selectedBrand?.visual_config ? {
+            primary_color: selectedBrand.visual_config.primary_color,
+            accent_color: selectedBrand.visual_config.accent_color,
+            secondary_color: selectedBrand.visual_config.secondary_color,
+            image_style: selectedBrand.visual_config.image_style,
+          } : undefined,
         }),
       });
 
@@ -564,6 +571,13 @@ export default function ContentPage() {
           backgroundStyle: selectedBackgroundStyle,
           visualStyle, // Pass the new visual style
           jobId,
+          // Pass brand colors for visual consistency
+          brandColors: selectedBrand?.visual_config ? {
+            primary_color: selectedBrand.visual_config.primary_color,
+            accent_color: selectedBrand.visual_config.accent_color,
+            secondary_color: selectedBrand.visual_config.secondary_color,
+            image_style: selectedBrand.visual_config.image_style,
+          } : undefined,
         }),
       });
 
