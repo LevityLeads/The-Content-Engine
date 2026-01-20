@@ -753,11 +753,19 @@ function SettingsPageContent() {
           {/* Brand Fonts */}
           <div>
             <label className="text-sm font-medium">Brand Fonts</label>
-            <p className="text-xs text-muted-foreground mb-2">
-              {visualConfig.fonts?.heading || visualConfig.fonts?.body
-                ? "Detected from your website - used for carousel text overlays"
-                : "Enter your brand fonts manually or re-analyze your website to detect them"}
-            </p>
+            {visualConfig.fonts?.heading || visualConfig.fonts?.body ? (
+              <p className="text-xs text-muted-foreground mb-2">
+                Detected from your website - used for carousel text overlays
+              </p>
+            ) : (
+              <div className="mt-2 mb-3 p-3 rounded-lg border border-amber-500/50 bg-amber-500/10">
+                <p className="text-sm text-amber-200 font-medium">Fonts not detected</p>
+                <p className="text-xs text-amber-200/70 mt-1">
+                  Your website uses custom or proprietary fonts that couldn&apos;t be automatically detected.
+                  Please enter your brand fonts manually below for best results in generated content.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4 mt-2">
               <div className="p-3 rounded-lg border bg-muted/30">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Heading Font</div>
