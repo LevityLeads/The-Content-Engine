@@ -610,157 +610,163 @@ export default function IdeasPage() {
 
             return (
               <Card key={idea.id} className="overflow-hidden">
-                {/* Collapsed Header Row */}
+                {/* Collapsed Header - Two Row Layout */}
                 <div
-                  className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => toggleCard(idea.id)}
                 >
-                  {/* Selection Checkbox */}
-                  <button
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleSelectItem(idea.id);
-                    }}
-                  >
-                    {selectedItems.has(idea.id) ? (
-                      <CheckSquare className="h-5 w-5 text-primary" />
-                    ) : (
-                      <Square className="h-5 w-5" />
-                    )}
-                  </button>
+                  {/* Row 1: Main title row */}
+                  <div className="flex items-center gap-3">
+                    {/* Selection Checkbox */}
+                    <button
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelectItem(idea.id);
+                      }}
+                    >
+                      {selectedItems.has(idea.id) ? (
+                        <CheckSquare className="h-5 w-5 text-primary" />
+                      ) : (
+                        <Square className="h-5 w-5" />
+                      )}
+                    </button>
 
-                  {/* Expand Icon */}
-                  <div className="text-muted-foreground">
-                    {isExpanded ? (
-                      <ChevronDown className="h-5 w-5" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5" />
-                    )}
-                  </div>
+                    {/* Expand Icon */}
+                    <div className="text-muted-foreground">
+                      {isExpanded ? (
+                        <ChevronDown className="h-5 w-5" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5" />
+                      )}
+                    </div>
 
-                  {/* Idea Icon */}
-                  <div className="p-2 rounded-lg bg-primary/20">
-                    <Lightbulb className="h-4 w-4 text-primary" />
-                  </div>
+                    {/* Idea Icon */}
+                    <div className="p-2 rounded-lg bg-primary/20">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                    </div>
 
-                  {/* Title/Concept */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{idea.concept}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {idea.potential_hooks?.[0] || idea.key_points?.[0] || ""}
-                    </p>
-                  </div>
+                    {/* Title/Concept - Now with more room */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium leading-snug">{idea.concept}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {idea.potential_hooks?.[0] || idea.key_points?.[0] || ""}
+                      </p>
+                    </div>
 
-                  {/* Angle Badge */}
-                  <Badge variant="secondary" className="capitalize shrink-0">
-                    {idea.angle}
-                  </Badge>
-
-                  {/* Platform indicators */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    {(idea.target_platforms || ALL_PLATFORMS).map((platform) => {
-                      const config = platformConfig[platform];
-                      return (
-                        <div
-                          key={platform}
-                          className={cn(
-                            "p-1.5 rounded",
-                            selected.includes(platform) ? config.activeColor : "bg-muted/50 text-muted-foreground"
-                          )}
-                        >
-                          {config?.icon}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Confidence Score */}
-                  <div className="text-right shrink-0 w-16">
-                    <p className="text-lg font-bold text-primary">{idea.confidence_score}%</p>
-                    <p className="text-[10px] text-muted-foreground">confidence</p>
-                  </div>
-
-                  {/* Timestamp */}
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatRelativeTime(idea.created_at)}</span>
-                  </div>
-
-                  {/* Status Badge */}
-                  <Badge className={cn("text-xs capitalize shrink-0", statusColors[idea.status] || "")}>
-                    {idea.status}
-                  </Badge>
-
-                  {/* Quick Actions */}
-                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                    {/* Quick Approve (only for pending) */}
-                    {idea.status === "pending" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/20"
-                        onClick={() => handleAction(idea.id, "approved")}
-                        disabled={actionLoading === idea.id || generatingContent === idea.id}
-                        title="Quick Approve"
-                      >
-                        {actionLoading === idea.id || generatingContent === idea.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    )}
-                    {/* Quick Reject (only for pending) */}
-                    {idea.status === "pending" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-orange-500 hover:text-orange-400 hover:bg-orange-500/20"
-                        onClick={() => handleAction(idea.id, "rejected")}
-                        disabled={actionLoading === idea.id || generatingContent === idea.id}
-                        title="Quick Reject"
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {/* Delete button */}
-                    {deleteConfirmId === idea.id ? (
-                      <div className="flex items-center gap-1 rounded-lg border border-red-500/50 bg-red-500/10 px-2">
-                        <span className="text-xs text-red-400">Delete?</span>
+                    {/* Quick Actions */}
+                    <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {/* Quick Approve (only for pending) */}
+                      {idea.status === "pending" && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-500/20"
-                          onClick={() => handleDelete(idea.id)}
-                          disabled={isDeleting}
+                          className="h-8 w-8 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/20"
+                          onClick={() => handleAction(idea.id, "approved")}
+                          disabled={actionLoading === idea.id || generatingContent === idea.id}
+                          title="Quick Approve"
                         >
-                          {isDeleting ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
+                          {actionLoading === idea.id || generatingContent === idea.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Check className="h-3 w-3" />
+                            <CheckCircle2 className="h-4 w-4" />
                           )}
                         </Button>
+                      )}
+                      {/* Quick Reject (only for pending) */}
+                      {idea.status === "pending" && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-white"
-                          onClick={() => setDeleteConfirmId(null)}
+                          className="h-8 w-8 text-orange-500 hover:text-orange-400 hover:bg-orange-500/20"
+                          onClick={() => handleAction(idea.id, "rejected")}
+                          disabled={actionLoading === idea.id || generatingContent === idea.id}
+                          title="Quick Reject"
                         >
-                          <X className="h-3 w-3" />
+                          <XCircle className="h-4 w-4" />
                         </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                        onClick={() => setDeleteConfirmId(idea.id)}
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                      )}
+                      {/* Delete button */}
+                      {deleteConfirmId === idea.id ? (
+                        <div className="flex items-center gap-1 rounded-lg border border-red-500/50 bg-red-500/10 px-2">
+                          <span className="text-xs text-red-400">Delete?</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-500/20"
+                            onClick={() => handleDelete(idea.id)}
+                            disabled={isDeleting}
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Check className="h-3 w-3" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-white"
+                            onClick={() => setDeleteConfirmId(null)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                          onClick={() => setDeleteConfirmId(idea.id)}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 2: Metadata row */}
+                  <div className="flex items-center gap-3 mt-3 ml-[52px]">
+                    {/* Angle Badge */}
+                    <Badge variant="secondary" className="capitalize">
+                      {idea.angle}
+                    </Badge>
+
+                    {/* Platform indicators */}
+                    <div className="flex items-center gap-1">
+                      {(idea.target_platforms || ALL_PLATFORMS).map((platform) => {
+                        const config = platformConfig[platform];
+                        return (
+                          <div
+                            key={platform}
+                            className={cn(
+                              "p-1.5 rounded",
+                              selected.includes(platform) ? config.activeColor : "bg-muted/50 text-muted-foreground"
+                            )}
+                          >
+                            {config?.icon}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Confidence Score */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold text-primary">{idea.confidence_score}%</span>
+                      <span className="text-xs text-muted-foreground">confidence</span>
+                    </div>
+
+                    {/* Timestamp */}
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>{formatRelativeTime(idea.created_at)}</span>
+                    </div>
+
+                    {/* Status Badge */}
+                    <Badge className={cn("text-xs capitalize", statusColors[idea.status] || "")}>
+                      {idea.status}
+                    </Badge>
                   </div>
                 </div>
 
