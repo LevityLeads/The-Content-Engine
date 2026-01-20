@@ -26,6 +26,7 @@ AI-powered content automation system that transforms raw inputs into polished, p
 | CI/CD, GitHub Actions, deployment, environment, infrastructure | **DevOps** | `.claude/roles/devops.md` |
 | end-to-end, full feature, both UI and API, spans multiple areas | **Full Stack** | `.claude/roles/fullstack.md` |
 | update docs, document, sync, architecture, CLAUDE.md, RULES.md | **Docs** | `.claude/roles/docs.md` |
+| debug, investigate, root cause, stack trace, performance issue, race condition, why is this | **Debug** | `.claude/roles/debug.md` |
 
 ### Role Announcement Format (ALWAYS USE THIS)
 
@@ -281,6 +282,7 @@ The system automatically hands off between roles:
 | Task crosses into prompts/AI | Switch to **AI** role or consult guidelines |
 | Multiple parallel sessions done | **QA** merges all branches |
 | Something is broken | **QA** investigates and coordinates fix |
+| Complex bug needs deep investigation | **QA** hands to **Debug** for root cause analysis |
 
 ### Available Roles
 
@@ -292,6 +294,7 @@ The system automatically hands off between roles:
 | **Backend** | APIs, Supabase, integrations | `src/app/api/`, `src/lib/supabase/` |
 | **Full Stack** | Cross-cutting frontend + backend | Both frontend and backend |
 | **QA** | Testing, verification, merge & deploy | Test suite, quality gates |
+| **Debug** | Deep investigation, root cause analysis | All files (investigation access) |
 | **DevOps** | CI/CD, deployment, infrastructure | `.github/`, deployment config |
 | **Docs** | Documentation sync, architecture review | `CLAUDE.md`, `RULES.md`, `docs/`, `.claude/` |
 
@@ -304,6 +307,7 @@ You can explicitly select a role if you prefer:
 - `/role:backend` - Backend Developer
 - `/role:fullstack` - Full Stack Developer
 - `/role:qa` - QA & Merge Coordinator
+- `/role:debug` - Expert Debug Specialist
 - `/role:devops` - DevOps Engineer
 - `/role:docs` - Documentation & Sync Specialist
 
