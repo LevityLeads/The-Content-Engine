@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Clock } from "lucide-react";
+import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Clock, Palette, Type, Camera, PenTool, Box, Shapes, Layers, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { type VisualStyle } from "@/lib/prompts";
 
 interface Idea {
   id: string;
@@ -64,6 +65,62 @@ const platformConfig: Record<string, { icon: React.ReactNode; label: string; col
   },
 };
 
+// Visual style configuration for the style selector
+type StyleOption = VisualStyle | "auto";
+const visualStyleConfig: Record<StyleOption, { icon: React.ReactNode; label: string; description: string; color: string; activeColor: string }> = {
+  auto: {
+    icon: <Wand2 className="h-4 w-4" />,
+    label: "Auto",
+    description: "AI chooses best style",
+    color: "border-purple-500/30 text-purple-400",
+    activeColor: "bg-purple-600 text-white border-purple-600",
+  },
+  typography: {
+    icon: <Type className="h-4 w-4" />,
+    label: "Typography",
+    description: "Bold text-focused designs",
+    color: "border-slate-500/30 text-slate-400",
+    activeColor: "bg-slate-700 text-white border-slate-700",
+  },
+  photorealistic: {
+    icon: <Camera className="h-4 w-4" />,
+    label: "Photo",
+    description: "Photo-quality backgrounds",
+    color: "border-emerald-500/30 text-emerald-400",
+    activeColor: "bg-emerald-600 text-white border-emerald-600",
+  },
+  illustration: {
+    icon: <PenTool className="h-4 w-4" />,
+    label: "Illustration",
+    description: "Hand-drawn/digital art",
+    color: "border-orange-500/30 text-orange-400",
+    activeColor: "bg-orange-500 text-white border-orange-500",
+  },
+  "3d-render": {
+    icon: <Box className="h-4 w-4" />,
+    label: "3D Render",
+    description: "Modern 3D scenes",
+    color: "border-cyan-500/30 text-cyan-400",
+    activeColor: "bg-cyan-600 text-white border-cyan-600",
+  },
+  "abstract-art": {
+    icon: <Shapes className="h-4 w-4" />,
+    label: "Abstract",
+    description: "Bold shapes & gradients",
+    color: "border-rose-500/30 text-rose-400",
+    activeColor: "bg-rose-500 text-white border-rose-500",
+  },
+  collage: {
+    icon: <Layers className="h-4 w-4" />,
+    label: "Collage",
+    description: "Mixed media layers",
+    color: "border-amber-500/30 text-amber-400",
+    activeColor: "bg-amber-600 text-white border-amber-600",
+  },
+};
+
+const STYLE_OPTIONS: StyleOption[] = ["auto", "typography", "photorealistic", "illustration", "3d-render", "abstract-art", "collage"];
+
 export default function IdeasPage() {
   const router = useRouter();
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -74,6 +131,8 @@ export default function IdeasPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   // Track selected platforms per idea
   const [selectedPlatforms, setSelectedPlatforms] = useState<Record<string, string[]>>({});
+  // Track selected visual style per idea (for Instagram carousels)
+  const [selectedVisualStyles, setSelectedVisualStyles] = useState<Record<string, StyleOption>>({});
 
   useEffect(() => {
     fetchIdeas();
@@ -126,6 +185,14 @@ export default function IdeasPage() {
     return selectedPlatforms[ideaId] || defaultPlatforms || [...ALL_PLATFORMS];
   };
 
+  const getSelectedVisualStyle = (ideaId: string): StyleOption => {
+    return selectedVisualStyles[ideaId] || "auto";
+  };
+
+  const setVisualStyle = (ideaId: string, style: StyleOption) => {
+    setSelectedVisualStyles((prev) => ({ ...prev, [ideaId]: style }));
+  };
+
   const handleAction = async (id: string, status: "approved" | "rejected") => {
     setActionLoading(id);
     setSuccessMessage(null);
@@ -149,15 +216,26 @@ export default function IdeasPage() {
         if (status === "approved") {
           const idea = ideas.find((i) => i.id === id);
           const platforms = getSelectedPlatforms(id, idea?.target_platforms || []);
+          const visualStyle = getSelectedVisualStyle(id);
 
           setActionLoading(null);
           setGeneratingContent(id);
-          setSuccessMessage(`Idea approved! Generating content for ${platforms.join(", ")}...`);
+
+          // Build message based on whether Instagram is selected and a style is chosen
+          const hasInstagram = platforms.includes("instagram");
+          const styleLabel = visualStyle !== "auto" ? visualStyleConfig[visualStyle].label : "Auto-selected";
+          const styleMsg = hasInstagram ? ` (${styleLabel} style)` : "";
+          setSuccessMessage(`Idea approved! Generating content for ${platforms.join(", ")}${styleMsg}...`);
 
           const contentRes = await fetch("/api/content/generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ideaId: id, platforms }),
+            body: JSON.stringify({
+              ideaId: id,
+              platforms,
+              // Only pass visualStyle if not "auto" - undefined lets AI choose
+              visualStyle: visualStyle !== "auto" ? visualStyle : undefined,
+            }),
           });
 
           const contentData = await contentRes.json();
@@ -326,6 +404,40 @@ export default function IdeasPage() {
                           );
                         })}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Visual Style Selector - Only show when Instagram is selected */}
+                  {idea.status === "pending" && selected.includes("instagram") && (
+                    <div className="space-y-2 pt-2 border-t border-muted/30">
+                      <div className="flex items-center gap-2">
+                        <Palette className="h-4 w-4 text-muted-foreground" />
+                        <p className="text-sm font-medium text-muted-foreground">Carousel visual style:</p>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap">
+                        {STYLE_OPTIONS.map((style) => {
+                          const config = visualStyleConfig[style];
+                          const isSelected = getSelectedVisualStyle(idea.id) === style;
+                          return (
+                            <button
+                              key={style}
+                              onClick={() => setVisualStyle(idea.id, style)}
+                              className={cn(
+                                "flex flex-col items-center gap-1 px-3 py-2 rounded-lg border-2 transition-all text-center",
+                                isSelected ? config.activeColor : config.color,
+                                "hover:opacity-90"
+                              )}
+                              title={config.description}
+                            >
+                              {config.icon}
+                              <span className="text-xs font-medium">{config.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {visualStyleConfig[getSelectedVisualStyle(idea.id)].description}
+                      </p>
                     </div>
                   )}
 
