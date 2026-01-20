@@ -37,8 +37,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Map platform to account ID environment variable
+    // TODO: Support multiple accounts per platform via brand settings
     const platformAccountIds: Record<string, string | undefined> = {
-      instagram: process.env.LATE_INSTAGRAM_ACCOUNT_ID,
+      instagram: process.env.LATE_INSTAGRAM_ACCOUNT_ID || process.env.LATE_INSTAGRAM_ACCOUNT_OCD_ID,
       twitter: process.env.LATE_TWITTER_ACCOUNT_ID,
       linkedin: process.env.LATE_LINKEDIN_ACCOUNT_ID,
     };
@@ -114,12 +115,78 @@ export async function POST(request: NextRequest) {
       caption = `${caption}\n\n${content.copy_cta}`;
     }
 
-    // Build media array for Late.dev
-    const mediaItems: LateMediaItem[] = validImages.map((img) => ({
-      url: img.url,
-      type: "image" as const,
-      altText: img.prompt || undefined,
-    }));
+    // Upload base64 images to Supabase Storage and get public URLs
+    const uploadedUrls: string[] = [];
+    const mediaItems: LateMediaItem[] = [];
+
+    for (let i = 0; i < validImages.length; i++) {
+      const img = validImages[i];
+      let imageUrl = img.url;
+
+      // Check if this is a base64 data URL that needs uploading
+      if (img.url.startsWith("data:")) {
+        try {
+          // Extract base64 data and mime type
+          const matches = img.url.match(/^data:([^;]+);base64,(.+)$/);
+          if (!matches) {
+            console.error("Invalid base64 data URL format");
+            continue;
+          }
+          const mimeType = matches[1];
+          const base64Data = matches[2];
+          const buffer = Buffer.from(base64Data, "base64");
+
+          // Determine file extension
+          const ext = mimeType.includes("png") ? "png" : mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : "png";
+
+          // Generate unique filename
+          const filename = `publish/${contentId}/${Date.now()}-${i}.${ext}`;
+
+          // Upload to Supabase Storage
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("images")
+            .upload(filename, buffer, {
+              contentType: mimeType,
+              upsert: true,
+            });
+
+          if (uploadError) {
+            console.error("Error uploading image to storage:", uploadError);
+            return NextResponse.json(
+              {
+                success: false,
+                error: `Failed to upload image ${i + 1}: ${uploadError.message}`,
+              },
+              { status: 500 }
+            );
+          }
+
+          // Get public URL
+          const { data: publicUrlData } = supabase.storage
+            .from("images")
+            .getPublicUrl(filename);
+
+          imageUrl = publicUrlData.publicUrl;
+          uploadedUrls.push(filename); // Track for cleanup later
+          console.log(`Uploaded image ${i + 1} to storage: ${imageUrl}`);
+        } catch (err) {
+          console.error("Error processing base64 image:", err);
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Failed to process image ${i + 1}`,
+            },
+            { status: 500 }
+          );
+        }
+      }
+
+      mediaItems.push({
+        url: imageUrl,
+        type: "image" as const,
+        altText: img.prompt || undefined,
+      });
+    }
 
     // Only require images for Instagram feed/carousel posts
     if (content.platform === "instagram" && mediaItems.length === 0) {
@@ -247,6 +314,21 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       console.error("Error updating content after publish:", updateError);
       // Don't fail the request - the post was published successfully
+    }
+
+    // Clean up uploaded images from storage after successful publish
+    // (to keep storage usage minimal)
+    if (uploadedUrls.length > 0) {
+      const { error: deleteError } = await supabase.storage
+        .from("images")
+        .remove(uploadedUrls);
+
+      if (deleteError) {
+        console.error("Error cleaning up uploaded images:", deleteError);
+        // Don't fail - publish was successful
+      } else {
+        console.log(`Cleaned up ${uploadedUrls.length} temporary images from storage`);
+      }
     }
 
     return NextResponse.json({
