@@ -750,6 +750,45 @@ function SettingsPageContent() {
             </div>
           </div>
 
+          {/* Brand Fonts */}
+          <div>
+            <label className="text-sm font-medium">Brand Fonts</label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Detected from your website - used for carousel text overlays
+            </p>
+            <div className="grid grid-cols-2 gap-4 mt-2">
+              <div className="p-3 rounded-lg border bg-muted/30">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Heading Font</div>
+                <Input
+                  value={visualConfig.fonts?.heading || "Inter"}
+                  onChange={(e) =>
+                    setVisualConfig({
+                      ...visualConfig,
+                      fonts: { ...visualConfig.fonts, heading: e.target.value }
+                    })
+                  }
+                  className="font-semibold"
+                  placeholder="Inter"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Used for titles & headlines</p>
+              </div>
+              <div className="p-3 rounded-lg border bg-muted/30">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Body Font</div>
+                <Input
+                  value={visualConfig.fonts?.body || "Inter"}
+                  onChange={(e) =>
+                    setVisualConfig({
+                      ...visualConfig,
+                      fonts: { ...visualConfig.fonts, body: e.target.value }
+                    })
+                  }
+                  placeholder="Inter"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Used for body text & captions</p>
+              </div>
+            </div>
+          </div>
+
           {visualConfig.extracted_images && visualConfig.extracted_images.length > 0 && (
             <div>
               <label className="text-sm font-medium">Extracted Images</label>

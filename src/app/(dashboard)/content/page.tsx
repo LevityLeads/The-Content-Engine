@@ -435,12 +435,13 @@ export default function ContentPage() {
           textStyle: selectedTextStyle,
           textColor: selectedTextColor,
           backgroundStyle: selectedBackgroundStyle,
-          // Pass brand colors for visual consistency
+          // Pass brand colors and fonts for visual consistency
           brandColors: selectedBrand?.visual_config ? {
             primary_color: selectedBrand.visual_config.primary_color,
             accent_color: selectedBrand.visual_config.accent_color,
             secondary_color: selectedBrand.visual_config.secondary_color,
             image_style: selectedBrand.visual_config.image_style,
+            fonts: selectedBrand.visual_config.fonts,
           } : undefined,
         }),
       });
@@ -571,12 +572,13 @@ export default function ContentPage() {
           backgroundStyle: selectedBackgroundStyle,
           visualStyle, // Pass the new visual style
           jobId,
-          // Pass brand colors for visual consistency
+          // Pass brand colors and fonts for visual consistency
           brandColors: selectedBrand?.visual_config ? {
             primary_color: selectedBrand.visual_config.primary_color,
             accent_color: selectedBrand.visual_config.accent_color,
             secondary_color: selectedBrand.visual_config.secondary_color,
             image_style: selectedBrand.visual_config.image_style,
+            fonts: selectedBrand.visual_config.fonts,
           } : undefined,
         }),
       });
@@ -677,39 +679,6 @@ export default function ContentPage() {
     } catch (err) {
       console.error("Error retrying:", err);
       setPublishMessage({ type: "error", text: "Failed to reset status" });
-      setTimeout(() => setPublishMessage(null), 5000);
-    } finally {
-      setPublishingId(null);
-    }
-  };
-
-  const handleRepublish = async (contentId: string) => {
-    setPublishingId(contentId);
-    setPublishMessage(null);
-    try {
-      const res = await fetch("/api/content/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentId, republish: true }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPublishMessage({ type: "success", text: "Republished successfully!" });
-        // Update local state
-        setContent((prev) =>
-          prev.map((c) =>
-            c.id === contentId ? { ...c, status: data.status || "published" } : c
-          )
-        );
-        // Clear message after 3 seconds
-        setTimeout(() => setPublishMessage(null), 3000);
-      } else {
-        setPublishMessage({ type: "error", text: data.error || "Failed to republish" });
-        setTimeout(() => setPublishMessage(null), 5000);
-      }
-    } catch (err) {
-      console.error("Error republishing:", err);
-      setPublishMessage({ type: "error", text: "Network error - please try again" });
       setTimeout(() => setPublishMessage(null), 5000);
     } finally {
       setPublishingId(null);
@@ -2391,25 +2360,10 @@ export default function ContentPage() {
                           </div>
                         )}
                         {item.status === "published" && (
-                          <>
-                            <div className="flex items-center gap-2 text-sm text-emerald-400">
-                              <CheckCircle2 className="h-4 w-4" />
-                              <span>Published</span>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRepublish(item.id)}
-                              disabled={publishingId === item.id}
-                            >
-                              {publishingId === item.id ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                              )}
-                              Republish
-                            </Button>
-                          </>
+                          <div className="flex items-center gap-2 text-sm text-emerald-400">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>Published</span>
+                          </div>
                         )}
                         {item.status === "failed" && (
                           <>
