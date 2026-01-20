@@ -618,7 +618,7 @@ export default function ContentPage() {
     );
   };
 
-  // Render fanned card deck view (cards fan out and recede into background)
+  // Render horizontal carousel with selected card larger
   const renderSlideFilmstripAndDetail = (
     item: Content,
     slides: CarouselSlide[],
@@ -644,235 +644,213 @@ export default function ContentPage() {
       return imgs[Math.min(vIdx, imgs.length - 1)] || null;
     };
 
-    // Calculate position in fan for each card relative to current
-    const getCardTransform = (cardIdx: number) => {
-      const diff = cardIdx - currentSlideIdx;
-      const rotation = diff * 12;
-      const translateX = diff * 90;
-      const translateZ = -Math.abs(diff) * 100;
-      const scale = 1 - Math.abs(diff) * 0.1;
-      const opacity = Math.max(0.5, 1 - Math.abs(diff) * 0.2);
-      const zIndex = 10 - Math.abs(diff);
-      return { rotation, translateX, translateZ, scale, opacity, zIndex };
-    };
-
-    // Get visible cards (current + 2 on each side, wrapping)
-    const visibleCards: { idx: number; offset: number }[] = [];
-    const maxVisible = Math.min(5, slides.length);
-    const halfVisible = Math.floor(maxVisible / 2);
-
-    for (let offset = -halfVisible; offset <= halfVisible; offset++) {
-      let idx = currentSlideIdx + offset;
-      if (idx < 0) idx = slides.length + idx;
-      if (idx >= slides.length) idx = idx - slides.length;
-      if (!visibleCards.find(c => c.idx === idx)) {
-        visibleCards.push({ idx, offset });
-      }
-    }
-    visibleCards.sort((a, b) => Math.abs(b.offset) - Math.abs(a.offset));
-
     return (
-      <div className="space-y-3">
-        {/* Main content: Fan + Caption side by side */}
-        <div className="grid grid-cols-[1.2fr_1fr] gap-4">
-          {/* Left: Fanned Card Deck - fills available height */}
-          <div
-            className="relative h-[520px] flex items-center justify-center -my-2"
-            style={{ perspective: '1200px' }}
-          >
-            {visibleCards.map(({ idx }) => {
-              const cardImage = getSlideImage(idx);
-              const { rotation, translateX, translateZ, scale, opacity, zIndex } = getCardTransform(idx);
-              const isCurrent = idx === currentSlideIdx;
+      <div className="grid grid-cols-[1fr_320px] gap-6">
+        {/* Left: Carousel and controls */}
+        <div className="space-y-4">
+          {/* Horizontal card carousel */}
+          <div className="relative overflow-hidden rounded-xl bg-muted/20 p-4">
+            <div
+              className="flex items-center gap-3 transition-transform duration-300 ease-out"
+              style={{
+                transform: `translateX(calc(50% - ${currentSlideIdx * 180 + 90}px - ${currentSlideIdx * 12}px))`,
+              }}
+            >
+              {slides.map((s, idx) => {
+                const cardImage = getSlideImage(idx);
+                const isCurrent = idx === currentSlideIdx;
 
-              return (
-                <div
-                  key={idx}
-                  className={cn(
-                    "absolute rounded-xl overflow-hidden shadow-xl cursor-pointer transition-all duration-300",
-                    isCurrent ? "ring-2 ring-primary shadow-2xl" : "hover:opacity-90"
-                  )}
-                  style={{
-                    width: '340px',
-                    aspectRatio: '4/5',
-                    transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotation}deg) scale(${scale})`,
-                    opacity: isCurrent ? 1 : opacity,
-                    zIndex,
-                    transformStyle: 'preserve-3d',
-                  }}
-                  onClick={() => !isCurrent && setCurrentSlide(item.id, idx)}
-                >
-                  {cardImage ? (
-                    <>
-                      <img
-                        src={cardImage.url}
-                        alt={`Slide ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      {isCurrent && cardImage.model && (
-                        <div className="absolute top-2 left-2 z-10">
-                          {renderModelBadge(cardImage.model)}
-                        </div>
-                      )}
-                      <Badge
-                        className={cn(
-                          "absolute top-2 right-2 border-0 z-10",
-                          isCurrent ? "bg-primary text-primary-foreground" : "bg-black/70 text-white"
-                        )}
-                      >
-                        {idx + 1}
-                      </Badge>
-                      {isCurrent && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-8 w-8 p-0 z-10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownloadImage(cardImage.url, item.platform, slide.slideNumber);
-                          }}
+                return (
+                  <div
+                    key={s.slideNumber}
+                    className={cn(
+                      "flex-shrink-0 rounded-lg overflow-hidden cursor-pointer transition-all duration-300",
+                      isCurrent
+                        ? "ring-2 ring-primary shadow-2xl scale-105 z-10"
+                        : "opacity-70 hover:opacity-90"
+                    )}
+                    style={{
+                      width: isCurrent ? '200px' : '160px',
+                      aspectRatio: '4/5',
+                    }}
+                    onClick={() => setCurrentSlide(item.id, idx)}
+                  >
+                    {cardImage ? (
+                      <div className="relative w-full h-full">
+                        <img
+                          src={cardImage.url}
+                          alt={`Slide ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <Badge
+                          className={cn(
+                            "absolute top-2 right-2 border-0",
+                            isCurrent ? "bg-primary text-primary-foreground" : "bg-black/60 text-white"
+                          )}
                         >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </>
-                  ) : (
-                    <div className="w-full h-full bg-muted/50 flex items-center justify-center">
-                      <div className="text-center">
-                        <ImageIcon className="h-8 w-8 mx-auto mb-1 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">{idx + 1}</span>
+                          {idx + 1}
+                        </Badge>
+                        {isCurrent && cardImage.model && (
+                          <div className="absolute top-2 left-2">
+                            {renderModelBadge(cardImage.model)}
+                          </div>
+                        )}
+                        {isCurrent && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-7 w-7 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownloadImage(cardImage.url, item.platform, s.slideNumber);
+                            }}
+                          >
+                            <Download className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    ) : (
+                      <div className="w-full h-full bg-muted/50 flex items-center justify-center border border-dashed border-muted-foreground/30">
+                        <div className="text-center">
+                          <ImageIcon className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{idx + 1}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Right: Caption and controls */}
-          <div className="flex flex-col justify-center space-y-4">
-            {/* Slide header */}
-            <div>
-              <h4 className="text-lg font-semibold">Slide {currentSlideIdx + 1}</h4>
-              <p className="text-xs text-muted-foreground">of {slides.length} slides</p>
-            </div>
-
-            {/* Slide text/caption */}
-            <div className="rounded-lg bg-muted/30 p-4 max-h-[200px] overflow-y-auto">
+          {/* Slide Text */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Slide Text</label>
+            <div className="rounded-lg bg-muted/30 p-3">
               <p className="text-sm leading-relaxed">{slide.text}</p>
             </div>
+          </div>
 
-            {/* Version thumbnails (if multiple) */}
-            {slideImgs.length > 1 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Versions ({slideImgs.length})</p>
-                <div className="flex gap-2 flex-wrap">
-                  {slideImgs.map((img, idx) => (
-                    <button
-                      key={img.id}
-                      onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
-                      className={cn(
-                        "w-12 h-15 rounded-lg overflow-hidden border-2 transition-all",
-                        idx === safeVersionIdx
-                          ? "border-primary ring-1 ring-primary/30"
-                          : "border-transparent opacity-60 hover:opacity-100"
-                      )}
-                    >
-                      <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
+          {/* Image Prompt + Generate */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">Image Prompt</label>
+            <div className="flex gap-2">
+              <div className="flex-1 rounded-lg bg-muted/20 p-2 text-xs text-muted-foreground max-h-[60px] overflow-y-auto">
+                {slide.imagePrompt}
               </div>
-            )}
-
-            {/* Generate button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
-              disabled={isGenerating}
-            >
-              {isGenerating ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
-              ) : currentImage ? (
-                <><RefreshCw className="mr-2 h-4 w-4" />Regenerate</>
-              ) : (
-                <><ImageIcon className="mr-2 h-4 w-4" />Generate</>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Bottom row: Navigation + Filmstrip + Prompt */}
-        <div className="flex items-center gap-4 pt-2 border-t border-muted/30">
-          {/* Navigation */}
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 w-8 p-0"
-              onClick={() => setCurrentSlide(item.id, currentSlideIdx > 0 ? currentSlideIdx - 1 : slides.length - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-xs font-medium w-12 text-center">
-              {currentSlideIdx + 1} / {slides.length}
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 w-8 p-0"
-              onClick={() => setCurrentSlide(item.id, currentSlideIdx < slides.length - 1 ? currentSlideIdx + 1 : 0)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-shrink-0"
+                onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                )}
+                Generate
+              </Button>
+            </div>
           </div>
 
-          {/* Filmstrip */}
-          <div className="flex items-center gap-1 flex-1 overflow-x-auto py-1">
-            {slides.map((s, idx) => {
-              const sImgs = getSlideImages(item.id, s.slideNumber);
-              const vIdx = getVersionIndex(item.id, s.slideNumber);
-              const displayImg = sImgs[Math.min(vIdx, sImgs.length - 1)];
-              const isActive = idx === currentSlideIdx;
+          {/* Bottom navigation row */}
+          <div className="flex items-center gap-3 pt-2 border-t border-muted/30">
+            {/* Prev/Next */}
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setCurrentSlide(item.id, currentSlideIdx > 0 ? currentSlideIdx - 1 : slides.length - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs font-medium w-10 text-center">
+                {currentSlideIdx + 1} / {slides.length}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => setCurrentSlide(item.id, currentSlideIdx < slides.length - 1 ? currentSlideIdx + 1 : 0)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
 
-              return (
+            {/* Slide number buttons */}
+            <div className="flex items-center gap-1">
+              {slides.map((_, idx) => (
                 <button
-                  key={s.slideNumber}
+                  key={idx}
                   onClick={() => setCurrentSlide(item.id, idx)}
                   className={cn(
-                    "relative flex-shrink-0 rounded overflow-hidden transition-all w-8 h-10",
-                    isActive ? "ring-2 ring-primary" : "opacity-50 hover:opacity-100"
+                    "w-6 h-6 rounded text-xs font-medium transition-colors",
+                    idx === currentSlideIdx
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
                   )}
                 >
-                  {displayImg ? (
-                    <img src={displayImg.url} alt={`Slide ${s.slideNumber}`} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-muted flex items-center justify-center">
-                      <span className="text-[9px] text-muted-foreground">{idx + 1}</span>
-                    </div>
-                  )}
+                  {idx + 1}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+
+            {/* Compressed prompt preview */}
+            <button
+              onClick={() => togglePrompt(promptKey)}
+              className="flex-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors text-left"
+            >
+              {isPromptExpanded ? <ChevronUp className="h-3 w-3 flex-shrink-0" /> : <ChevronDown className="h-3 w-3 flex-shrink-0" />}
+              <span className="truncate">{truncateText(slide.imagePrompt, 50)}</span>
+            </button>
           </div>
 
-          {/* Compressed prompt */}
-          <button
-            onClick={() => togglePrompt(promptKey)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors max-w-[300px]"
-          >
-            {isPromptExpanded ? <ChevronUp className="h-3 w-3 flex-shrink-0" /> : <ChevronDown className="h-3 w-3 flex-shrink-0" />}
-            <span className="truncate">{truncateText(slide.imagePrompt, 60)}</span>
-          </button>
+          {/* Expanded prompt */}
+          {isPromptExpanded && (
+            <div className="rounded-lg bg-muted/20 p-3 text-xs text-muted-foreground leading-relaxed">
+              {slide.imagePrompt}
+            </div>
+          )}
         </div>
 
-        {/* Expanded prompt */}
-        {isPromptExpanded && (
-          <div className="rounded-lg bg-muted/20 p-3 text-xs text-muted-foreground leading-relaxed">
-            {slide.imagePrompt}
+        {/* Right: Caption panel */}
+        <div className="space-y-4 border-l border-muted/30 pl-6">
+          {/* Full post caption */}
+          <div className="rounded-lg bg-muted/20 p-4 max-h-[400px] overflow-y-auto">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{item.copy_primary}</p>
+            {item.copy_hashtags && item.copy_hashtags.length > 0 && (
+              <p className="text-sm text-primary mt-4">
+                {item.copy_hashtags.map((h) => `#${h}`).join(" ")}
+              </p>
+            )}
           </div>
-        )}
+
+          {/* Version thumbnails (if multiple) */}
+          {slideImgs.length > 1 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Versions ({slideImgs.length})</p>
+              <div className="flex gap-2 flex-wrap">
+                {slideImgs.map((img, idx) => (
+                  <button
+                    key={img.id}
+                    onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
+                    className={cn(
+                      "w-12 h-14 rounded overflow-hidden border-2 transition-all",
+                      idx === safeVersionIdx
+                        ? "border-primary"
+                        : "border-transparent opacity-60 hover:opacity-100"
+                    )}
+                  >
+                    <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
