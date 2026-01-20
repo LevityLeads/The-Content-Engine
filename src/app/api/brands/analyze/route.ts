@@ -32,44 +32,35 @@ const SYSTEM_FONTS = new Set([
   'helvetica neue', 'sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'inherit'
 ]);
 
-// Extract fonts from CSS/HTML
-function extractFonts(html: string): { heading: string; body: string; detected: string[] } {
-  const fonts = new Set<string>();
-
-  // 1. Extract from Google Fonts links (most reliable for identifying brand fonts)
-  const googleFontsMatches = html.match(/fonts\.googleapis\.com\/css2?\?family=([^"&]+)/gi) || [];
-  googleFontsMatches.forEach((match) => {
-    const familyMatch = match.match(/family=([^"&]+)/i);
+// Extract fonts from CSS content
+function extractFontsFromCSS(css: string, fonts: Set<string>): void {
+  // Extract from @font-face declarations (most reliable)
+  const fontFaceMatches = css.match(/@font-face\s*\{[^}]+\}/gi) || [];
+  fontFaceMatches.forEach((block) => {
+    const familyMatch = block.match(/font-family\s*:\s*["']?([^;"']+)/i);
     if (familyMatch) {
-      // Decode URL encoding and extract font names
-      const decoded = decodeURIComponent(familyMatch[1]);
-      // Handle format: "Poppins:wght@400;700|Roboto:wght@300"
-      const fontFamilies = decoded.split('|').map(f => f.split(':')[0].replace(/\+/g, ' '));
-      fontFamilies.forEach(f => fonts.add(f.trim()));
+      const font = familyMatch[1].trim();
+      const normalized = font.toLowerCase();
+      if (!SYSTEM_FONTS.has(normalized)) {
+        const properCase = font.split(' ').map(w =>
+          w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+        ).join(' ');
+        fonts.add(properCase);
+      }
     }
   });
 
-  // 2. Extract from Adobe Fonts/Typekit
-  const adobeFontsMatch = html.match(/use\.typekit\.net\/([a-z0-9]+)\.css/i);
-  if (adobeFontsMatch) {
-    // Can't easily get font names from Typekit ID, but note it's in use
-    fonts.add('[Adobe Fonts detected]');
-  }
-
-  // 3. Extract from CSS font-family declarations
-  const fontFamilyMatches = html.match(/font-family\s*:\s*([^;}{]+)/gi) || [];
+  // Extract from font-family declarations
+  const fontFamilyMatches = css.match(/font-family\s*:\s*([^;}{]+)/gi) || [];
   fontFamilyMatches.forEach((match) => {
     const value = match.replace(/font-family\s*:\s*/i, '').trim();
-    // Split by comma and clean up
     const families = value.split(',').map(f =>
-      f.trim().replace(/["']/g, '').toLowerCase()
+      f.trim().replace(/["']/g, '')
     );
 
-    // Add non-system fonts
     families.forEach(f => {
       const normalized = f.toLowerCase().trim();
-      if (normalized && !SYSTEM_FONTS.has(normalized) && !normalized.startsWith('var(')) {
-        // Capitalize properly
+      if (normalized && !SYSTEM_FONTS.has(normalized) && !normalized.startsWith('var(') && normalized.length > 1) {
         const properCase = f.split(' ').map(w =>
           w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
         ).join(' ');
@@ -77,6 +68,80 @@ function extractFonts(html: string): { heading: string; body: string; detected: 
       }
     });
   });
+}
+
+// Extract external stylesheet URLs from HTML
+function extractStylesheetUrls(html: string, baseUrl: string): string[] {
+  const urls: string[] = [];
+
+  // Match <link rel="stylesheet" href="...">
+  const linkMatches = html.match(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi) || [];
+  linkMatches.forEach((link) => {
+    const hrefMatch = link.match(/href=["']([^"']+)["']/i);
+    if (hrefMatch) {
+      let url = hrefMatch[1];
+      // Make URL absolute
+      if (url.startsWith('//')) {
+        url = `https:${url}`;
+      } else if (url.startsWith('/')) {
+        url = `${new URL(baseUrl).origin}${url}`;
+      } else if (!url.startsWith('http')) {
+        url = `${baseUrl}/${url}`;
+      }
+      // Skip Google Fonts (handled separately) and other external CDNs
+      if (!url.includes('fonts.googleapis.com') && !url.includes('cdnjs.') && !url.includes('unpkg.com')) {
+        urls.push(url);
+      }
+    }
+  });
+
+  return urls.slice(0, 5); // Limit to 5 stylesheets
+}
+
+// Extract fonts from CSS/HTML (async to fetch external stylesheets)
+async function extractFonts(html: string, baseUrl: string): Promise<{ heading: string; body: string; detected: string[] }> {
+  const fonts = new Set<string>();
+
+  // 1. Extract from Google Fonts links (most reliable for identifying brand fonts)
+  const googleFontsMatches = html.match(/fonts\.googleapis\.com\/css2?\?family=([^"'&\s]+)/gi) || [];
+  googleFontsMatches.forEach((match) => {
+    const familyMatch = match.match(/family=([^"'&\s]+)/i);
+    if (familyMatch) {
+      // Decode URL encoding and extract font names
+      const decoded = decodeURIComponent(familyMatch[1]);
+      // Handle format: "Poppins:wght@400;700|Roboto:wght@300" or "Poppins:wght@400;700&family=Roboto"
+      const fontFamilies = decoded.split(/[|&]/).map(f => {
+        // Remove 'family=' prefix if present
+        const clean = f.replace(/^family=/i, '');
+        return clean.split(':')[0].replace(/\+/g, ' ');
+      });
+      fontFamilies.forEach(f => {
+        const trimmed = f.trim();
+        if (trimmed && trimmed.length > 1) {
+          fonts.add(trimmed);
+        }
+      });
+    }
+  });
+
+  // 2. Extract from Adobe Fonts/Typekit
+  const adobeFontsMatch = html.match(/use\.typekit\.net\/([a-z0-9]+)\.css/i);
+  if (adobeFontsMatch) {
+    // Try to fetch and parse Adobe Fonts CSS
+    try {
+      const adobeUrl = `https://use.typekit.net/${adobeFontsMatch[1]}.css`;
+      const response = await fetch(adobeUrl, { signal: AbortSignal.timeout(3000) });
+      if (response.ok) {
+        const css = await response.text();
+        extractFontsFromCSS(css, fonts);
+      }
+    } catch {
+      // Ignore fetch errors for Adobe Fonts
+    }
+  }
+
+  // 3. Extract from inline CSS in HTML
+  extractFontsFromCSS(html, fonts);
 
   // 4. Extract from CSS variables (--font-heading, --font-body, etc.)
   const fontVarMatches = html.match(/--font[^:]*:\s*([^;}{]+)/gi) || [];
@@ -86,7 +151,7 @@ function extractFonts(html: string): { heading: string; body: string; detected: 
       const families = value.split(',').map(f => f.trim().replace(/["']/g, ''));
       families.forEach(f => {
         const normalized = f.toLowerCase().trim();
-        if (normalized && !SYSTEM_FONTS.has(normalized) && !normalized.startsWith('var(')) {
+        if (normalized && !SYSTEM_FONTS.has(normalized) && !normalized.startsWith('var(') && f.length > 1) {
           const properCase = f.split(' ').map(w =>
             w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
           ).join(' ');
@@ -96,34 +161,69 @@ function extractFonts(html: string): { heading: string; body: string; detected: 
     }
   });
 
-  const detectedFonts = Array.from(fonts).filter(f => !f.startsWith('[')).slice(0, 5);
+  // 5. Fetch and parse external stylesheets (limited to avoid slowdowns)
+  const stylesheetUrls = extractStylesheetUrls(html, baseUrl);
+  const cssPromises = stylesheetUrls.map(async (url) => {
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(3000),
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; ContentEngine/1.0)",
+        },
+      });
+      if (response.ok) {
+        const css = await response.text();
+        extractFontsFromCSS(css, fonts);
+      }
+    } catch {
+      // Ignore individual stylesheet fetch errors
+    }
+  });
+
+  await Promise.allSettled(cssPromises);
+
+  const detectedFonts = Array.from(fonts).filter(f => !f.startsWith('[') && f.length > 1).slice(0, 10);
 
   // Try to identify heading vs body font
-  // Usually: first font in CSS is primary/heading, or look for specific class names
-  let headingFont = detectedFonts[0] || 'Inter';
-  let bodyFont = detectedFonts[1] || detectedFonts[0] || 'Inter';
+  let headingFont = '';
+  let bodyFont = '';
 
-  // Check for heading-specific declarations
+  // Check for heading-specific declarations in inline CSS
   const headingMatch = html.match(/(?:h1|h2|h3|\.heading|\.title)[^{]*\{[^}]*font-family\s*:\s*["']?([^;,"']+)/i);
   if (headingMatch) {
     const font = headingMatch[1].trim();
-    if (!SYSTEM_FONTS.has(font.toLowerCase())) {
+    if (!SYSTEM_FONTS.has(font.toLowerCase()) && font.length > 1) {
       headingFont = font.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
     }
   }
 
   // Check for body-specific declarations
-  const bodyMatch = html.match(/(?:body|\.body|p)[^{]*\{[^}]*font-family\s*:\s*["']?([^;,"']+)/i);
+  const bodyMatch = html.match(/(?:body|\.body|p\s*\{)[^{]*font-family\s*:\s*["']?([^;,"']+)/i);
   if (bodyMatch) {
     const font = bodyMatch[1].trim();
-    if (!SYSTEM_FONTS.has(font.toLowerCase())) {
+    if (!SYSTEM_FONTS.has(font.toLowerCase()) && font.length > 1) {
       bodyFont = font.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
     }
   }
 
+  // Fallback: use first detected fonts if specific matches weren't found
+  if (!headingFont && detectedFonts.length > 0) {
+    headingFont = detectedFonts[0];
+  }
+  if (!bodyFont && detectedFonts.length > 1) {
+    bodyFont = detectedFonts[1];
+  } else if (!bodyFont && detectedFonts.length > 0) {
+    bodyFont = detectedFonts[0];
+  }
+
+  // Only default to Inter if absolutely nothing was found
+  // Otherwise leave empty to indicate "not detected"
+  const finalHeading = headingFont || (detectedFonts.length === 0 ? '' : detectedFonts[0]);
+  const finalBody = bodyFont || (detectedFonts.length === 0 ? '' : (detectedFonts[1] || detectedFonts[0]));
+
   return {
-    heading: headingFont,
-    body: bodyFont,
+    heading: finalHeading,
+    body: finalBody,
     detected: detectedFonts,
   };
 }
@@ -257,7 +357,7 @@ export async function POST(request: NextRequest) {
 
     // Extract elements from HTML
     const colors = extractColors(html);
-    const fonts = extractFonts(html);
+    const fonts = await extractFonts(html, normalizedUrl);
     const images = extractImages(html, normalizedUrl);
     const textContent = extractTextContent(html);
     const meta = extractMeta(html);

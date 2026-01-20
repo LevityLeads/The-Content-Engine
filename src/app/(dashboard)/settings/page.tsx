@@ -754,13 +754,15 @@ function SettingsPageContent() {
           <div>
             <label className="text-sm font-medium">Brand Fonts</label>
             <p className="text-xs text-muted-foreground mb-2">
-              Detected from your website - used for carousel text overlays
+              {visualConfig.fonts?.heading || visualConfig.fonts?.body
+                ? "Detected from your website - used for carousel text overlays"
+                : "Enter your brand fonts manually or re-analyze your website to detect them"}
             </p>
             <div className="grid grid-cols-2 gap-4 mt-2">
               <div className="p-3 rounded-lg border bg-muted/30">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Heading Font</div>
                 <Input
-                  value={visualConfig.fonts?.heading || "Inter"}
+                  value={visualConfig.fonts?.heading || ""}
                   onChange={(e) =>
                     setVisualConfig({
                       ...visualConfig,
@@ -768,21 +770,21 @@ function SettingsPageContent() {
                     })
                   }
                   className="font-semibold"
-                  placeholder="Inter"
+                  placeholder="e.g. Poppins, Montserrat"
                 />
                 <p className="text-xs text-muted-foreground mt-1">Used for titles & headlines</p>
               </div>
               <div className="p-3 rounded-lg border bg-muted/30">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Body Font</div>
                 <Input
-                  value={visualConfig.fonts?.body || "Inter"}
+                  value={visualConfig.fonts?.body || ""}
                   onChange={(e) =>
                     setVisualConfig({
                       ...visualConfig,
                       fonts: { ...visualConfig.fonts, body: e.target.value }
                     })
                   }
-                  placeholder="Inter"
+                  placeholder="e.g. Open Sans, Roboto"
                 />
                 <p className="text-xs text-muted-foreground mt-1">Used for body text & captions</p>
               </div>
