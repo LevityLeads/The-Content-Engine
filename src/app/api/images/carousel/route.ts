@@ -73,7 +73,8 @@ async function getFont(): Promise<ArrayBuffer> {
 async function generateBackground(
   style: string,
   googleApiKey: string,
-  modelConfig: { id: string; name: string }
+  modelConfig: { id: string; name: string },
+  brandColors?: { primary_color?: string; accent_color?: string; secondary_color?: string; image_style?: string }
 ): Promise<string | null> {
   // Typography/Abstract backgrounds (text-overlay optimized)
   const TYPOGRAPHY_BACKGROUNDS: Record<string, string> = {
@@ -138,7 +139,33 @@ async function generateBackground(
     ...COLLAGE_BACKGROUNDS,
   };
 
-  const prompt = ALL_STYLES[style] || TYPOGRAPHY_BACKGROUNDS['gradient-dark'];
+  let prompt = ALL_STYLES[style] || TYPOGRAPHY_BACKGROUNDS['gradient-dark'];
+
+  // BRAND COLORS: Inject brand colors into the background prompt for visual consistency
+  if (brandColors?.primary_color || brandColors?.accent_color) {
+    const primaryHex = brandColors.primary_color || '#cc100a';
+    const accentHex = brandColors.accent_color || '#d9d9d9';
+    const secondaryHex = brandColors.secondary_color || '#1a1a1a';
+
+    // Build a brand color directive to append to the prompt
+    const brandColorDirective = `
+
+BRAND COLOR REQUIREMENTS (MUST FOLLOW):
+- Primary brand color: ${primaryHex} - use this as the dominant accent color
+- Secondary brand color: ${accentHex} - use for highlights and secondary elements
+- Background base: ${secondaryHex} - integrate into the color scheme
+- The overall color palette MUST prominently feature these brand colors
+- Replace any generic colors in the design with these brand-specific colors`;
+
+    prompt = prompt + brandColorDirective;
+
+    console.log(`Background prompt enhanced with brand colors: ${primaryHex}, ${accentHex}`);
+  }
+
+  // If brand has a preferred image style, factor it in
+  if (brandColors?.image_style) {
+    prompt = prompt + `\n\nSTYLE NOTE: Align with "${brandColors.image_style}" aesthetic.`;
+  }
 
   try {
     const response = await fetch(
@@ -278,6 +305,7 @@ export async function POST(request: NextRequest) {
       useNumberedSlides,   // If true, use numbered template for middle slides
       model: requestedModel,
       jobId: providedJobId, // Allow passing existing job ID for tracking
+      brandColors,         // NEW: Brand visual config { primary_color, accent_color, image_style, etc. }
     } = body;
 
     // Map visual styles to default background styles
@@ -397,13 +425,37 @@ export async function POST(request: NextRequest) {
     };
 
     // Resolve design system
-    // Priority: 1) Full object, 2) textStyle+textColor combo, 3) legacy designPreset, 4) default
+    // Priority: 1) Full object, 2) Brand colors, 3) textStyle+textColor combo, 4) legacy designPreset, 5) default
     let design: CarouselDesignSystem;
     if (typeof designPreset === 'object' && designPreset !== null) {
       // Full design system object passed directly
       design = designPreset as CarouselDesignSystem;
+    } else if (brandColors?.primary_color || brandColors?.accent_color) {
+      // NEW: Build design system from brand colors
+      const stylePreset = TEXT_STYLE_PRESETS[textStyle] || TEXT_STYLE_PRESETS['bold-editorial'];
+
+      // Create a custom color preset from brand colors
+      // For text visibility: use white text on dark backgrounds, dark text on light backgrounds
+      const primaryBrandColor = brandColors.primary_color || '#cc100a';
+      const accentBrandColor = brandColors.accent_color || brandColors.primary_color || '#ffffff';
+
+      // Determine if we should use light or dark text based on the brand's primary color
+      // (Brand primary is usually a dark accent, so we typically want white text)
+      const customColorPreset = {
+        id: 'brand-custom',
+        name: 'Brand Custom',
+        primaryColor: '#ffffff', // White text for readability on most backgrounds
+        accentColor: primaryBrandColor, // Use brand primary as the accent/highlight
+        forDarkBg: true,
+      };
+
+      design = buildDesignSystem(stylePreset, customColorPreset);
+      // Override the accent to use brand primary color prominently
+      design.accentColor = primaryBrandColor;
+
+      console.log(`Using brand colors: primary=${primaryBrandColor}, accent=${accentBrandColor}`);
     } else if (textStyle && textColor) {
-      // New: Build from separate style and color presets
+      // Build from separate style and color presets
       const stylePreset = TEXT_STYLE_PRESETS[textStyle] || TEXT_STYLE_PRESETS['bold-editorial'];
       const colorPreset = TEXT_COLOR_PRESETS[textColor] || TEXT_COLOR_PRESETS['white-coral'];
       design = buildDesignSystem(stylePreset, colorPreset);
@@ -438,8 +490,8 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        console.log(`Generating background: ${backgroundStyle}`);
-        bgImage = await generateBackground(backgroundStyle, googleApiKey, modelConfig);
+        console.log(`Generating background: ${backgroundStyle}${brandColors ? ' with brand colors' : ''}`);
+        bgImage = await generateBackground(backgroundStyle, googleApiKey, modelConfig, brandColors);
 
         if (!bgImage) {
           backgroundError = 'Background generation failed - using solid color fallback';
