@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Palette } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Palette, GripVertical } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -92,11 +92,38 @@ export default function ContentPage() {
   const [generatingCompositeCarousel, setGeneratingCompositeCarousel] = useState<string | null>(null);
   const [selectedDesignPreset, setSelectedDesignPreset] = useState<string>("dark-coral");
   const [selectedBackgroundStyle, setSelectedBackgroundStyle] = useState<string>("gradient-dark");
+  const [captionPanelWidth, setCaptionPanelWidth] = useState<number>(320); // Default ~1/3 width
+  const [isDraggingDivider, setIsDraggingDivider] = useState(false);
 
   useEffect(() => {
     fetchContent();
     setSelectedItems(new Set());
   }, [filter]);
+
+  // Handle divider drag for resizing caption panel
+  useEffect(() => {
+    if (!isDraggingDivider) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = document.getElementById('slides-container');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const newWidth = rect.right - e.clientX;
+      // Clamp between 200px and 500px
+      setCaptionPanelWidth(Math.max(200, Math.min(500, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingDivider(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingDivider]);
 
   const fetchContent = async () => {
     try {
@@ -618,9 +645,9 @@ export default function ContentPage() {
     );
   };
 
-  // Render horizontal carousel with selected card larger
+  // Render horizontal carousel with overlapping fanned cards
   // Layout: Left side has carousel + slide text + image prompt + image variants
-  //         Right side has caption
+  //         Right side has resizable caption panel
   const renderSlideFilmstripAndDetail = (
     item: Content,
     slides: CarouselSlide[],
@@ -643,102 +670,112 @@ export default function ContentPage() {
       return imgs[Math.min(vIdx, imgs.length - 1)] || null;
     };
 
+    // Calculate card positions for fanned/overlapping effect
+    const cardWidth = 220; // Larger cards
+    const cardOverlap = 60; // How much cards overlap
+    const visibleCardWidth = cardWidth - cardOverlap;
+
     return (
-      <div className="grid grid-cols-[1fr_320px] gap-6">
+      <div
+        id="slides-container"
+        className="flex h-[500px]"
+        style={{ userSelect: isDraggingDivider ? 'none' : 'auto' }}
+      >
         {/* Left: Carousel and controls */}
-        <div className="space-y-4">
-          {/* Horizontal card carousel with nav arrows */}
-          <div className="relative">
+        <div className="flex-1 flex flex-col min-w-0 pr-2">
+          {/* Fanned card carousel - takes up most of the vertical space */}
+          <div className="relative flex-1 flex items-center justify-center overflow-hidden rounded-xl bg-muted/20">
             {/* Left Arrow */}
             <Button
               size="icon"
               variant="outline"
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-background/80 backdrop-blur"
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-30 h-10 w-10 rounded-full bg-background/90 backdrop-blur shadow-lg"
               onClick={() => setCurrentSlide(item.id, currentSlideIdx > 0 ? currentSlideIdx - 1 : slides.length - 1)}
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
 
-            {/* Carousel strip */}
-            <div className="overflow-hidden rounded-xl bg-muted/20 py-4 px-14">
-              <div
-                className="flex items-center justify-center gap-3 transition-transform duration-300 ease-out"
-                style={{
-                  transform: `translateX(calc(-${currentSlideIdx * 140}px - ${currentSlideIdx * 12}px))`,
-                }}
-              >
-                {slides.map((s, idx) => {
-                  const cardImage = getSlideImage(idx);
-                  const isCurrent = idx === currentSlideIdx;
+            {/* Fanned overlapping cards */}
+            <div className="relative flex items-center justify-center h-full w-full">
+              {slides.map((s, idx) => {
+                const cardImage = getSlideImage(idx);
+                const isCurrent = idx === currentSlideIdx;
+                const offset = idx - currentSlideIdx;
 
-                  return (
-                    <div
-                      key={s.slideNumber}
-                      className={cn(
-                        "flex-shrink-0 rounded-lg overflow-hidden cursor-pointer transition-all duration-300",
-                        isCurrent
-                          ? "ring-2 ring-primary shadow-2xl scale-110 z-10"
-                          : "opacity-60 hover:opacity-80 scale-95"
-                      )}
-                      style={{
-                        width: isCurrent ? '180px' : '120px',
-                        aspectRatio: '4/5',
-                      }}
-                      onClick={() => setCurrentSlide(item.id, idx)}
-                    >
-                      {cardImage ? (
-                        <div className="relative w-full h-full">
-                          <img
-                            src={cardImage.url}
-                            alt={`Slide ${idx + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                          <Badge
-                            className={cn(
-                              "absolute top-2 right-2 border-0",
-                              isCurrent ? "bg-primary text-primary-foreground" : "bg-black/60 text-white"
-                            )}
-                          >
-                            {idx + 1}
-                          </Badge>
-                          {isCurrent && cardImage.model && (
-                            <div className="absolute top-2 left-2">
-                              {renderModelBadge(cardImage.model)}
-                            </div>
+                // Calculate position - cards fan out from center with overlap
+                const translateX = offset * visibleCardWidth;
+                const scale = isCurrent ? 1 : 0.85;
+                const zIndex = isCurrent ? 20 : 10 - Math.abs(offset);
+                const opacity = Math.abs(offset) > 2 ? 0 : isCurrent ? 1 : 0.7;
+
+                return (
+                  <div
+                    key={s.slideNumber}
+                    className={cn(
+                      "absolute rounded-xl overflow-hidden cursor-pointer transition-all duration-300 ease-out shadow-xl",
+                      isCurrent && "ring-2 ring-primary shadow-2xl"
+                    )}
+                    style={{
+                      width: `${cardWidth}px`,
+                      height: `${cardWidth * 1.25}px`, // 4:5 aspect ratio
+                      transform: `translateX(${translateX}px) scale(${scale})`,
+                      zIndex,
+                      opacity,
+                    }}
+                    onClick={() => setCurrentSlide(item.id, idx)}
+                  >
+                    {cardImage ? (
+                      <div className="relative w-full h-full">
+                        <img
+                          src={cardImage.url}
+                          alt={`Slide ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <Badge
+                          className={cn(
+                            "absolute top-3 right-3 border-0 text-sm",
+                            isCurrent ? "bg-primary text-primary-foreground" : "bg-black/60 text-white"
                           )}
-                          {isCurrent && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-7 w-7 p-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDownloadImage(cardImage.url, item.platform, s.slideNumber);
-                              }}
-                            >
-                              <Download className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="w-full h-full bg-muted/50 flex items-center justify-center border border-dashed border-muted-foreground/30">
-                          <div className="text-center">
-                            <ImageIcon className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">{idx + 1}</span>
+                        >
+                          {idx + 1}
+                        </Badge>
+                        {isCurrent && cardImage.model && (
+                          <div className="absolute top-3 left-3">
+                            {renderModelBadge(cardImage.model)}
                           </div>
+                        )}
+                        {isCurrent && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="absolute bottom-3 right-3 bg-black/70 hover:bg-black/90 text-white border-0 h-8 w-8 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownloadImage(cardImage.url, item.platform, s.slideNumber);
+                            }}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-full h-full bg-muted/80 flex items-center justify-center border-2 border-dashed border-muted-foreground/30">
+                        <div className="text-center">
+                          <ImageIcon className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground font-medium">{idx + 1}</span>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Right Arrow */}
             <Button
               size="icon"
               variant="outline"
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-20 h-10 w-10 rounded-full bg-background/80 backdrop-blur"
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-30 h-10 w-10 rounded-full bg-background/90 backdrop-blur shadow-lg"
               onClick={() => setCurrentSlide(item.id, currentSlideIdx < slides.length - 1 ? currentSlideIdx + 1 : 0)}
             >
               <ChevronRight className="h-5 w-5" />
@@ -746,31 +783,31 @@ export default function ContentPage() {
           </div>
 
           {/* Slide Text */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Slide Text</label>
-            <div className="rounded-lg bg-muted/30 p-3">
+          <div className="mt-3 space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Slide Text</label>
+            <div className="rounded-lg bg-muted/30 p-2">
               <p className="text-sm leading-relaxed">{slide.text}</p>
             </div>
           </div>
 
           {/* Image Prompt */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Image Prompt</label>
+          <div className="mt-2 space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Image Prompt</label>
             <div className="flex gap-2">
-              <div className="flex-1 rounded-lg bg-muted/20 p-2 text-xs text-muted-foreground max-h-[60px] overflow-y-auto">
+              <div className="flex-1 rounded-lg bg-muted/20 p-2 text-xs text-muted-foreground max-h-[50px] overflow-y-auto">
                 {slide.imagePrompt}
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-shrink-0"
+                className="flex-shrink-0 h-auto"
                 onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
                 disabled={isGenerating}
               >
                 {isGenerating ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <ImageIcon className="mr-2 h-4 w-4" />
+                  <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
                 )}
                 Generate
               </Button>
@@ -778,21 +815,21 @@ export default function ContentPage() {
           </div>
 
           {/* Image Variants - thumbnail strip at bottom */}
-          <div className="flex items-center gap-3 pt-2 border-t border-muted/30">
-            {/* Slide number indicator */}
+          <div className="mt-2 flex items-center gap-2 pt-2 border-t border-muted/30">
+            {/* Slide indicator */}
             <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-              Slide {currentSlideIdx + 1}/{slides.length}
+              {currentSlideIdx + 1}/{slides.length}
             </span>
 
             {/* Image variant thumbnails */}
-            <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
+            <div className="flex items-center gap-1 flex-1 overflow-x-auto">
               {slideImgs.length > 0 ? (
                 slideImgs.map((img, idx) => (
                   <button
                     key={img.id}
                     onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
                     className={cn(
-                      "flex-shrink-0 w-10 h-12 rounded overflow-hidden border-2 transition-all",
+                      "flex-shrink-0 w-8 h-10 rounded overflow-hidden border-2 transition-all",
                       idx === safeVersionIdx
                         ? "border-primary ring-1 ring-primary/50"
                         : "border-muted opacity-60 hover:opacity-100"
@@ -803,7 +840,7 @@ export default function ContentPage() {
                   </button>
                 ))
               ) : (
-                <span className="text-xs text-muted-foreground">No images generated yet</span>
+                <span className="text-xs text-muted-foreground">No images yet</span>
               )}
             </div>
 
@@ -819,17 +856,36 @@ export default function ContentPage() {
                       ? "bg-primary w-4"
                       : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
                   )}
-                  title={`Go to slide ${idx + 1}`}
+                  title={`Slide ${idx + 1}`}
                 />
               ))}
             </div>
           </div>
         </div>
 
+        {/* Draggable Divider */}
+        <div
+          className={cn(
+            "w-4 flex items-center justify-center cursor-col-resize group hover:bg-primary/10 transition-colors rounded",
+            isDraggingDivider && "bg-primary/20"
+          )}
+          onMouseDown={() => setIsDraggingDivider(true)}
+        >
+          <div className={cn(
+            "w-1 h-16 rounded-full bg-muted-foreground/30 group-hover:bg-primary/50 transition-colors",
+            isDraggingDivider && "bg-primary"
+          )}>
+            <GripVertical className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary -ml-1.5 mt-6" />
+          </div>
+        </div>
+
         {/* Right: Caption panel */}
-        <div className="border-l border-muted/30 pl-6">
-          <label className="text-sm font-medium text-muted-foreground mb-2 block">Caption</label>
-          <div className="rounded-lg bg-muted/20 p-4 h-[calc(100%-28px)] overflow-y-auto">
+        <div
+          className="flex flex-col pl-2"
+          style={{ width: `${captionPanelWidth}px` }}
+        >
+          <label className="text-xs font-medium text-muted-foreground mb-2">Caption</label>
+          <div className="flex-1 rounded-lg bg-muted/20 p-4 overflow-y-auto">
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{item.copy_primary}</p>
             {item.copy_hashtags && item.copy_hashtags.length > 0 && (
               <p className="text-sm text-primary mt-4">
