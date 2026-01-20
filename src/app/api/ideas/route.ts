@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
+    const brandId = searchParams.get("brandId");
     const limit = parseInt(searchParams.get("limit") || "20");
 
     let query = supabase
@@ -14,6 +15,10 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(limit);
 
+    // Filter by brand if provided
+    if (brandId) {
+      query = query.eq("brand_id", brandId);
+    }
     if (status) {
       query = query.eq("status", status);
     }
