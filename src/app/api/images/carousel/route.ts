@@ -358,8 +358,7 @@ export async function POST(request: NextRequest) {
           url: imageUrl,
           is_primary: slide.slideNumber === 1,
           format: 'png',
-          dimensions: { width, height, aspectRatio: '4:5' },
-          model: 'composite', // Mark as composite-generated
+          dimensions: { width, height, aspectRatio: '4:5', model: 'composite' },
         })
         .select()
         .single();
