@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles, ExternalLink, Unlink } from "lucide-react";
+import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles, ExternalLink, Unlink, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,13 @@ interface SocialAccount {
   late_account_id: string | null;
   is_active: boolean;
   profile_image_url?: string;
+}
+
+interface LateAccount {
+  id: string;
+  platform: string;
+  username: string;
+  profileImageUrl?: string;
 }
 
 // Wrapper component with Suspense for useSearchParams
@@ -62,6 +69,10 @@ function SettingsPageContent() {
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
+
+  // Available Late.dev accounts for selection
+  const [availableLateAccounts, setAvailableLateAccounts] = useState<LateAccount[]>([]);
+  const [showAccountPicker, setShowAccountPicker] = useState<string | null>(null); // platform id
 
   // UI state
   const [isSaving, setIsSaving] = useState(false);
@@ -250,7 +261,7 @@ function SettingsPageContent() {
     }
   };
 
-  // Connect a social account - opens Late.dev dashboard for OAuth
+  // Fetch available Late.dev accounts for a platform
   const handleConnectAccount = async (platform: string) => {
     if (!selectedBrand?.id) {
       setSaveMessage({ type: "error", text: "Please select a client first" });
@@ -258,51 +269,77 @@ function SettingsPageContent() {
       return;
     }
 
-    // Open Late.dev dashboard to connect the account
-    // After connecting there, the account will appear when we sync
-    window.open("https://getlate.dev/dashboard", "_blank");
-
-    setSaveMessage({
-      type: "success",
-      text: `Connect your ${platform} account in Late.dev, then click "Sync Accounts" below.`
-    });
-    setTimeout(() => setSaveMessage(null), 10000);
-  };
-
-  // Sync accounts from Late.dev
-  const handleSyncAccounts = async () => {
-    if (!selectedBrand?.id) return;
-
-    setLoadingAccounts(true);
-    setSaveMessage(null);
+    setConnectingPlatform(platform);
 
     try {
-      // First, get accounts from Late.dev
-      const lateRes = await fetch("/api/social-accounts/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandId: selectedBrand.id }),
-      });
+      // Fetch available accounts from Late.dev
+      const res = await fetch("/api/social-accounts/available");
+      const data = await res.json();
 
-      const data = await lateRes.json();
-      console.log("Sync response:", data);
+      if (data.success && data.accounts) {
+        const platformAccounts = data.accounts.filter(
+          (a: LateAccount) => a.platform === platform
+        );
 
-      if (data.success) {
-        setSocialAccounts(data.accounts || []);
-        const foundCount = data.totalFromLate || 0;
-        if (data.newAccounts > 0) {
-          setSaveMessage({ type: "success", text: `Synced ${data.newAccounts} new account(s) from Late.dev` });
-        } else if (foundCount === 0) {
-          setSaveMessage({ type: "error", text: "No accounts found in Late.dev. Make sure you have connected accounts there." });
+        if (platformAccounts.length === 0) {
+          // No accounts for this platform - open Late.dev dashboard
+          window.open("https://getlate.dev/dashboard", "_blank");
+          setSaveMessage({
+            type: "success",
+            text: `No ${platform} accounts found. Connect one in Late.dev, then try again.`
+          });
+          setTimeout(() => setSaveMessage(null), 10000);
+        } else if (platformAccounts.length === 1) {
+          // Only one account - link it directly
+          await linkAccount(platformAccounts[0]);
         } else {
-          setSaveMessage({ type: "success", text: `Accounts synced (${foundCount} found in Late.dev)` });
+          // Multiple accounts - show picker
+          setAvailableLateAccounts(platformAccounts);
+          setShowAccountPicker(platform);
         }
       } else {
-        setSaveMessage({ type: "error", text: data.error || "Failed to sync accounts" });
+        setSaveMessage({ type: "error", text: data.error || "Failed to fetch accounts" });
+        setTimeout(() => setSaveMessage(null), 5000);
       }
     } catch (err) {
-      console.error("Error syncing accounts:", err);
-      setSaveMessage({ type: "error", text: "Failed to sync with Late.dev" });
+      console.error("Error fetching accounts:", err);
+      setSaveMessage({ type: "error", text: "Failed to fetch accounts from Late.dev" });
+      setTimeout(() => setSaveMessage(null), 5000);
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
+  // Link a specific Late.dev account to this brand
+  const linkAccount = async (lateAccount: LateAccount) => {
+    if (!selectedBrand?.id) return;
+
+    setShowAccountPicker(null);
+    setLoadingAccounts(true);
+
+    try {
+      const res = await fetch("/api/social-accounts/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandId: selectedBrand.id,
+          lateAccountId: lateAccount.id,
+          platform: lateAccount.platform,
+          username: lateAccount.username,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setSocialAccounts((prev) => [...prev.filter(a => a.platform !== lateAccount.platform), data.account]);
+        setSaveMessage({ type: "success", text: `Connected @${lateAccount.username}` });
+      } else {
+        setSaveMessage({ type: "error", text: data.error || "Failed to link account" });
+      }
+    } catch (err) {
+      console.error("Error linking account:", err);
+      setSaveMessage({ type: "error", text: "Failed to link account" });
     } finally {
       setLoadingAccounts(false);
       setTimeout(() => setSaveMessage(null), 5000);
@@ -331,6 +368,38 @@ function SettingsPageContent() {
     } finally {
       setDisconnectingId(null);
       setTimeout(() => setSaveMessage(null), 3000);
+    }
+  };
+
+  // Sync accounts - just refreshes the list of connected accounts for this brand
+  const handleSyncAccounts = async () => {
+    if (!selectedBrand?.id) return;
+
+    setLoadingAccounts(true);
+    try {
+      const res = await fetch("/api/social-accounts/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandId: selectedBrand.id }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setSocialAccounts(data.accounts || []);
+        setSaveMessage({
+          type: "success",
+          text: `Synced ${data.accounts?.length || 0} account(s)`,
+        });
+      } else {
+        setSaveMessage({ type: "error", text: data.error || "Sync failed" });
+      }
+    } catch (err) {
+      console.error("Error syncing accounts:", err);
+      setSaveMessage({ type: "error", text: "Failed to sync accounts" });
+    } finally {
+      setLoadingAccounts(false);
+      setTimeout(() => setSaveMessage(null), 5000);
     }
   };
 
@@ -885,6 +954,79 @@ function SettingsPageContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Account Picker Modal */}
+      {showAccountPicker && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-2 top-2"
+                onClick={() => {
+                  setShowAccountPicker(null);
+                  setAvailableLateAccounts([]);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <CardTitle>Select Account</CardTitle>
+              <CardDescription>
+                Choose which {showAccountPicker} account to connect to {selectedBrand?.name}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {availableLateAccounts.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  Loading accounts...
+                </div>
+              ) : (
+                availableLateAccounts.map((account) => (
+                  <button
+                    key={account.id}
+                    onClick={() => linkAccount(account)}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-accent/50 transition-colors text-left"
+                  >
+                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                      {account.profileImageUrl ? (
+                        <img
+                          src={account.profileImageUrl}
+                          alt={account.username}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-lg">
+                          {PLATFORMS.find(p => p.id === account.platform)?.icon || "📱"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">@{account.username}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{account.platform}</p>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))
+              )}
+              <div className="pt-4 border-t mt-4">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Don&apos;t see your account?
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open("https://getlate.dev/dashboard", "_blank")}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open Late.dev Dashboard
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

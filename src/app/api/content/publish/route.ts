@@ -16,6 +16,7 @@ import {
  * Request body:
  * - contentId: string (required) - The content ID to publish
  * - scheduledFor?: string - ISO 8601 timestamp for scheduled publishing
+ * - republish?: boolean - If true, allows republishing already published content
  *
  * Response:
  * - success: boolean
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const adminClient = createAdminClient(); // For storage operations (bypasses RLS)
     const body = await request.json();
-    const { contentId, scheduledFor } = body;
+    const { contentId, scheduledFor, republish } = body;
 
     // Validate required fields
     if (!contentId) {
@@ -64,15 +65,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check content status - only approved or scheduled content can be published
-    if (!["approved", "scheduled"].includes(content.status)) {
+    // Check content status - only approved, scheduled, or published (for republish) content can be published
+    const allowedStatuses = republish
+      ? ["approved", "scheduled", "published"]
+      : ["approved", "scheduled"];
+
+    if (!allowedStatuses.includes(content.status)) {
+      const errorMessage = republish
+        ? `Content cannot be republished with current status: ${content.status}`
+        : `Content must be approved before publishing. Current status: ${content.status}`;
       return NextResponse.json(
         {
           success: false,
-          error: `Content must be approved before publishing. Current status: ${content.status}`,
+          error: errorMessage,
         },
         { status: 400 }
       );
+    }
+
+    // Log if this is a republish action
+    if (republish && content.status === "published") {
+      console.log(`Republishing content ${contentId} (previously published at ${content.published_at})`);
     }
 
     // Fetch associated images
@@ -338,6 +351,28 @@ export async function POST(request: NextRequest) {
     // Determine the new status based on whether this was scheduled or immediate
     const newStatus = scheduledFor ? "scheduled" : "published";
 
+    // Build metadata update - track republish history if this is a republish
+    const existingMetadata = (content.metadata as Record<string, unknown>) || {};
+    const republishHistory = (existingMetadata.republishHistory as Array<{ latePostId: string; publishedAt: string }>) || [];
+
+    // If republishing, add the previous publish to history
+    if (republish && content.late_post_id && content.published_at) {
+      republishHistory.push({
+        latePostId: content.late_post_id,
+        publishedAt: content.published_at,
+      });
+    }
+
+    const updatedMetadata = {
+      ...existingMetadata,
+      lateResponse: {
+        platforms: lateResponse.platforms,
+        createdAt: lateResponse.createdAt,
+      },
+      ...(republishHistory.length > 0 && { republishHistory }),
+      ...(republish && { lastRepublishedAt: new Date().toISOString() }),
+    };
+
     // Update content with Late.dev post ID and status
     const { error: updateError } = await supabase
       .from("content")
@@ -346,13 +381,7 @@ export async function POST(request: NextRequest) {
         status: newStatus,
         scheduled_for: scheduledFor || content.scheduled_for,
         published_at: lateResponse.status === "published" ? new Date().toISOString() : null,
-        metadata: {
-          ...((content.metadata as Record<string, unknown>) || {}),
-          lateResponse: {
-            platforms: lateResponse.platforms,
-            createdAt: lateResponse.createdAt,
-          },
-        },
+        metadata: updatedMetadata,
       })
       .eq("id", contentId);
 
@@ -385,6 +414,7 @@ export async function POST(request: NextRequest) {
       status: newStatus,
       platforms: lateResponse.platforms,
       scheduledFor: scheduledFor || null,
+      republished: !!republish,
     });
   } catch (error) {
     console.error("Error in POST /api/content/publish:", error);
