@@ -25,6 +25,32 @@ import {
 } from '@/lib/slide-templates';
 import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from '@/lib/image-models';
 
+// Helper to update job status
+async function updateJobStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  jobId: string,
+  updates: {
+    status?: string;
+    progress?: number;
+    completedItems?: number;
+    currentStep?: string;
+    errorMessage?: string;
+    errorCode?: string;
+    errorDetails?: Record<string, unknown>;
+  }
+) {
+  const updateData: Record<string, unknown> = {};
+  if (updates.status !== undefined) updateData.status = updates.status;
+  if (updates.progress !== undefined) updateData.progress = updates.progress;
+  if (updates.completedItems !== undefined) updateData.completed_items = updates.completedItems;
+  if (updates.currentStep !== undefined) updateData.current_step = updates.currentStep;
+  if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
+  if (updates.errorCode !== undefined) updateData.error_code = updates.errorCode;
+  if (updates.errorDetails !== undefined) updateData.error_details = updates.errorDetails;
+
+  await supabase.from('generation_jobs').update(updateData).eq('id', jobId);
+}
+
 // Font loading
 async function loadFont(): Promise<ArrayBuffer> {
   const fontUrl = 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZ9hjp-Ek-_EeA.woff';
@@ -235,8 +261,10 @@ function parseSlideContent(
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = await createClient();
+  let jobId: string | null = null;
+
   try {
-    const supabase = await createClient();
     const body = await request.json();
     const {
       contentId,
@@ -269,6 +297,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Content not found' }, { status: 404 });
     }
 
+    const totalSlides = slides.length;
+
+    // Create a generation job
+    const { data: job, error: jobError } = await supabase
+      .from('generation_jobs')
+      .insert({
+        content_id: contentId,
+        type: 'composite',
+        status: 'generating',
+        progress: 0,
+        total_items: totalSlides,
+        completed_items: 0,
+        current_step: 'Initializing',
+        metadata: {
+          backgroundStyle,
+          textStyle,
+          textColor,
+          slideCount: totalSlides,
+        },
+      })
+      .select()
+      .single();
+
+    if (jobError) {
+      console.error('Error creating job:', jobError);
+      // Continue without job tracking if it fails
+    } else {
+      jobId = job.id;
+    }
+
     // Resolve design system
     // Priority: 1) Full object, 2) textStyle+textColor combo, 3) legacy designPreset, 4) default
     let design: CarouselDesignSystem;
@@ -299,17 +357,55 @@ export async function POST(request: NextRequest) {
 
     // Generate or use provided background
     let bgImage: string | null = backgroundImage || null;
+    let backgroundError: string | null = null;
 
     if (!bgImage && backgroundStyle) {
       const googleApiKey = process.env.GOOGLE_API_KEY;
       if (googleApiKey) {
+        if (jobId) {
+          await updateJobStatus(supabase, jobId, {
+            progress: 5,
+            currentStep: 'Generating background',
+          });
+        }
+
         console.log(`Generating background: ${backgroundStyle}`);
         bgImage = await generateBackground(backgroundStyle, googleApiKey, modelConfig);
+
+        if (!bgImage) {
+          backgroundError = 'Background generation failed - using solid color fallback';
+          console.warn(backgroundError);
+        }
       }
     }
 
     // Load font once
-    const fontData = await getFont();
+    if (jobId) {
+      await updateJobStatus(supabase, jobId, {
+        progress: 10,
+        currentStep: 'Loading fonts',
+      });
+    }
+
+    let fontData: ArrayBuffer;
+    try {
+      fontData = await getFont();
+    } catch (fontError) {
+      console.error('Font loading failed:', fontError);
+      if (jobId) {
+        await updateJobStatus(supabase, jobId, {
+          status: 'failed',
+          progress: 100,
+          errorMessage: 'Failed to load font for text rendering',
+          errorCode: 'FONT_ERROR',
+          errorDetails: { error: fontError instanceof Error ? fontError.message : String(fontError) },
+        });
+      }
+      return NextResponse.json(
+        { error: 'Failed to load font for text rendering', jobId },
+        { status: 500 }
+      );
+    }
 
     // Generate all slides
     const generatedImages: Array<{
@@ -322,11 +418,22 @@ export async function POST(request: NextRequest) {
       } | null;
     }> = [];
 
-    const totalSlides = slides.length;
+    const slideErrors: Array<{ slideNumber: number; error: string }> = [];
 
-    for (const slide of slides) {
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i];
       const slideIndex = slide.slideNumber - 1;
       const templateType = getTemplateTypeForSlide(slideIndex, totalSlides, useNumberedSlides);
+
+      // Update progress (10% for setup + 80% for slides + 10% for saving)
+      const slideProgress = 10 + Math.round((i / totalSlides) * 80);
+      if (jobId) {
+        await updateJobStatus(supabase, jobId, {
+          progress: slideProgress,
+          currentStep: `Compositing slide ${slide.slideNumber}/${totalSlides}`,
+          completedItems: i,
+        });
+      }
 
       // Parse content from slide text
       const slideContent = parseSlideContent(slide.text, slide.slideNumber);
@@ -338,44 +445,86 @@ export async function POST(request: NextRequest) {
 
       console.log(`Compositing slide ${slide.slideNumber}/${totalSlides} (${templateType})`);
 
-      // Generate composite image
-      const imageUrl = await compositeSlide(
-        bgImage,
-        slideContent,
-        design,
-        templateType,
-        fontData,
-        width,
-        height
-      );
+      try {
+        // Generate composite image
+        const imageUrl = await compositeSlide(
+          bgImage,
+          slideContent,
+          design,
+          templateType,
+          fontData,
+          width,
+          height
+        );
 
-      // Save to database
-      const { data: savedImage, error: saveError } = await supabase
-        .from('images')
-        .insert({
-          content_id: contentId,
-          prompt: `[Slide ${slide.slideNumber}] Composite: ${slide.text.substring(0, 100)}`,
-          url: imageUrl,
-          is_primary: slide.slideNumber === 1,
-          format: 'png',
-          dimensions: { width, height, aspectRatio: '4:5', model: 'composite' },
-        })
-        .select()
-        .single();
+        // Save to database
+        const { data: savedImage, error: saveError } = await supabase
+          .from('images')
+          .insert({
+            content_id: contentId,
+            prompt: `[Slide ${slide.slideNumber}] Composite: ${slide.text.substring(0, 100)}`,
+            url: imageUrl,
+            is_primary: slide.slideNumber === 1,
+            format: 'png',
+            dimensions: { width, height, aspectRatio: '4:5', model: 'composite' },
+          })
+          .select()
+          .single();
 
-      if (saveError) {
-        console.error(`Error saving slide ${slide.slideNumber}:`, saveError);
+        if (saveError) {
+          console.error(`Error saving slide ${slide.slideNumber}:`, saveError);
+          slideErrors.push({ slideNumber: slide.slideNumber, error: `Database save failed: ${saveError.message}` });
+        }
+
+        generatedImages.push({
+          slideNumber: slide.slideNumber,
+          imageUrl,
+          savedImage: savedImage ? {
+            id: savedImage.id,
+            url: savedImage.url,
+            prompt: savedImage.prompt,
+          } : null,
+        });
+      } catch (slideError) {
+        console.error(`Error compositing slide ${slide.slideNumber}:`, slideError);
+        slideErrors.push({
+          slideNumber: slide.slideNumber,
+          error: slideError instanceof Error ? slideError.message : String(slideError),
+        });
       }
+    }
 
-      generatedImages.push({
-        slideNumber: slide.slideNumber,
-        imageUrl,
-        savedImage: savedImage ? {
-          id: savedImage.id,
-          url: savedImage.url,
-          prompt: savedImage.prompt,
-        } : null,
-      });
+    // Update job status
+    const successCount = generatedImages.filter(img => img.savedImage).length;
+    const hasErrors = slideErrors.length > 0 || backgroundError;
+
+    if (jobId) {
+      if (successCount === 0) {
+        await updateJobStatus(supabase, jobId, {
+          status: 'failed',
+          progress: 100,
+          completedItems: 0,
+          errorMessage: 'All slides failed to generate',
+          errorCode: 'ALL_FAILED',
+          errorDetails: { slideErrors },
+        });
+      } else if (hasErrors) {
+        await updateJobStatus(supabase, jobId, {
+          status: 'completed',
+          progress: 100,
+          completedItems: successCount,
+          currentStep: undefined,
+          errorMessage: backgroundError || `${slideErrors.length} slide(s) had issues`,
+          errorDetails: { slideErrors, backgroundError },
+        });
+      } else {
+        await updateJobStatus(supabase, jobId, {
+          status: 'completed',
+          progress: 100,
+          completedItems: successCount,
+          currentStep: undefined,
+        });
+      }
     }
 
     return NextResponse.json({
@@ -387,12 +536,26 @@ export async function POST(request: NextRequest) {
         system: design,
       },
       backgroundGenerated: !!backgroundStyle && !!bgImage,
+      backgroundError,
+      slideErrors: slideErrors.length > 0 ? slideErrors : undefined,
       dimensions: { width, height },
+      jobId,
     });
   } catch (error) {
     console.error('Error in POST /api/images/carousel:', error);
+
+    if (jobId) {
+      await updateJobStatus(supabase, jobId, {
+        status: 'failed',
+        progress: 100,
+        errorMessage: 'Internal server error',
+        errorCode: 'INTERNAL_ERROR',
+        errorDetails: { error: error instanceof Error ? error.message : String(error) },
+      });
+    }
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: error instanceof Error ? error.message : 'Internal server error', jobId },
       { status: 500 }
     );
   }

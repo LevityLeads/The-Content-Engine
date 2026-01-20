@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from "@/lib/image-models";
 
+// Helper to update job status
+async function updateJobStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  jobId: string,
+  updates: {
+    status?: string;
+    progress?: number;
+    completedItems?: number;
+    currentStep?: string;
+    errorMessage?: string;
+    errorCode?: string;
+    errorDetails?: Record<string, unknown>;
+  }
+) {
+  const updateData: Record<string, unknown> = {};
+  if (updates.status !== undefined) updateData.status = updates.status;
+  if (updates.progress !== undefined) updateData.progress = updates.progress;
+  if (updates.completedItems !== undefined) updateData.completed_items = updates.completedItems;
+  if (updates.currentStep !== undefined) updateData.current_step = updates.currentStep;
+  if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
+  if (updates.errorCode !== undefined) updateData.error_code = updates.errorCode;
+  if (updates.errorDetails !== undefined) updateData.error_details = updates.errorDetails;
+
+  await supabase.from('generation_jobs').update(updateData).eq('id', jobId);
+}
+
 // Platform-specific image dimensions (for internal use only - NOT sent to image generator)
 const PLATFORM_IMAGE_CONFIG: Record<string, {
   aspectRatio: string;
@@ -33,8 +59,10 @@ const DEFAULT_CONFIG = {
 };
 
 export async function POST(request: NextRequest) {
+  const supabase = await createClient();
+  let jobId: string | null = null;
+
   try {
-    const supabase = await createClient();
     const body = await request.json();
     const { contentId, prompt, model: requestedModel } = body;
 
@@ -65,6 +93,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create a generation job
+    const { data: job, error: jobError } = await supabase
+      .from('generation_jobs')
+      .insert({
+        content_id: contentId,
+        type: 'single',
+        status: 'generating',
+        progress: 0,
+        total_items: 1,
+        completed_items: 0,
+        current_step: 'Generating image',
+        metadata: { model: modelKey, prompt: prompt.substring(0, 200) },
+      })
+      .select()
+      .single();
+
+    if (jobError) {
+      console.error('Error creating job:', jobError);
+      // Continue without job tracking if it fails
+    } else {
+      jobId = job.id;
+    }
+
     // Get platform-specific image configuration
     const platform = (content.platform || "").toLowerCase();
     const imageConfig = PLATFORM_IMAGE_CONFIG[platform] || DEFAULT_CONFIG;
@@ -76,9 +127,16 @@ export async function POST(request: NextRequest) {
     let imageBase64 = null;
     let generationStatus = "pending";
     let generationMessage = "";
+    let errorCode: string | null = null;
+    let errorDetails: Record<string, unknown> | null = null;
 
     if (googleApiKey) {
       try {
+        // Update job progress
+        if (jobId) {
+          await updateJobStatus(supabase, jobId, { progress: 20, currentStep: 'Calling image API' });
+        }
+
         // Build clean prompt WITHOUT any social media or platform references
         // The image generator should create a pure graphic design, not a mockup
         const fullPrompt = `${prompt}
@@ -123,6 +181,10 @@ CRITICAL OUTPUT REQUIREMENTS:
         );
 
         if (response.ok) {
+          if (jobId) {
+            await updateJobStatus(supabase, jobId, { progress: 60, currentStep: 'Processing response' });
+          }
+
           const data = await response.json();
 
           // Log response structure for debugging
@@ -156,21 +218,46 @@ CRITICAL OUTPUT REQUIREMENTS:
               textPreview: typeof p.text === 'string' ? p.text.substring(0, 100) : undefined,
             })));
             generationMessage = `${modelConfig.name} returned no image. The prompt may have been filtered.`;
+            errorCode = 'FILTERED';
+            errorDetails = { partsReceived: parts.length, reason: 'No image data in response' };
           }
         } else {
           const errorData = await response.text();
           console.error(`${modelConfig.name} API error:`, errorData);
-          generationMessage = `${modelConfig.name} generation failed: ${response.status}. Image prompt saved for retry.`;
+          errorCode = String(response.status);
+          errorDetails = {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorData.substring(0, 500),
+          };
+
+          // User-friendly error messages
+          if (response.status === 503) {
+            generationMessage = `${modelConfig.name} is temporarily unavailable (503). Please try again in a moment.`;
+          } else if (response.status === 429) {
+            generationMessage = `Rate limit exceeded. Please wait a moment before trying again.`;
+          } else if (response.status === 400) {
+            generationMessage = `Invalid request. The prompt may contain unsupported content.`;
+          } else {
+            generationMessage = `${modelConfig.name} generation failed (${response.status}). Please try again.`;
+          }
         }
       } catch (err) {
         console.error(`${modelConfig.name} API error:`, err);
-        generationMessage = `${modelConfig.name} generation failed. Image prompt saved for manual creation.`;
+        errorCode = 'NETWORK_ERROR';
+        errorDetails = { error: err instanceof Error ? err.message : String(err) };
+        generationMessage = `${modelConfig.name} generation failed due to network error. Please try again.`;
       }
     } else {
-      generationMessage = "No image generation API configured. Add GOOGLE_API_KEY for Nano Banana Pro image generation.";
+      errorCode = 'NO_API_KEY';
+      generationMessage = "No image generation API configured. Add GOOGLE_API_KEY for image generation.";
     }
 
     // Save image record to database with platform-specific dimensions
+    if (jobId) {
+      await updateJobStatus(supabase, jobId, { progress: 80, currentStep: 'Saving to database' });
+    }
+
     const { data: savedImage, error: saveError } = await supabase
       .from("images")
       .insert({
@@ -183,7 +270,7 @@ CRITICAL OUTPUT REQUIREMENTS:
           width: imageConfig.width,
           height: imageConfig.height,
           aspectRatio: imageConfig.aspectRatio,
-          model: modelKey, // Store model info in dimensions JSON
+          model: modelKey,
         },
       })
       .select()
@@ -191,10 +278,39 @@ CRITICAL OUTPUT REQUIREMENTS:
 
     if (saveError) {
       console.error("Error saving image:", saveError);
+      if (jobId) {
+        await updateJobStatus(supabase, jobId, {
+          status: 'failed',
+          progress: 100,
+          errorMessage: 'Failed to save image to database',
+          errorCode: 'DB_ERROR',
+          errorDetails: { error: saveError.message },
+        });
+      }
       return NextResponse.json(
-        { error: "Failed to save image record" },
+        { error: "Failed to save image record", jobId },
         { status: 500 }
       );
+    }
+
+    // Update job status to completed or failed
+    if (jobId) {
+      if (imageUrl) {
+        await updateJobStatus(supabase, jobId, {
+          status: 'completed',
+          progress: 100,
+          completedItems: 1,
+          currentStep: undefined,
+        });
+      } else {
+        await updateJobStatus(supabase, jobId, {
+          status: 'failed',
+          progress: 100,
+          errorMessage: generationMessage,
+          errorCode: errorCode || 'UNKNOWN',
+          errorDetails: errorDetails || {},
+        });
+      }
     }
 
     return NextResponse.json({
@@ -214,11 +330,25 @@ CRITICAL OUTPUT REQUIREMENTS:
         name: modelConfig.name,
         description: modelConfig.description,
       },
+      jobId,
+      errorCode,
     });
   } catch (error) {
     console.error("Error in POST /api/images/generate:", error);
+
+    // Update job status if we have one
+    if (jobId) {
+      await updateJobStatus(supabase, jobId, {
+        status: 'failed',
+        progress: 100,
+        errorMessage: 'Internal server error',
+        errorCode: 'INTERNAL_ERROR',
+        errorDetails: { error: error instanceof Error ? error.message : String(error) },
+      });
+    }
+
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", jobId },
       { status: 500 }
     );
   }
