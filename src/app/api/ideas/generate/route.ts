@@ -55,12 +55,21 @@ export async function POST(request: NextRequest) {
       brand_id: string;
       type: string;
       raw_content: string;
-      brands?: { voice_config?: Record<string, unknown> } | null;
+      brands?: {
+        voice_config?: Record<string, unknown>;
+        visual_config?: Record<string, unknown>;
+      } | null;
     };
 
-    // Build the voice prompt from brand config
+    // Build the voice prompt from brand config (with visual config for consistent brand alignment)
     const voiceConfig = inputData.brands?.voice_config as VoiceConfig | null;
-    const brandVoicePrompt = buildVoicePrompt(voiceConfig);
+    const visualConfig = inputData.brands?.visual_config as {
+      primary_color?: string;
+      secondary_color?: string;
+      accent_color?: string;
+      image_style?: string;
+    } | null;
+    const brandVoicePrompt = buildVoicePrompt(voiceConfig, visualConfig);
 
     // Truncate very long content (e.g., from large PDFs) to avoid context limits
     // Keep first ~15000 chars which is roughly ~4000 tokens

@@ -61,7 +61,11 @@ export async function POST(request: NextRequest) {
       key_points: string[];
       potential_hooks: string[];
       inputs?: { raw_content: string; type: string } | null;
-      brands?: { voice_config?: Record<string, unknown>; name?: string } | null;
+      brands?: {
+        voice_config?: Record<string, unknown>;
+        visual_config?: Record<string, unknown>;
+        name?: string;
+      } | null;
     };
 
     // Use selected platforms if provided, otherwise use idea's target platforms
@@ -69,9 +73,16 @@ export async function POST(request: NextRequest) {
       ? selectedPlatforms
       : ideaData.target_platforms;
 
-    // Build the voice prompt from brand config
+    // Build the voice prompt from brand config (with visual config for image consistency)
     const voiceConfig = ideaData.brands?.voice_config as VoiceConfig | null;
-    const brandVoicePrompt = buildVoicePrompt(voiceConfig);
+    const visualConfig = ideaData.brands?.visual_config as {
+      primary_color?: string;
+      secondary_color?: string;
+      accent_color?: string;
+      image_style?: string;
+      fonts?: { heading?: string; body?: string };
+    } | null;
+    const brandVoicePrompt = buildVoicePrompt(voiceConfig, visualConfig);
 
     // Build the enhanced user prompt using the new prompt system
     const userPrompt = buildContentUserPrompt(

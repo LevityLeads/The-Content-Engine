@@ -32,9 +32,11 @@ export {
 export {
   VOICE_ARCHETYPES,
   buildVoicePrompt,
+  buildBrandPrompt,
   VOICE_QUALITY_CHECK,
   DEFAULT_VOICE_PROMPT,
   type VoiceConfig,
+  type VisualConfig,
 } from "./voice-system";
 
 // Ideation prompts
