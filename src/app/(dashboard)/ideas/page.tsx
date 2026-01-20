@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram } from "lucide-react";
+import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,22 @@ interface Idea {
 }
 
 const ALL_PLATFORMS = ["twitter", "instagram", "linkedin"] as const;
+
+const formatRelativeTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+};
 
 const platformConfig: Record<string, { icon: React.ReactNode; label: string; color: string; activeColor: string }> = {
   twitter: {
@@ -269,6 +285,10 @@ export default function IdeasPage() {
                         )}
                       </div>
                       <CardTitle className="mt-2 text-lg">{idea.concept}</CardTitle>
+                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatRelativeTime(idea.created_at)}</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="text-right">
