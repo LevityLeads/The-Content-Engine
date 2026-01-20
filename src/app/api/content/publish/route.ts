@@ -297,9 +297,8 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    // Determine the new status based on the response
-    const newStatus = scheduledFor ? "scheduled" :
-      (lateResponse.status === "published" ? "published" : "scheduled");
+    // Determine the new status based on whether this was scheduled or immediate
+    const newStatus = scheduledFor ? "scheduled" : "published";
 
     // Update content with Late.dev post ID and status
     const { error: updateError } = await supabase

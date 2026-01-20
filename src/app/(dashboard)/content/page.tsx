@@ -38,6 +38,8 @@ interface Content {
   copy_carousel_slides: CarouselSlide[] | string[] | null;
   status: string;
   scheduled_for: string | null;
+  published_at: string | null;
+  late_post_id: string | null;
   metadata: {
     imagePrompt?: string;
     carouselStyle?: string;
@@ -1934,17 +1936,41 @@ export default function ContentPage() {
                             </Button>
                           </>
                         )}
-                        {item.status === "scheduled" && item.scheduled_for && (
-                          <div className="flex items-center gap-2 text-sm text-blue-400">
-                            <Clock className="h-4 w-4" />
-                            <span>Scheduled for {new Date(item.scheduled_for).toLocaleString()}</span>
-                          </div>
-                        )}
                         {item.status === "published" && (
-                          <div className="flex items-center gap-2 text-sm text-emerald-400">
-                            <CheckCircle2 className="h-4 w-4" />
-                            <span>Published</span>
-                          </div>
+                          <>
+                            <div className="flex items-center gap-2 text-sm text-emerald-400">
+                              <CheckCircle2 className="h-4 w-4" />
+                              <span>Published</span>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateContent(item.id, { status: "draft", late_post_id: null, published_at: null })}
+                            >
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Reset to Draft
+                            </Button>
+                          </>
+                        )}
+                        {item.status === "scheduled" && (
+                          <>
+                            <div className="flex items-center gap-2 text-sm text-blue-400">
+                              <Clock className="h-4 w-4" />
+                              <span>
+                                {item.scheduled_for
+                                  ? `Scheduled for ${new Date(item.scheduled_for).toLocaleString()}`
+                                  : "Scheduled"}
+                              </span>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUpdateContent(item.id, { status: "draft", late_post_id: null, scheduled_for: null })}
+                            >
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Reset to Draft
+                            </Button>
+                          </>
                         )}
                         {item.status === "failed" && (
                           <>
