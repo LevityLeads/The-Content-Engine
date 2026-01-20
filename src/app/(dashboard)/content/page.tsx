@@ -385,6 +385,37 @@ export default function ContentPage() {
     }
   };
 
+  const handleRetry = async (contentId: string) => {
+    // Reset status to approved and try publishing again
+    setPublishingId(contentId);
+    setPublishMessage(null);
+    try {
+      // First reset status to approved
+      const resetRes = await fetch("/api/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: contentId, status: "approved" }),
+      });
+      if (!resetRes.ok) {
+        throw new Error("Failed to reset status");
+      }
+      // Update local state
+      setContent((prev) =>
+        prev.map((c) =>
+          c.id === contentId ? { ...c, status: "approved" } : c
+        )
+      );
+      setPublishMessage({ type: "success", text: "Status reset to approved. You can now publish again." });
+      setTimeout(() => setPublishMessage(null), 3000);
+    } catch (err) {
+      console.error("Error retrying:", err);
+      setPublishMessage({ type: "error", text: "Failed to reset status" });
+      setTimeout(() => setPublishMessage(null), 5000);
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
   const openScheduleDialog = (contentId: string) => {
     setSchedulingContentId(contentId);
     // Default to tomorrow at 9:00 AM
@@ -1820,6 +1851,23 @@ export default function ContentPage() {
                             <CheckCircle2 className="h-4 w-4" />
                             <span>Published</span>
                           </div>
+                        )}
+                        {item.status === "failed" && (
+                          <>
+                            <div className="flex items-center gap-2 text-sm text-red-400">
+                              <AlertCircle className="h-4 w-4" />
+                              <span>Failed</span>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRetry(item.id)}
+                              disabled={publishingId === item.id}
+                            >
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Retry
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
