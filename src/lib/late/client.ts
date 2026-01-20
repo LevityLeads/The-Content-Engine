@@ -189,15 +189,30 @@ export class LateClient {
   /**
    * Get OAuth authorization URL for connecting a new account
    *
-   * @param platform - Platform to connect
-   * @param callbackUrl - URL to redirect to after authorization
-   * @returns Authorization URL
+   * Late.dev uses GET /connect/{platform}?profileId=xxx to initiate OAuth
+   * The response redirects to the platform's OAuth page
+   *
+   * @param platform - Platform to connect (twitter, instagram, linkedin, etc.)
+   * @param profileId - Optional Late.dev profile ID to associate the account with
+   * @param callbackUrl - Optional callback URL after authorization
+   * @returns Authorization URL to redirect the user to
    */
-  async getAuthUrl(platform: string, callbackUrl: string): Promise<{ url: string }> {
-    return this.request<{ url: string }>('POST', '/accounts/auth', {
-      platform,
-      callbackUrl,
-    });
+  async getAuthUrl(platform: string, callbackUrl?: string, profileId?: string): Promise<{ url: string }> {
+    // Build the connect URL - this is a redirect endpoint, not a JSON API
+    const params = new URLSearchParams();
+    if (profileId) {
+      params.set('profileId', profileId);
+    }
+    if (callbackUrl) {
+      params.set('callbackUrl', callbackUrl);
+    }
+
+    const connectUrl = `${this.baseUrl}/connect/${platform}?${params.toString()}`;
+
+    // For Late.dev, the connect endpoint itself IS the auth URL
+    // We just need to redirect the user there with proper auth
+    // Return the URL with the API key in the header requirement
+    return { url: `${connectUrl}&apiKey=${this.apiKey}` };
   }
 
   /**
