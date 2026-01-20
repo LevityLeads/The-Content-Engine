@@ -38,16 +38,42 @@ export async function POST(request: NextRequest) {
 
     try {
       const response = await lateClient.listAccounts();
-      lateAccounts = response.accounts || [];
-      console.log(`Fetched ${lateAccounts.length} accounts from Late.dev`);
+      console.log("Late.dev listAccounts raw response:", JSON.stringify(response, null, 2));
+
+      // Handle different response formats - Late.dev might return accounts directly or nested
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawResponse = response as any;
+      if (Array.isArray(rawResponse)) {
+        lateAccounts = rawResponse;
+      } else if (rawResponse.accounts) {
+        lateAccounts = rawResponse.accounts;
+      } else if (rawResponse.data) {
+        lateAccounts = rawResponse.data;
+      } else {
+        // If response has id/platform fields, it might be a single account or different structure
+        console.log("Unexpected response structure, keys:", Object.keys(rawResponse));
+        lateAccounts = [];
+      }
+
+      console.log(`Fetched ${lateAccounts.length} accounts from Late.dev:`,
+        lateAccounts.map((a: { platform?: string; username?: string; id?: string }) =>
+          `${a.platform}: ${a.username || a.id}`
+        )
+      );
     } catch (error) {
       if (error instanceof LateApiException) {
-        console.error("Late.dev API error:", error.message);
+        console.error("Late.dev API error:", {
+          message: error.message,
+          code: error.code,
+          statusCode: error.statusCode,
+          details: error.details,
+        });
         return NextResponse.json(
           { success: false, error: `Late.dev error: ${error.message}` },
           { status: error.statusCode >= 500 ? 502 : 400 }
         );
       }
+      console.error("Unexpected error fetching from Late.dev:", error);
       throw error;
     }
 
@@ -132,6 +158,14 @@ export async function POST(request: NextRequest) {
       accounts: allAccounts,
       newAccounts,
       totalFromLate: lateAccounts.length,
+      debug: {
+        lateAccountsFound: lateAccounts.map((a: { platform?: string; username?: string; id?: string }) => ({
+          platform: a.platform,
+          username: a.username,
+          id: a.id,
+        })),
+        brandId,
+      },
     });
   } catch (error) {
     console.error("Error in POST /api/social-accounts/sync:", error);
