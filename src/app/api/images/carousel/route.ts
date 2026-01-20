@@ -46,7 +46,8 @@ async function generateBackground(
   googleApiKey: string,
   modelConfig: { id: string; name: string }
 ): Promise<string | null> {
-  const BACKGROUND_STYLES: Record<string, string> = {
+  // Typography/Abstract backgrounds (text-overlay optimized)
+  const TYPOGRAPHY_BACKGROUNDS: Record<string, string> = {
     'gradient-dark': 'Abstract dark gradient background transitioning from deep navy (#1a1a2e) to charcoal black (#0d0d0d). Subtle purple and blue tones blend smoothly. Minimal, sophisticated, perfect for text overlay. No text, no objects, no patterns - pure gradient only.',
     'gradient-warm': 'Abstract warm gradient background with rich coral (#ff6b6b) fading into deep burgundy (#4a1a1a). Smooth color transitions, slightly desaturated for text readability. No text, no objects - pure gradient colors only.',
     'texture-noise': 'Dark charcoal background (#1a1a1a) with very subtle grain/noise texture. Minimal, modern, premium feel. Slight vignette toward edges. No text, no patterns, no objects - just textured solid color.',
@@ -56,7 +57,59 @@ async function generateBackground(
     'minimal-solid': 'Clean solid charcoal background (#1a1a1a). Perfectly uniform color. Minimal, modern, professional. No texture, no gradient, no text, no objects - pure solid color.',
   };
 
-  const prompt = BACKGROUND_STYLES[style] || BACKGROUND_STYLES['gradient-dark'];
+  // Photorealistic backgrounds (scene-based)
+  const PHOTOREALISTIC_BACKGROUNDS: Record<string, string> = {
+    'photo-landscape': 'Photorealistic landscape photograph. Dramatic mountain vista at golden hour with misty valleys. Warm sunlight filtering through clouds. Professional photography quality, cinematic composition. Lower third slightly darker for text overlay. No text, no UI elements.',
+    'photo-urban': 'Photorealistic urban cityscape at dusk. Modern architecture with glowing windows. Deep blue sky transitioning to warm city lights. Professional photography, 85mm lens look. Lower portion darker for text placement. No text.',
+    'photo-nature': 'Photorealistic close-up nature scene. Dewdrops on leaves with soft morning light. Beautiful bokeh background in green and gold tones. Macro photography quality. Area for text overlay in corner or lower third. No text.',
+    'photo-ocean': 'Photorealistic ocean scene at sunset. Calm waves reflecting orange and pink sky colors. Serene, peaceful atmosphere. Professional landscape photography. Darker horizon line for text placement. No text, no people.',
+    'photo-minimal': 'Photorealistic minimal interior scene. Clean modern space with soft natural lighting. Neutral tones with one accent color. Professional architectural photography. Clear areas for text overlay. No text, no people.',
+    'photo-texture': 'Photorealistic texture close-up. Weathered wood, marble, or concrete surface with beautiful natural patterns. Dramatic side lighting creating depth. Lower third slightly darker. No text.',
+  };
+
+  // Illustration backgrounds
+  const ILLUSTRATION_BACKGROUNDS: Record<string, string> = {
+    'illust-flat': 'Flat vector illustration background. Soft gradient sky with simple geometric landscape shapes. Limited color palette: dusty blue, coral, cream, navy. Clean modern editorial style. Large clear area for text. No text, no characters.',
+    'illust-watercolor': 'Soft watercolor wash background. Dreamy abstract colors blending together - soft blues, pinks, and purples. Organic flowing shapes. Artistic, warm feeling. Lighter center area for text. No text.',
+    'illust-geometric': 'Geometric illustration background. Bold shapes in coral, navy, and cream arranged in modern composition. Memphis design inspired. Clear focal area for text placement. No text.',
+    'illust-nature': 'Illustrated nature scene. Stylized trees, mountains, or plants in flat vector style. Warm, friendly color palette. Editorial illustration quality. Open sky or clear area for text. No text, no characters.',
+    'illust-abstract': 'Abstract illustration with organic flowing shapes. Soft gradients in modern color palette. Contemporary art style with clean lines. Large clear area for text overlay. No text.',
+  };
+
+  // 3D render backgrounds
+  const RENDER_3D_BACKGROUNDS: Record<string, string> = {
+    '3d-geometric': 'Modern 3D rendered scene. Floating geometric shapes - spheres, cubes, cylinders in chrome, glass, and matte materials. Soft gradient background from deep purple to dark blue. Studio lighting with soft shadows. Clear center for text. No text.',
+    '3d-abstract': '3D rendered abstract environment. Smooth curved surfaces and flowing forms. Metallic and translucent materials. Soft lighting with subtle reflections. Premium tech aesthetic. Clear area for text. No text.',
+    '3d-minimal': 'Minimal 3D scene. Single elegant object on gradient background. Soft studio lighting. Premium, sophisticated. Large clear area for text overlay. No text, no UI.',
+    '3d-tech': '3D rendered tech-inspired scene. Abstract data visualization forms, flowing lines, particle effects. Deep blue and purple gradient. Futuristic, innovative feel. Clear area for text. No text.',
+  };
+
+  // Abstract art backgrounds
+  const ABSTRACT_ART_BACKGROUNDS: Record<string, string> = {
+    'art-expressive': 'Bold abstract art composition. Large organic brush strokes in coral, navy, and white on dark background. Expressive, dynamic energy. Contemporary art style. Clear area in composition for text. No text.',
+    'art-minimal': 'Minimal abstract art. Single bold shape or gesture on clean background. High contrast colors. Museum-quality aesthetic. Large clear area for text overlay. No text.',
+    'art-textured': 'Abstract textured art background. Layered paint textures and subtle color variations. Rich, tactile quality. Contemporary gallery style. Area with lower contrast for text. No text.',
+    'art-geometric': 'Geometric abstract art. Bold shapes and color blocks in modern composition. Bauhaus or contemporary art inspired. Clear focal area for text placement. No text.',
+  };
+
+  // Collage backgrounds
+  const COLLAGE_BACKGROUNDS: Record<string, string> = {
+    'collage-vintage': 'Mixed media collage background. Layered vintage paper textures, subtle torn edges, aged aesthetic. Warm sepia and cream tones with coral accents. Editorial zine style. Clear area for text overlay. No text.',
+    'collage-modern': 'Modern collage composition. Geometric paper cutouts, bold colors, layered elements. Clean edges mixed with organic shapes. Contemporary editorial style. Clear space for text. No text.',
+    'collage-texture': 'Textured collage background. Overlapping paper, fabric, and material textures. Rich tactile quality. Artistic, handmade feel. Area with cleaner background for text. No text.',
+  };
+
+  // Combine all style categories
+  const ALL_STYLES: Record<string, string> = {
+    ...TYPOGRAPHY_BACKGROUNDS,
+    ...PHOTOREALISTIC_BACKGROUNDS,
+    ...ILLUSTRATION_BACKGROUNDS,
+    ...RENDER_3D_BACKGROUNDS,
+    ...ABSTRACT_ART_BACKGROUNDS,
+    ...COLLAGE_BACKGROUNDS,
+  };
+
+  const prompt = ALL_STYLES[style] || TYPOGRAPHY_BACKGROUNDS['gradient-dark'];
 
   try {
     const response = await fetch(
