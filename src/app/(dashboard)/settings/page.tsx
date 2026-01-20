@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles } from "lucide-react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles, ExternalLink, Unlink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,8 +11,39 @@ import { Badge } from "@/components/ui/badge";
 import { useBrand, VoiceConfig, VisualConfig } from "@/contexts/brand-context";
 import { StrictnessSlider } from "@/components/brand/strictness-slider";
 
+// Platform configuration
+const PLATFORMS = [
+  { id: "twitter", name: "X (Twitter)", icon: "𝕏" },
+  { id: "instagram", name: "Instagram", icon: "📷" },
+  { id: "linkedin", name: "LinkedIn", icon: "in" },
+] as const;
+
+interface SocialAccount {
+  id: string;
+  brand_id: string;
+  platform: string;
+  platform_username: string | null;
+  late_account_id: string | null;
+  is_active: boolean;
+  profile_image_url?: string;
+}
+
+// Wrapper component with Suspense for useSearchParams
 export default function SettingsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <SettingsPageContent />
+    </Suspense>
+  );
+}
+
+function SettingsPageContent() {
   const { selectedBrand, updateBrand, isLoading: brandLoading } = useBrand();
+  const searchParams = useSearchParams();
 
   // Form state
   const [name, setName] = useState("");
@@ -25,9 +57,50 @@ export default function SettingsPage() {
   const [analyzeUrl, setAnalyzeUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Social accounts state
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [connectingPlatform, setConnectingPlatform] = useState<string | null>(null);
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
+
   // UI state
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Handle OAuth callback messages from URL params
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+
+    if (success) {
+      setSaveMessage({ type: "success", text: success });
+      // Clear URL params without refresh
+      window.history.replaceState({}, "", "/settings");
+      setTimeout(() => setSaveMessage(null), 5000);
+    } else if (error) {
+      setSaveMessage({ type: "error", text: error });
+      window.history.replaceState({}, "", "/settings");
+      setTimeout(() => setSaveMessage(null), 5000);
+    }
+  }, [searchParams]);
+
+  // Fetch social accounts
+  const fetchSocialAccounts = useCallback(async () => {
+    if (!selectedBrand?.id) return;
+
+    setLoadingAccounts(true);
+    try {
+      const res = await fetch(`/api/social-accounts?brandId=${selectedBrand.id}`);
+      const data = await res.json();
+      if (data.success) {
+        setSocialAccounts(data.accounts);
+      }
+    } catch (err) {
+      console.error("Error fetching social accounts:", err);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  }, [selectedBrand?.id]);
 
   // Load brand data when selected brand changes
   useEffect(() => {
@@ -38,8 +111,10 @@ export default function SettingsPage() {
       setVisualConfig(selectedBrand.visual_config || {});
       // Pre-fill analyze URL with existing source URL if available
       setAnalyzeUrl(selectedBrand.voice_config?.source_url || "");
+      // Fetch social accounts for this brand
+      fetchSocialAccounts();
     }
-  }, [selectedBrand]);
+  }, [selectedBrand, fetchSocialAccounts]);
 
   const handleSave = async (section: "brand" | "voice" | "visual") => {
     if (!selectedBrand) return;
@@ -173,6 +248,66 @@ export default function SettingsPage() {
       setIsAnalyzing(false);
       setTimeout(() => setSaveMessage(null), 5000);
     }
+  };
+
+  // Connect a social account via Late.dev OAuth
+  const handleConnectAccount = async (platform: string) => {
+    if (!selectedBrand?.id) return;
+
+    setConnectingPlatform(platform);
+    try {
+      const res = await fetch("/api/social-accounts/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform, brandId: selectedBrand.id }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.authUrl) {
+        // Redirect to Late.dev OAuth
+        window.location.href = data.authUrl;
+      } else {
+        setSaveMessage({ type: "error", text: data.error || "Failed to initiate connection" });
+        setTimeout(() => setSaveMessage(null), 5000);
+      }
+    } catch (err) {
+      console.error("Error connecting account:", err);
+      setSaveMessage({ type: "error", text: "Network error. Please try again." });
+      setTimeout(() => setSaveMessage(null), 5000);
+    } finally {
+      setConnectingPlatform(null);
+    }
+  };
+
+  // Disconnect a social account
+  const handleDisconnectAccount = async (accountId: string) => {
+    setDisconnectingId(accountId);
+    try {
+      const res = await fetch(`/api/social-accounts/${accountId}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setSocialAccounts((prev) => prev.filter((a) => a.id !== accountId));
+        setSaveMessage({ type: "success", text: "Account disconnected" });
+      } else {
+        setSaveMessage({ type: "error", text: data.error || "Failed to disconnect" });
+      }
+    } catch (err) {
+      console.error("Error disconnecting account:", err);
+      setSaveMessage({ type: "error", text: "Network error. Please try again." });
+    } finally {
+      setDisconnectingId(null);
+      setTimeout(() => setSaveMessage(null), 3000);
+    }
+  };
+
+  // Helper to check if a platform is connected
+  const getConnectedAccount = (platformId: string) => {
+    return socialAccounts.find((a) => a.platform === platformId && a.is_active);
   };
 
   if (brandLoading) {
@@ -541,45 +676,96 @@ export default function SettingsPage() {
       </Card>
 
       {/* Connected Accounts */}
-      <Card className="opacity-75">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
             Connected Accounts
-            <Badge variant="outline" className="ml-2 text-xs">Coming Soon</Badge>
           </CardTitle>
           <CardDescription>
-            Social media accounts for publishing (Late.dev integration)
+            Social media accounts for publishing via Late.dev
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-3">
-            {[
-              { name: "X (Twitter)", connected: false },
-              { name: "Instagram", connected: false },
-              { name: "LinkedIn", connected: false },
-            ].map((account) => (
-              <div
-                key={account.name}
-                className="flex items-center justify-between rounded-lg border p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-muted" />
-                  <div>
-                    <p className="font-medium">{account.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {account.connected ? "Connected" : "Not connected"}
-                    </p>
+          {loadingAccounts ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {PLATFORMS.map((platform) => {
+                const connectedAccount = getConnectedAccount(platform.id);
+                const isConnecting = connectingPlatform === platform.id;
+                const isDisconnecting = disconnectingId === connectedAccount?.id;
+
+                return (
+                  <div
+                    key={platform.id}
+                    className="flex items-center justify-between rounded-lg border p-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-lg font-semibold">
+                        {connectedAccount?.profile_image_url ? (
+                          <img
+                            src={connectedAccount.profile_image_url}
+                            alt={platform.name}
+                            className="h-10 w-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          platform.icon
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">{platform.name}</p>
+                        {connectedAccount ? (
+                          <p className="text-xs text-emerald-500 flex items-center gap-1">
+                            <Check className="h-3 w-3" />
+                            {connectedAccount.platform_username
+                              ? `@${connectedAccount.platform_username}`
+                              : "Connected"}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">Not connected</p>
+                        )}
+                      </div>
+                    </div>
+                    {connectedAccount ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDisconnectAccount(connectedAccount.id)}
+                        disabled={isDisconnecting}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        {isDisconnecting ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Unlink className="mr-2 h-4 w-4" />
+                        )}
+                        Disconnect
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleConnectAccount(platform.id)}
+                        disabled={isConnecting}
+                      >
+                        {isConnecting ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                        )}
+                        Connect
+                      </Button>
+                    )}
                   </div>
-                </div>
-                <Button variant="outline" disabled>
-                  Coming Soon
-                </Button>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
-            Powered by Late.dev for secure OAuth connections
+            Powered by Late.dev for secure OAuth connections. Connected accounts will be used for publishing content.
           </p>
         </CardContent>
       </Card>

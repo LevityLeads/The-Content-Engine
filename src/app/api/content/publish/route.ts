@@ -36,9 +36,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Map platform to account ID environment variable
-    // TODO: Support multiple accounts per platform via brand settings
-    const platformAccountIds: Record<string, string | undefined> = {
+    // Fallback platform account IDs from environment (for backwards compatibility)
+    const fallbackAccountIds: Record<string, string | undefined> = {
       instagram: process.env.LATE_INSTAGRAM_ACCOUNT_ID || process.env.LATE_INSTAGRAM_ACCOUNT_OCD_ID,
       twitter: process.env.LATE_TWITTER_ACCOUNT_ID,
       linkedin: process.env.LATE_LINKEDIN_ACCOUNT_ID,
@@ -231,15 +230,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get account ID for this platform
-    const accountId = platformAccountIds[content.platform];
+    // Get account ID for this platform from social_accounts table
+    // First, try to find a connected account for this brand and platform
+    let accountId: string | undefined;
+
+    const { data: socialAccount, error: socialError } = await supabase
+      .from("social_accounts")
+      .select("late_account_id")
+      .eq("brand_id", content.brand_id)
+      .eq("platform", content.platform)
+      .eq("is_active", true)
+      .single();
+
+    if (socialAccount?.late_account_id) {
+      accountId = socialAccount.late_account_id;
+      console.log(`Using connected account for ${content.platform}: ${accountId}`);
+    } else {
+      // Fall back to environment variable for backwards compatibility
+      accountId = fallbackAccountIds[content.platform];
+      if (accountId) {
+        console.log(`Using fallback env account for ${content.platform}: ${accountId}`);
+      }
+    }
+
     if (!accountId) {
       return NextResponse.json(
         {
           success: false,
-          error: `Late.dev account ID not configured for ${content.platform}. Please set LATE_${content.platform.toUpperCase()}_ACCOUNT_ID in your environment variables.`,
+          error: `No ${content.platform} account connected for this client. Please connect an account in Settings.`,
         },
-        { status: 500 }
+        { status: 400 }
       );
     }
 
