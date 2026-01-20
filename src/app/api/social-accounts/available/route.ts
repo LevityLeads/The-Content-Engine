@@ -75,15 +75,30 @@ export async function GET(request: Request) {
       id: string;
       platform: string;
       username?: string;
+      name?: string;
+      handle?: string;
+      screenName?: string;
       profileImageUrl?: string;
+      profile_image_url?: string;
+      avatar?: string;
       isActive?: boolean;
-    }) => ({
-      id: acc.id,
-      platform: acc.platform,
-      username: acc.username || acc.id,
-      profileImageUrl: acc.profileImageUrl,
-      isActive: acc.isActive !== false,
-    }));
+      is_active?: boolean;
+    }) => {
+      // Try multiple possible field names for username
+      const username = acc.username || acc.name || acc.handle || acc.screenName || acc.id;
+      // Try multiple possible field names for profile image
+      const profileImageUrl = acc.profileImageUrl || acc.profile_image_url || acc.avatar;
+
+      console.log("Mapping account:", { original: acc, mapped: { id: acc.id, platform: acc.platform, username, profileImageUrl } });
+
+      return {
+        id: acc.id,
+        platform: acc.platform,
+        username,
+        profileImageUrl,
+        isActive: acc.isActive !== false && acc.is_active !== false,
+      };
+    });
 
     return NextResponse.json({
       success: true,
