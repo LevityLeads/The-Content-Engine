@@ -645,9 +645,7 @@ export default function ContentPage() {
     );
   };
 
-  // Render horizontal carousel with overlapping fanned cards
-  // Layout: Left side has carousel + slide text + image prompt + image variants
-  //         Right side has resizable caption panel
+  // Render 3-column layout: Left (slide content), Center (carousel), Right (caption)
   const renderSlideFilmstripAndDetail = (
     item: Content,
     slides: CarouselSlide[],
@@ -671,25 +669,200 @@ export default function ContentPage() {
     };
 
     // Calculate card positions for fanned/overlapping effect
-    const cardWidth = 220; // Larger cards
-    const cardOverlap = 60; // How much cards overlap
+    const cardWidth = 200;
+    const cardOverlap = 50;
     const visibleCardWidth = cardWidth - cardOverlap;
 
     return (
       <div
         id="slides-container"
-        className="flex h-[500px]"
+        className="flex h-[580px] gap-4"
         style={{ userSelect: isDraggingDivider ? 'none' : 'auto' }}
       >
-        {/* Left: Carousel and controls */}
-        <div className="flex-1 flex flex-col min-w-0 pr-2">
-          {/* Fanned card carousel - takes up most of the vertical space */}
+        {/* Left Panel: Slide Content */}
+        <div className="w-[300px] flex-shrink-0 flex flex-col border-r border-muted/30 pr-4">
+          {/* Model Selector */}
+          <div className="mb-3">
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Model</label>
+            <select
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value as ImageModelKey)}
+            >
+              {MODEL_OPTIONS.map((model) => (
+                <option key={model.key} value={model.key}>{model.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* AI Generation / Composite Tabs */}
+          <Tabs defaultValue="ai-generation" className="flex-1 flex flex-col">
+            <TabsList className="w-full mb-3">
+              <TabsTrigger value="ai-generation" className="flex-1 text-xs">
+                <Sparkles className="h-3 w-3 mr-1" />
+                AI Generation
+              </TabsTrigger>
+              <TabsTrigger value="composite" className="flex-1 text-xs">
+                <Layers className="h-3 w-3 mr-1" />
+                Composite
+              </TabsTrigger>
+            </TabsList>
+
+            {/* AI Generation Tab */}
+            <TabsContent value="ai-generation" className="flex-1 flex flex-col mt-0 space-y-3 overflow-y-auto">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Slide Content</div>
+
+              {/* Slide Text */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Slide Text:</label>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit">
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Regenerate">
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-lg bg-muted/30 p-2.5 text-sm leading-relaxed">
+                  {slide.text}
+                </div>
+              </div>
+
+              {/* Slide Prompt */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Slide Prompt:</label>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit">
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Regenerate">
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-lg bg-muted/30 p-2.5 text-xs text-muted-foreground leading-relaxed max-h-[80px] overflow-y-auto">
+                  {slide.imagePrompt}
+                </div>
+              </div>
+
+              {/* Style Variants */}
+              <div className="space-y-2 flex-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Style Variants</label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <ImageIcon className="mr-1 h-3 w-3" />
+                    )}
+                    Generate Another
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {slideImgs.length > 0 ? (
+                    slideImgs.map((img, idx) => (
+                      <button
+                        key={img.id}
+                        onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
+                        className={cn(
+                          "aspect-[4/5] rounded-lg overflow-hidden border-2 transition-all",
+                          idx === safeVersionIdx
+                            ? "border-primary ring-2 ring-primary/30"
+                            : "border-muted opacity-70 hover:opacity-100"
+                        )}
+                        title={`Version ${idx + 1}${img.model ? ` (${IMAGE_MODELS[img.model as ImageModelKey]?.name || img.model})` : ''}`}
+                      >
+                        <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))
+                  ) : (
+                    <div className="col-span-3 py-8 text-center text-xs text-muted-foreground">
+                      No images generated yet
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Composite Tab */}
+            <TabsContent value="composite" className="flex-1 flex flex-col mt-0 space-y-3 overflow-y-auto">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Composite Settings</div>
+
+              {/* Design Preset */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Design Preset</label>
+                <select
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedDesignPreset}
+                  onChange={(e) => setSelectedDesignPreset(e.target.value)}
+                >
+                  <option value="dark-coral">Dark Coral</option>
+                  <option value="navy-gold">Navy Gold</option>
+                  <option value="light-minimal">Light Minimal</option>
+                  <option value="teal-cream">Teal Cream</option>
+                </select>
+              </div>
+
+              {/* Background Style */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Background Style</label>
+                <select
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedBackgroundStyle}
+                  onChange={(e) => setSelectedBackgroundStyle(e.target.value)}
+                >
+                  <option value="gradient-dark">Dark Gradient</option>
+                  <option value="gradient-warm">Warm Gradient</option>
+                  <option value="abstract-shapes">Abstract</option>
+                  <option value="bokeh-dark">Bokeh</option>
+                  <option value="minimal-solid">Solid</option>
+                </select>
+              </div>
+
+              {/* Generate Composite Button */}
+              <Button
+                className="w-full"
+                onClick={() => handleGenerateCompositeCarousel(item.id, slides)}
+                disabled={generatingCompositeCarousel === item.id}
+              >
+                {generatingCompositeCarousel === item.id ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Layers className="mr-2 h-4 w-4" />
+                    Generate Composite Carousel
+                  </>
+                )}
+              </Button>
+
+              <p className="text-xs text-muted-foreground">
+                Composite mode generates all slides with consistent text styling and design.
+              </p>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Center: Carousel */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Fanned card carousel */}
           <div className="relative flex-1 flex items-center justify-center overflow-hidden rounded-xl bg-muted/20">
             {/* Left Arrow */}
             <Button
               size="icon"
               variant="outline"
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-30 h-10 w-10 rounded-full bg-background/90 backdrop-blur shadow-lg"
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-30 h-10 w-10 rounded-full bg-background/90 backdrop-blur shadow-lg"
               onClick={() => setCurrentSlide(item.id, currentSlideIdx > 0 ? currentSlideIdx - 1 : slides.length - 1)}
             >
               <ChevronLeft className="h-5 w-5" />
@@ -702,7 +875,6 @@ export default function ContentPage() {
                 const isCurrent = idx === currentSlideIdx;
                 const offset = idx - currentSlideIdx;
 
-                // Calculate position - cards fan out from center with overlap
                 const translateX = offset * visibleCardWidth;
                 const scale = isCurrent ? 1 : 0.85;
                 const zIndex = isCurrent ? 20 : 10 - Math.abs(offset);
@@ -717,7 +889,7 @@ export default function ContentPage() {
                     )}
                     style={{
                       width: `${cardWidth}px`,
-                      height: `${cardWidth * 1.25}px`, // 4:5 aspect ratio
+                      height: `${cardWidth * 1.25}px`,
                       transform: `translateX(${translateX}px) scale(${scale})`,
                       zIndex,
                       opacity,
@@ -733,36 +905,31 @@ export default function ContentPage() {
                         />
                         <Badge
                           className={cn(
-                            "absolute top-3 right-3 border-0 text-sm",
+                            "absolute top-2 right-2 border-0",
                             isCurrent ? "bg-primary text-primary-foreground" : "bg-black/60 text-white"
                           )}
                         >
                           {idx + 1}
                         </Badge>
-                        {isCurrent && cardImage.model && (
-                          <div className="absolute top-3 left-3">
-                            {renderModelBadge(cardImage.model)}
-                          </div>
-                        )}
                         {isCurrent && (
                           <Button
                             size="sm"
                             variant="secondary"
-                            className="absolute bottom-3 right-3 bg-black/70 hover:bg-black/90 text-white border-0 h-8 w-8 p-0"
+                            className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-7 w-7 p-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDownloadImage(cardImage.url, item.platform, s.slideNumber);
                             }}
                           >
-                            <Download className="h-4 w-4" />
+                            <Download className="h-3.5 w-3.5" />
                           </Button>
                         )}
                       </div>
                     ) : (
                       <div className="w-full h-full bg-muted/80 flex items-center justify-center border-2 border-dashed border-muted-foreground/30">
                         <div className="text-center">
-                          <ImageIcon className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground font-medium">{idx + 1}</span>
+                          <ImageIcon className="h-8 w-8 mx-auto mb-1 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">{idx + 1}</span>
                         </div>
                       </div>
                     )}
@@ -775,116 +942,67 @@ export default function ContentPage() {
             <Button
               size="icon"
               variant="outline"
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-30 h-10 w-10 rounded-full bg-background/90 backdrop-blur shadow-lg"
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-30 h-10 w-10 rounded-full bg-background/90 backdrop-blur shadow-lg"
               onClick={() => setCurrentSlide(item.id, currentSlideIdx < slides.length - 1 ? currentSlideIdx + 1 : 0)}
             >
               <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
 
-          {/* Slide Text */}
-          <div className="mt-3 space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Slide Text</label>
-            <div className="rounded-lg bg-muted/30 p-2">
-              <p className="text-sm leading-relaxed">{slide.text}</p>
-            </div>
-          </div>
-
-          {/* Image Prompt */}
-          <div className="mt-2 space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Image Prompt</label>
-            <div className="flex gap-2">
-              <div className="flex-1 rounded-lg bg-muted/20 p-2 text-xs text-muted-foreground max-h-[50px] overflow-y-auto">
-                {slide.imagePrompt}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-shrink-0 h-auto"
-                onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
-                disabled={isGenerating}
-              >
-                {isGenerating ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
-                )}
-                Generate
-              </Button>
-            </div>
-          </div>
-
-          {/* Image Variants - thumbnail strip at bottom */}
-          <div className="mt-2 flex items-center gap-2 pt-2 border-t border-muted/30">
-            {/* Slide indicator */}
-            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-              {currentSlideIdx + 1}/{slides.length}
-            </span>
-
-            {/* Image variant thumbnails */}
-            <div className="flex items-center gap-1 flex-1 overflow-x-auto">
-              {slideImgs.length > 0 ? (
-                slideImgs.map((img, idx) => (
-                  <button
-                    key={img.id}
-                    onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
-                    className={cn(
-                      "flex-shrink-0 w-8 h-10 rounded overflow-hidden border-2 transition-all",
-                      idx === safeVersionIdx
-                        ? "border-primary ring-1 ring-primary/50"
-                        : "border-muted opacity-60 hover:opacity-100"
-                    )}
-                    title={`Version ${idx + 1}${img.model ? ` (${IMAGE_MODELS[img.model as ImageModelKey]?.name || img.model})` : ''}`}
-                  >
-                    <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
-                  </button>
-                ))
-              ) : (
-                <span className="text-xs text-muted-foreground">No images yet</span>
-              )}
-            </div>
-
-            {/* Slide navigation dots */}
-            <div className="flex items-center gap-1">
-              {slides.map((_, idx) => (
+          {/* Thumbnail strip */}
+          <div className="mt-3 flex items-center justify-center gap-2">
+            {slides.map((s, idx) => {
+              const thumbImage = getSlideImage(idx);
+              const isCurrent = idx === currentSlideIdx;
+              return (
                 <button
-                  key={idx}
+                  key={s.slideNumber}
                   onClick={() => setCurrentSlide(item.id, idx)}
                   className={cn(
-                    "w-2 h-2 rounded-full transition-all",
-                    idx === currentSlideIdx
-                      ? "bg-primary w-4"
-                      : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                    "w-16 h-20 rounded-lg overflow-hidden border-2 transition-all",
+                    isCurrent
+                      ? "border-primary ring-2 ring-primary/30 scale-105"
+                      : "border-muted opacity-60 hover:opacity-100"
                   )}
-                  title={`Slide ${idx + 1}`}
-                />
-              ))}
-            </div>
+                >
+                  {thumbImage ? (
+                    <img src={thumbImage.url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-muted/50 flex items-center justify-center">
+                      <span className="text-xs text-muted-foreground">{idx + 1}</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Draggable Divider */}
         <div
           className={cn(
-            "w-4 flex items-center justify-center cursor-col-resize group hover:bg-primary/10 transition-colors rounded",
+            "w-3 flex items-center justify-center cursor-col-resize group hover:bg-primary/10 transition-colors rounded",
             isDraggingDivider && "bg-primary/20"
           )}
           onMouseDown={() => setIsDraggingDivider(true)}
         >
           <div className={cn(
-            "w-1 h-16 rounded-full bg-muted-foreground/30 group-hover:bg-primary/50 transition-colors",
+            "w-1 h-12 rounded-full bg-muted-foreground/30 group-hover:bg-primary/50 transition-colors",
             isDraggingDivider && "bg-primary"
-          )}>
-            <GripVertical className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary -ml-1.5 mt-6" />
-          </div>
+          )} />
         </div>
 
-        {/* Right: Caption panel */}
+        {/* Right Panel: Caption */}
         <div
-          className="flex flex-col pl-2"
+          className="flex flex-col"
           style={{ width: `${captionPanelWidth}px` }}
         >
-          <label className="text-xs font-medium text-muted-foreground mb-2">Caption</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-muted-foreground">Caption</label>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="flex-1 rounded-lg bg-muted/20 p-4 overflow-y-auto">
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{item.copy_primary}</p>
             {item.copy_hashtags && item.copy_hashtags.length > 0 && (
