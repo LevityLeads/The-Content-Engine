@@ -71,28 +71,22 @@ export async function GET(request: Request) {
     }
 
     // Map to a consistent format
-    const accounts = lateAccounts.map((acc: {
-      id: string;
-      platform: string;
-      username?: string;
-      name?: string;
-      handle?: string;
-      screenName?: string;
-      profileImageUrl?: string;
-      profile_image_url?: string;
-      avatar?: string;
-      isActive?: boolean;
-      is_active?: boolean;
-    }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const accounts = lateAccounts.map((acc: any) => {
+      // Log raw account data to see what fields Late.dev returns
+      console.log("Raw Late.dev account:", JSON.stringify(acc));
+
+      // Try multiple possible field names for ID
+      const id = acc.id || acc.accountId || acc.account_id || acc._id;
       // Try multiple possible field names for username
-      const username = acc.username || acc.name || acc.handle || acc.screenName || acc.id;
+      const username = acc.username || acc.name || acc.handle || acc.screenName || id;
       // Try multiple possible field names for profile image
       const profileImageUrl = acc.profileImageUrl || acc.profile_image_url || acc.avatar;
 
-      console.log("Mapping account:", { original: acc, mapped: { id: acc.id, platform: acc.platform, username, profileImageUrl } });
+      console.log("Mapped account:", { id, platform: acc.platform, username, profileImageUrl });
 
       return {
-        id: acc.id,
+        id,
         platform: acc.platform,
         username,
         profileImageUrl,
