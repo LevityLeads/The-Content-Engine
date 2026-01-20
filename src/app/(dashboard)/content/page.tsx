@@ -44,12 +44,12 @@ interface Content {
   metadata: {
     imagePrompt?: string;
     carouselStyle?: string;
-  };
+  } | null;
   created_at: string;
   ideas?: {
     concept: string;
     angle: string;
-  };
+  } | null;
 }
 
 const formatRelativeTime = (dateString: string): string => {
@@ -1287,7 +1287,7 @@ export default function ContentPage() {
             </div>
             {item.metadata?.carouselStyle && (
               <div className="text-[9px] text-muted-foreground mt-0.5">
-                Current: {visualStyleOptions.find(s => s.id === item.metadata?.carouselStyle)?.label || item.metadata.carouselStyle}
+                Current: {visualStyleOptions.find(s => s.id === item.metadata?.carouselStyle)?.label || item.metadata?.carouselStyle}
               </div>
             )}
           </div>
@@ -1880,7 +1880,7 @@ export default function ContentPage() {
                         if (job.type === 'composite') {
                           handleGenerateCompositeCarousel(item.id, carouselSlides || []);
                         } else if (item.metadata?.imagePrompt) {
-                          handleGenerateImage(item.id, item.metadata.imagePrompt);
+                          handleGenerateImage(item.id, item.metadata?.imagePrompt || "");
                         }
                       }
                     }}
@@ -1989,7 +1989,7 @@ export default function ContentPage() {
                               if (job.type === 'composite') {
                                 handleGenerateCompositeCarousel(item.id, carouselSlides || []);
                               } else if (item.metadata?.imagePrompt) {
-                                handleGenerateImage(item.id, item.metadata.imagePrompt);
+                                handleGenerateImage(item.id, item.metadata?.imagePrompt || "");
                               }
                             }
                           }}
@@ -2171,20 +2171,20 @@ export default function ContentPage() {
                                 Image Prompt
                                 {!expandedPrompts.has(`single-${item.id}`) && (
                                   <span className="text-muted-foreground/60 truncate flex-1">
-                                    — {truncateText(item.metadata.imagePrompt, 50)}
+                                    — {truncateText(item.metadata?.imagePrompt || "", 50)}
                                   </span>
                                 )}
                               </button>
                               {expandedPrompts.has(`single-${item.id}`) && (
                                 <p className="text-xs text-muted-foreground leading-relaxed pl-5">
-                                  {item.metadata.imagePrompt}
+                                  {item.metadata?.imagePrompt}
                                 </p>
                               )}
                               <Button
                                 size="sm"
                                 variant="outline"
                                 className="w-full"
-                                onClick={() => handleGenerateImage(item.id, item.metadata.imagePrompt!)}
+                                onClick={() => handleGenerateImage(item.id, item.metadata?.imagePrompt || "")}
                                 disabled={generatingImage === item.id}
                               >
                                 {generatingImage === item.id ? (
