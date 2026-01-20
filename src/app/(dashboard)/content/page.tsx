@@ -43,7 +43,15 @@ interface Content {
   scheduled_for: string | null;
   metadata: {
     imagePrompt?: string;
-    carouselStyle?: string;
+    carouselStyle?: string | {
+      visualStyle?: string;
+      font?: string;
+      aesthetic?: string;
+      primaryColor?: string;
+      accentColor?: string;
+      textOverlayMethod?: string;
+      styleRationale?: string;
+    };
   } | null;
   created_at: string;
   ideas?: {
@@ -993,6 +1001,14 @@ export default function ContentPage() {
     setSelectedVersionIndex((prev) => ({ ...prev, [key]: index }));
   };
 
+  // Helper to extract visual style string from carouselStyle (which can be string or object)
+  const getCarouselStyleId = (carouselStyle: string | { visualStyle?: string } | null | undefined): string => {
+    if (!carouselStyle) return "typography";
+    if (typeof carouselStyle === "string") return carouselStyle;
+    if (typeof carouselStyle === "object" && carouselStyle.visualStyle) return carouselStyle.visualStyle;
+    return "typography";
+  };
+
   const truncateText = (text: string | null | undefined, maxLength: number) => {
     if (!text) return "";
     if (text.length <= maxLength) return text;
@@ -1261,7 +1277,7 @@ export default function ContentPage() {
             <div className="flex gap-1.5">
               <select
                 className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
-                value={selectedVisualStyle[item.id] || item.metadata?.carouselStyle || "typography"}
+                value={selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)}
                 onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
               >
                 {visualStyleOptions.map((style) => (
@@ -1275,7 +1291,7 @@ export default function ContentPage() {
                 onClick={() => handleRegenerateWithStyle(
                   item.id,
                   slides,
-                  selectedVisualStyle[item.id] || item.metadata?.carouselStyle || "typography"
+                  selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)
                 )}
                 disabled={isChangingStyle === item.id || generatingCompositeCarousel === item.id}
               >
@@ -1288,7 +1304,7 @@ export default function ContentPage() {
             </div>
             {item.metadata?.carouselStyle && (
               <div className="text-[9px] text-muted-foreground mt-0.5">
-                Current: {visualStyleOptions.find(s => s.id === item.metadata?.carouselStyle)?.label || item.metadata?.carouselStyle}
+                Current: {visualStyleOptions.find(s => s.id === getCarouselStyleId(item.metadata?.carouselStyle))?.label || getCarouselStyleId(item.metadata?.carouselStyle)}
               </div>
             )}
           </div>
