@@ -115,6 +115,7 @@ export default function ContentPage() {
   const [selectedTextStyle, setSelectedTextStyle] = useState<string>("bold-editorial");
   const [selectedTextColor, setSelectedTextColor] = useState<string>("white-coral");
   const [selectedBackgroundStyle, setSelectedBackgroundStyle] = useState<string>("gradient-dark");
+  const [generationMode, setGenerationMode] = useState<"ai-generation" | "composite">("ai-generation");
   const [captionPanelWidth, setCaptionPanelWidth] = useState<number>(320); // Default ~1/3 width
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
   const [publishingId, setPublishingId] = useState<string | null>(null);
@@ -908,7 +909,7 @@ export default function ContentPage() {
           </div>
 
           {/* AI Generation / Composite Tabs */}
-          <Tabs defaultValue="ai-generation" className="flex-1 flex flex-col">
+          <Tabs defaultValue="ai-generation" value={generationMode} onValueChange={(v) => setGenerationMode(v as "ai-generation" | "composite")} className="flex-1 flex flex-col">
             <TabsList className="w-full h-7 mb-2">
               <TabsTrigger value="ai-generation" className="flex-1 text-[10px] h-6">
                 <Sparkles className="h-3 w-3 mr-1" />
@@ -923,8 +924,14 @@ export default function ContentPage() {
             {/* Generate All Slides Button */}
             <Button
               className="w-full h-8 mb-3 bg-emerald-600 hover:bg-emerald-700"
-              onClick={() => handleGenerateAllSlides(item.id, slides)}
-              disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
+              onClick={() => {
+                if (generationMode === "composite") {
+                  handleGenerateCompositeCarousel(item.id, slides);
+                } else {
+                  handleGenerateAllSlides(item.id, slides);
+                }
+              }}
+              disabled={Object.keys(generatingSlides[item.id] || {}).length > 0 || generatingCompositeCarousel === item.id}
             >
               <ImageIcon className="mr-2 h-3.5 w-3.5" />
               <span className="text-xs">Generate all slides</span>
