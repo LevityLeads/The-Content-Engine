@@ -1,21 +1,161 @@
 "use client";
 
-import { Settings, Palette, Volume2, Link2, Bell } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { useBrand, VoiceConfig, VisualConfig } from "@/contexts/brand-context";
+import { StrictnessSlider } from "@/components/brand/strictness-slider";
 
 export default function SettingsPage() {
+  const { selectedBrand, updateBrand, isLoading: brandLoading } = useBrand();
+
+  // Form state
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>({});
+  const [visualConfig, setVisualConfig] = useState<VisualConfig>({});
+  const [newKeyword, setNewKeyword] = useState("");
+  const [newAvoidWord, setNewAvoidWord] = useState("");
+
+  // UI state
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Load brand data when selected brand changes
+  useEffect(() => {
+    if (selectedBrand) {
+      setName(selectedBrand.name);
+      setDescription(selectedBrand.description || "");
+      setVoiceConfig(selectedBrand.voice_config || {});
+      setVisualConfig(selectedBrand.visual_config || {});
+    }
+  }, [selectedBrand]);
+
+  const handleSave = async (section: "brand" | "voice" | "visual") => {
+    if (!selectedBrand) return;
+
+    setIsSaving(true);
+    setSaveMessage(null);
+
+    let updates = {};
+    switch (section) {
+      case "brand":
+        updates = { name, description };
+        break;
+      case "voice":
+        updates = { voice_config: voiceConfig };
+        break;
+      case "visual":
+        updates = { visual_config: visualConfig };
+        break;
+    }
+
+    const result = await updateBrand(selectedBrand.id, updates);
+
+    if (result) {
+      setSaveMessage({ type: "success", text: "Settings saved!" });
+    } else {
+      setSaveMessage({ type: "error", text: "Failed to save settings" });
+    }
+
+    setIsSaving(false);
+    setTimeout(() => setSaveMessage(null), 3000);
+  };
+
+  const addToneKeyword = () => {
+    if (newKeyword && !voiceConfig.tone_keywords?.includes(newKeyword)) {
+      setVoiceConfig({
+        ...voiceConfig,
+        tone_keywords: [...(voiceConfig.tone_keywords || []), newKeyword],
+      });
+      setNewKeyword("");
+    }
+  };
+
+  const removeToneKeyword = (keyword: string) => {
+    setVoiceConfig({
+      ...voiceConfig,
+      tone_keywords: voiceConfig.tone_keywords?.filter((k) => k !== keyword) || [],
+    });
+  };
+
+  const addAvoidWord = () => {
+    if (newAvoidWord && !voiceConfig.words_to_avoid?.includes(newAvoidWord)) {
+      setVoiceConfig({
+        ...voiceConfig,
+        words_to_avoid: [...(voiceConfig.words_to_avoid || []), newAvoidWord],
+      });
+      setNewAvoidWord("");
+    }
+  };
+
+  const removeAvoidWord = (word: string) => {
+    setVoiceConfig({
+      ...voiceConfig,
+      words_to_avoid: voiceConfig.words_to_avoid?.filter((w) => w !== word) || [],
+    });
+  };
+
+  if (brandLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!selectedBrand) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">
+            Configure your brand, voice, and connected accounts
+          </p>
+        </div>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-semibold">No Client Selected</h3>
+            <p className="text-sm text-muted-foreground">
+              Select a client from the sidebar or add a new one to configure settings.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
-          Configure your brand, voice, and connected accounts
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">
+            Configure {selectedBrand.name}&apos;s brand, voice, and connected accounts
+          </p>
+        </div>
+        {saveMessage && (
+          <div
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 ${
+              saveMessage.type === "success"
+                ? "bg-emerald-500/20 text-emerald-400"
+                : "bg-red-500/20 text-red-400"
+            }`}
+          >
+            {saveMessage.type === "success" ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <AlertCircle className="h-4 w-4" />
+            )}
+            {saveMessage.text}
+          </div>
+        )}
       </div>
 
       {/* Brand Settings */}
@@ -30,16 +170,30 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div>
             <label className="text-sm font-medium">Brand Name</label>
-            <Input defaultValue="My Brand" className="mt-1" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1"
+            />
           </div>
           <div>
             <label className="text-sm font-medium">Description</label>
             <Textarea
-              defaultValue="Default brand for content creation"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               className="mt-1"
             />
           </div>
-          <Button>Save Changes</Button>
+          {voiceConfig.source_url && (
+            <div>
+              <label className="text-sm font-medium">Source Website</label>
+              <p className="text-sm text-muted-foreground mt-1">{voiceConfig.source_url}</p>
+            </div>
+          )}
+          <Button onClick={() => handleSave("brand")} disabled={isSaving}>
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Save Changes
+          </Button>
         </CardContent>
       </Card>
 
@@ -55,33 +209,103 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Brand Strictness */}
+          <StrictnessSlider
+            value={voiceConfig.strictness ?? 0.7}
+            onChange={(value) => setVoiceConfig({ ...voiceConfig, strictness: value })}
+          />
+
           <div>
             <label className="text-sm font-medium">Tone Keywords</label>
             <p className="text-xs text-muted-foreground mb-2">
-              Words that describe your brand&apos;s voice
+              Words that describe your brand&apos;s voice (click to remove)
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Badge>professional</Badge>
-              <Badge>approachable</Badge>
-              <Badge>witty</Badge>
-              <Button variant="outline" size="sm">+ Add</Button>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {voiceConfig.tone_keywords?.map((keyword) => (
+                <Badge
+                  key={keyword}
+                  className="cursor-pointer hover:bg-destructive/20"
+                  onClick={() => removeToneKeyword(keyword)}
+                >
+                  {keyword}
+                  <span className="ml-1">×</span>
+                </Badge>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={newKeyword}
+                onChange={(e) => setNewKeyword(e.target.value)}
+                placeholder="Add keyword..."
+                className="flex-1"
+                onKeyDown={(e) => e.key === "Enter" && addToneKeyword()}
+              />
+              <Button variant="outline" size="sm" onClick={addToneKeyword}>
+                Add
+              </Button>
             </div>
           </div>
+
           <div>
             <label className="text-sm font-medium">Words to Avoid</label>
-            <Textarea
-              placeholder="Enter words your brand should never use, separated by commas..."
-              className="mt-1"
-            />
+            <p className="text-xs text-muted-foreground mb-2">
+              Words your brand should never use (click to remove)
+            </p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {voiceConfig.words_to_avoid?.map((word) => (
+                <Badge
+                  key={word}
+                  variant="destructive"
+                  className="cursor-pointer"
+                  onClick={() => removeAvoidWord(word)}
+                >
+                  {word}
+                  <span className="ml-1">×</span>
+                </Badge>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={newAvoidWord}
+                onChange={(e) => setNewAvoidWord(e.target.value)}
+                placeholder="Add word to avoid..."
+                className="flex-1"
+                onKeyDown={(e) => e.key === "Enter" && addAvoidWord()}
+              />
+              <Button variant="outline" size="sm" onClick={addAvoidWord}>
+                Add
+              </Button>
+            </div>
           </div>
+
+          {voiceConfig.extracted_voice?.writing_style && (
+            <div>
+              <label className="text-sm font-medium">Writing Style</label>
+              <p className="text-sm text-muted-foreground mt-1">
+                {voiceConfig.extracted_voice.writing_style}
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="text-sm font-medium">Example Posts (Good)</label>
             <Textarea
+              value={voiceConfig.example_posts?.join("\n\n") || ""}
+              onChange={(e) =>
+                setVoiceConfig({
+                  ...voiceConfig,
+                  example_posts: e.target.value.split("\n\n").filter(Boolean),
+                })
+              }
               placeholder="Paste examples of posts that represent your ideal voice..."
               className="mt-1"
+              rows={4}
             />
           </div>
-          <Button>Save Voice Settings</Button>
+          <Button onClick={() => handleSave("voice")} disabled={isSaving}>
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Save Voice Settings
+          </Button>
         </CardContent>
       </Card>
 
@@ -101,33 +325,98 @@ export default function SettingsPage() {
             <div>
               <label className="text-sm font-medium">Primary Color</label>
               <div className="mt-1 flex gap-2">
-                <Input type="color" defaultValue="#1a1a1a" className="h-10 w-14 p-1" />
-                <Input defaultValue="#1a1a1a" className="flex-1" />
+                <input
+                  type="color"
+                  value={visualConfig.primary_color || "#1a1a1a"}
+                  onChange={(e) =>
+                    setVisualConfig({ ...visualConfig, primary_color: e.target.value })
+                  }
+                  className="h-10 w-14 p-1 rounded cursor-pointer"
+                />
+                <Input
+                  value={visualConfig.primary_color || "#1a1a1a"}
+                  onChange={(e) =>
+                    setVisualConfig({ ...visualConfig, primary_color: e.target.value })
+                  }
+                  className="flex-1 font-mono"
+                />
               </div>
             </div>
             <div>
               <label className="text-sm font-medium">Accent Color</label>
               <div className="mt-1 flex gap-2">
-                <Input type="color" defaultValue="#3b82f6" className="h-10 w-14 p-1" />
-                <Input defaultValue="#3b82f6" className="flex-1" />
+                <input
+                  type="color"
+                  value={visualConfig.accent_color || "#3b82f6"}
+                  onChange={(e) =>
+                    setVisualConfig({ ...visualConfig, accent_color: e.target.value })
+                  }
+                  className="h-10 w-14 p-1 rounded cursor-pointer"
+                />
+                <Input
+                  value={visualConfig.accent_color || "#3b82f6"}
+                  onChange={(e) =>
+                    setVisualConfig({ ...visualConfig, accent_color: e.target.value })
+                  }
+                  className="flex-1 font-mono"
+                />
               </div>
             </div>
           </div>
+
+          {visualConfig.color_palette && visualConfig.color_palette.length > 0 && (
+            <div>
+              <label className="text-sm font-medium">Extracted Color Palette</label>
+              <div className="mt-2 flex gap-2">
+                {visualConfig.color_palette.map((color, i) => (
+                  <div key={i} className="text-center">
+                    <div
+                      className="h-10 w-10 rounded border"
+                      style={{ backgroundColor: color }}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">{color}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-sm font-medium">Image Style</label>
             <div className="mt-2 flex flex-wrap gap-2">
-              {["minimalist", "photorealistic", "illustrated", "3d", "abstract"].map((style) => (
+              {["minimalist", "photorealistic", "illustrated", "3d", "abstract", "bold", "elegant"].map((style) => (
                 <Badge
                   key={style}
-                  variant={style === "minimalist" ? "default" : "outline"}
+                  variant={visualConfig.image_style === style ? "default" : "outline"}
                   className="cursor-pointer capitalize"
+                  onClick={() => setVisualConfig({ ...visualConfig, image_style: style })}
                 >
                   {style}
                 </Badge>
               ))}
             </div>
           </div>
-          <Button>Save Visual Settings</Button>
+
+          {visualConfig.extracted_images && visualConfig.extracted_images.length > 0 && (
+            <div>
+              <label className="text-sm font-medium">Extracted Images</label>
+              <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+                {visualConfig.extracted_images.map((img, i) => (
+                  <img
+                    key={i}
+                    src={img}
+                    alt={`Sample ${i + 1}`}
+                    className="h-20 w-20 rounded-lg object-cover border"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Button onClick={() => handleSave("visual")} disabled={isSaving}>
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Save Visual Settings
+          </Button>
         </CardContent>
       </Card>
 
@@ -193,11 +482,11 @@ export default function SettingsPage() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span>Anthropic (Claude)</span>
-              <Badge variant="outline">Not configured</Badge>
+              <Badge variant="outline">Configured</Badge>
             </div>
             <div className="flex justify-between">
               <span>Google (Gemini)</span>
-              <Badge variant="outline">Not configured</Badge>
+              <Badge variant="outline">Configured</Badge>
             </div>
             <div className="flex justify-between">
               <span>Late.dev</span>
