@@ -16,6 +16,9 @@ import sharp from 'sharp';
 import {
   getSlideTemplate,
   PRESET_DESIGN_SYSTEMS,
+  TEXT_STYLE_PRESETS,
+  TEXT_COLOR_PRESETS,
+  buildDesignSystem,
   INSTAGRAM_CAROUSEL_DIMENSIONS,
   type CarouselDesignSystem,
   type SlideContent,
@@ -238,8 +241,10 @@ export async function POST(request: NextRequest) {
     const {
       contentId,
       slides,              // Array of { slideNumber, text, imagePrompt }
-      designPreset,        // 'dark-coral', 'navy-gold', etc. or full CarouselDesignSystem
-      backgroundStyle,     // 'gradient-dark', 'abstract-shapes', etc.
+      designPreset,        // Legacy: 'dark-coral', 'navy-gold', etc. or full CarouselDesignSystem
+      textStyle,           // New: 'bold-editorial', 'clean-modern', etc.
+      textColor,           // New: 'white-coral', 'white-teal', etc.
+      backgroundStyle,     // 'gradient-dark', 'abstract-shapes', 'photo-landscape', etc.
       backgroundImage,     // Or provide your own background URL/base64
       useNumberedSlides,   // If true, use numbered template for middle slides
       model: requestedModel,
@@ -265,12 +270,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolve design system
+    // Priority: 1) Full object, 2) textStyle+textColor combo, 3) legacy designPreset, 4) default
     let design: CarouselDesignSystem;
     if (typeof designPreset === 'object' && designPreset !== null) {
+      // Full design system object passed directly
       design = designPreset as CarouselDesignSystem;
+    } else if (textStyle && textColor) {
+      // New: Build from separate style and color presets
+      const stylePreset = TEXT_STYLE_PRESETS[textStyle] || TEXT_STYLE_PRESETS['bold-editorial'];
+      const colorPreset = TEXT_COLOR_PRESETS[textColor] || TEXT_COLOR_PRESETS['white-coral'];
+      design = buildDesignSystem(stylePreset, colorPreset);
     } else if (typeof designPreset === 'string' && PRESET_DESIGN_SYSTEMS[designPreset]) {
+      // Legacy: Use named preset
       design = PRESET_DESIGN_SYSTEMS[designPreset];
     } else {
+      // Default
       design = PRESET_DESIGN_SYSTEMS['dark-coral'];
     }
 
