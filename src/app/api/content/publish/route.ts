@@ -96,9 +96,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Filter out placeholder images (those without real URLs)
-    const validImages = (images || []).filter(
+    let validImages = (images || []).filter(
       (img) => img.url && !img.url.startsWith("placeholder:")
     );
+
+    // Sort carousel images by slide number (extracted from prompt like "[Slide 1]")
+    validImages = validImages.sort((a, b) => {
+      const aMatch = a.prompt?.match(/\[Slide (\d+)\]/);
+      const bMatch = b.prompt?.match(/\[Slide (\d+)\]/);
+      const aNum = aMatch ? parseInt(aMatch[1], 10) : 999;
+      const bNum = bMatch ? parseInt(bMatch[1], 10) : 999;
+      return aNum - bNum;
+    });
 
     // Build the caption text
     let caption = content.copy_primary || "";
@@ -316,8 +325,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Clean up uploaded images from storage after successful publish
-    // (to keep storage usage minimal)
-    if (uploadedUrls.length > 0) {
+    // Only clean up for immediate posts - scheduled posts need images until publish time
+    if (uploadedUrls.length > 0 && !scheduledFor) {
       const { error: deleteError } = await adminClient.storage
         .from("images")
         .remove(uploadedUrls);
@@ -328,6 +337,9 @@ export async function POST(request: NextRequest) {
       } else {
         console.log(`Cleaned up ${uploadedUrls.length} temporary images from storage`);
       }
+    } else if (uploadedUrls.length > 0 && scheduledFor) {
+      console.log(`Keeping ${uploadedUrls.length} images in storage for scheduled post`);
+      // TODO: Set up a cleanup job to delete after scheduled publish time
     }
 
     return NextResponse.json({
