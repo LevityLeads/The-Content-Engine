@@ -2034,7 +2034,7 @@ export default function ContentPage() {
                                     const slideNum = carouselSlides[currentSlide]?.slideNumber || 1;
                                     const slideImgs = getSlideImages(item.id, slideNum);
                                     const versionIdx = getVersionIndex(item.id, slideNum);
-                                    const safeVersionIdx = Math.min(versionIdx, slideImgs.length - 1);
+                                    const safeVersionIdx = slideImgs.length > 0 ? Math.min(versionIdx, slideImgs.length - 1) : 0;
                                     if (slideImgs.length > 0 && slideImgs[safeVersionIdx]) {
                                       return (
                                         <>
@@ -2119,7 +2119,8 @@ export default function ContentPage() {
                                 {carouselSlides.map((slide, idx) => {
                                   const slideImgs = getSlideImages(item.id, slide.slideNumber);
                                   const versionIdx = getVersionIndex(item.id, slide.slideNumber);
-                                  const displayImg = slideImgs[Math.min(versionIdx, slideImgs.length - 1)];
+                                  const safeIdx = slideImgs.length > 0 ? Math.min(versionIdx, slideImgs.length - 1) : -1;
+                                  const displayImg = safeIdx >= 0 ? slideImgs[safeIdx] : undefined;
                                   const hasImage = slideImgs.length > 0;
                                   return (
                                     <button
