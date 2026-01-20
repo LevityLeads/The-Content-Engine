@@ -31,7 +31,8 @@ interface GenerationStatusProps {
  * Extract slide statuses from job metadata
  */
 function getSlideStatuses(job: GenerationJob): SlideStatus[] | null {
-  if (job.type !== 'composite' || !job.metadata) return null;
+  if (job.type !== 'composite' && job.type !== 'carousel') return null;
+  if (!job.metadata) return null;
   const metadata = job.metadata as Record<string, unknown>;
   const statuses = metadata.slideStatuses as SlideStatus[] | undefined;
   return statuses || null;
