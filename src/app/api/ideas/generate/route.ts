@@ -23,7 +23,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
     const body = await request.json();
-    const { inputId } = body;
+    const { inputId, ideaCount = 4 } = body;
+
+    // Validate ideaCount (min 1, max 10)
+    const validatedIdeaCount = Math.min(Math.max(parseInt(ideaCount) || 4, 1), 10);
 
     if (!inputId) {
       return NextResponse.json(
@@ -74,7 +77,9 @@ export async function POST(request: NextRequest) {
     const userPrompt = buildIdeationUserPrompt(
       contentForPrompt + truncationNote,
       inputData.type,
-      brandVoicePrompt
+      brandVoicePrompt,
+      undefined, // additionalContext
+      validatedIdeaCount
     );
 
     // Call Claude Opus 4.5

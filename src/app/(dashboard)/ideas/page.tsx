@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Clock, Palette, Type, Camera, PenTool, Box, Shapes, Layers, Wand2, ChevronDown, ChevronRight, Square, CheckSquare, Trash2, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Clock, Palette, Type, Camera, PenTool, Box, Shapes, Layers, Wand2, ChevronDown, ChevronRight, Square, CheckSquare, Trash2, AlertCircle, CheckCircle2, XCircle, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -66,8 +66,8 @@ const platformConfig: Record<string, { icon: React.ReactNode; label: string; col
   },
 };
 
-// Visual style configuration for the style selector
-type StyleOption = VisualStyle | "auto";
+// Visual style configuration for the style selector (includes experimental)
+type StyleOption = VisualStyle | "auto" | "experimental";
 const visualStyleConfig: Record<StyleOption, { icon: React.ReactNode; label: string; description: string; color: string; activeColor: string }> = {
   auto: {
     icon: <Wand2 className="h-4 w-4" />,
@@ -118,9 +118,16 @@ const visualStyleConfig: Record<StyleOption, { icon: React.ReactNode; label: str
     color: "border-amber-500/30 text-amber-400",
     activeColor: "bg-amber-600 text-white border-amber-600",
   },
+  experimental: {
+    icon: <Zap className="h-4 w-4" />,
+    label: "Experimental",
+    description: "Wild & boundary-pushing",
+    color: "border-fuchsia-500/30 text-fuchsia-400",
+    activeColor: "bg-gradient-to-r from-fuchsia-600 via-pink-500 to-orange-500 text-white border-transparent",
+  },
 };
 
-const STYLE_OPTIONS: StyleOption[] = ["auto", "typography", "photorealistic", "illustration", "3d-render", "abstract-art", "collage"];
+const STYLE_OPTIONS: StyleOption[] = ["auto", "typography", "photorealistic", "illustration", "3d-render", "abstract-art", "collage", "experimental"];
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",

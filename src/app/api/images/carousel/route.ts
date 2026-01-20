@@ -272,11 +272,27 @@ export async function POST(request: NextRequest) {
       designPreset,        // Legacy: 'dark-coral', 'navy-gold', etc. or full CarouselDesignSystem
       textStyle,           // New: 'bold-editorial', 'clean-modern', etc.
       textColor,           // New: 'white-coral', 'white-teal', etc.
-      backgroundStyle,     // 'gradient-dark', 'abstract-shapes', 'photo-landscape', etc.
+      backgroundStyle: requestedBgStyle,     // 'gradient-dark', 'abstract-shapes', 'photo-landscape', etc.
+      visualStyle,         // Visual style override: 'typography', 'photorealistic', 'illustration', '3d-render', 'abstract-art', 'collage', 'experimental'
       backgroundImage,     // Or provide your own background URL/base64
       useNumberedSlides,   // If true, use numbered template for middle slides
       model: requestedModel,
+      jobId: providedJobId, // Allow passing existing job ID for tracking
     } = body;
+
+    // Map visual styles to default background styles
+    const VISUAL_STYLE_TO_BACKGROUND: Record<string, string> = {
+      'typography': 'gradient-dark',
+      'photorealistic': 'photo-landscape',
+      'illustration': 'illust-flat',
+      '3d-render': '3d-geometric',
+      'abstract-art': 'art-expressive',
+      'collage': 'collage-modern',
+      'experimental': 'art-expressive', // Use expressive art for experimental
+    };
+
+    // Resolve background style: explicit > visualStyle mapping > default
+    const backgroundStyle = requestedBgStyle || (visualStyle ? VISUAL_STYLE_TO_BACKGROUND[visualStyle] : undefined);
 
     // Validate
     if (!contentId) {
@@ -306,33 +322,45 @@ export async function POST(request: NextRequest) {
       status: 'pending' as const,
     }));
 
-    // Create a generation job
-    const { data: job, error: jobError } = await supabase
-      .from('generation_jobs')
-      .insert({
-        content_id: contentId,
-        type: 'composite',
+    // Use provided job ID or create a new generation job
+    if (providedJobId && typeof providedJobId === 'string') {
+      // Use existing job and update it
+      jobId = providedJobId;
+      await updateJobStatus(supabase, providedJobId, {
         status: 'generating',
         progress: 0,
-        total_items: totalSlides,
-        completed_items: 0,
-        current_step: 'Initializing',
-        metadata: {
-          backgroundStyle,
-          textStyle,
-          textColor,
-          slideCount: totalSlides,
-          slideStatuses: initialSlideStatuses,
-        },
-      })
-      .select()
-      .single();
-
-    if (jobError) {
-      console.error('Error creating job:', jobError);
-      // Continue without job tracking if it fails
+        currentStep: 'Initializing',
+      });
     } else {
-      jobId = job.id;
+      // Create a new generation job
+      const { data: job, error: jobError } = await supabase
+        .from('generation_jobs')
+        .insert({
+          content_id: contentId,
+          type: 'composite',
+          status: 'generating',
+          progress: 0,
+          total_items: totalSlides,
+          completed_items: 0,
+          current_step: 'Initializing',
+          metadata: {
+            backgroundStyle,
+            textStyle,
+            textColor,
+            visualStyle,
+            slideCount: totalSlides,
+            slideStatuses: initialSlideStatuses,
+          },
+        })
+        .select()
+        .single();
+
+      if (jobError) {
+        console.error('Error creating job:', jobError);
+        // Continue without job tracking if it fails
+      } else {
+        jobId = job.id;
+      }
     }
 
     // Helper to update individual slide status in metadata
