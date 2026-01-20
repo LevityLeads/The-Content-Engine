@@ -21,12 +21,19 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log("Link endpoint received body:", JSON.stringify(body, null, 2));
+
     const { brandId, lateAccountId, platform, username, profileImageUrl } = body;
 
     // Validate required fields
     if (!brandId || !lateAccountId || !platform || !username) {
+      console.log("Validation failed:", { brandId, lateAccountId, platform, username });
       return NextResponse.json(
-        { success: false, error: "brandId, lateAccountId, platform, and username are required" },
+        {
+          success: false,
+          error: "brandId, lateAccountId, platform, and username are required",
+          received: { brandId, lateAccountId, platform, username }
+        },
         { status: 400 }
       );
     }
