@@ -170,7 +170,7 @@ CRITICAL OUTPUT REQUIREMENTS:
       generationMessage = "No image generation API configured. Add GOOGLE_API_KEY for Nano Banana Pro image generation.";
     }
 
-    // Save image record to database with platform-specific dimensions and model info
+    // Save image record to database with platform-specific dimensions
     const { data: savedImage, error: saveError } = await supabase
       .from("images")
       .insert({
@@ -183,8 +183,8 @@ CRITICAL OUTPUT REQUIREMENTS:
           width: imageConfig.width,
           height: imageConfig.height,
           aspectRatio: imageConfig.aspectRatio,
+          model: modelKey, // Store model info in dimensions JSON
         },
-        model: modelKey,
       })
       .select()
       .single();
