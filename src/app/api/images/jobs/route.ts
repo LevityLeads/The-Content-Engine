@@ -163,6 +163,7 @@ export async function PATCH(request: NextRequest) {
       errorMessage,
       errorCode,
       errorDetails,
+      metadata,
     } = body;
 
     if (!jobId) {
@@ -178,6 +179,7 @@ export async function PATCH(request: NextRequest) {
     if (errorMessage !== undefined) updates.error_message = errorMessage;
     if (errorCode !== undefined) updates.error_code = errorCode;
     if (errorDetails !== undefined) updates.error_details = errorDetails;
+    if (metadata !== undefined) updates.metadata = metadata;
 
     const { data: job, error } = await supabase
       .from('generation_jobs')
