@@ -84,11 +84,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch associated images
-    const { data: images, error: imagesError } = await supabase
+    // For carousels, we only want the composite images (selected slides), not style variants
+    // Composite images have model: 'composite', while AI variants have other model names
+    // First try to get composite images (for carousels)
+    let { data: images, error: imagesError } = await supabase
       .from("images")
       .select("*")
       .eq("content_id", contentId)
+      .eq("model", "composite") // Only get composite/selected carousel images
       .order("created_at", { ascending: true });
+
+    // If no composite images found, fall back to all images (for single-image posts)
+    if ((!images || images.length === 0) && !imagesError) {
+      const fallbackResult = await supabase
+        .from("images")
+        .select("*")
+        .eq("content_id", contentId)
+        .order("created_at", { ascending: true });
+
+      images = fallbackResult.data;
+      imagesError = fallbackResult.error;
+
+      if (images && images.length > 0) {
+        console.log(`No composite images found, using ${images.length} regular image(s)`);
+      }
+    } else if (images && images.length > 0) {
+      console.log(`Found ${images.length} composite carousel image(s)`);
+    }
 
     if (imagesError) {
       console.error("Error fetching images:", imagesError);
