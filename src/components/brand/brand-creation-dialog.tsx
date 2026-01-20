@@ -70,6 +70,8 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
   const [editedToneKeywords, setEditedToneKeywords] = useState<string[]>([]);
   const [editedPrimaryColor, setEditedPrimaryColor] = useState("");
   const [editedAccentColor, setEditedAccentColor] = useState("");
+  const [editedHeadingFont, setEditedHeadingFont] = useState("");
+  const [editedBodyFont, setEditedBodyFont] = useState("");
 
   const resetDialog = () => {
     setStep("input");
@@ -82,6 +84,8 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
     setEditedToneKeywords([]);
     setEditedPrimaryColor("");
     setEditedAccentColor("");
+    setEditedHeadingFont("");
+    setEditedBodyFont("");
   };
 
   const handleClose = () => {
@@ -114,6 +118,8 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
           setEditedToneKeywords(data.analysis.voice.tone_keywords || []);
           setEditedPrimaryColor(data.analysis.visual.primary_color || "#1a1a1a");
           setEditedAccentColor(data.analysis.visual.accent_color || "#3b82f6");
+          setEditedHeadingFont(data.analysis.visual.fonts?.heading || "");
+          setEditedBodyFont(data.analysis.visual.fonts?.body || "");
           setStep("preview");
         } else {
           setError(data.error || "Failed to analyze website");
@@ -175,10 +181,10 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
       image_style: analysis.visual.image_style,
       color_palette: analysis.visual.color_palette,
       extracted_images: analysis.visual.sample_images,
-      // Include detected fonts for use in content generation
-      fonts: analysis.visual.fonts ? {
-        heading: analysis.visual.fonts.heading,
-        body: analysis.visual.fonts.body,
+      // Include fonts (user-edited or detected) for use in content generation
+      fonts: (editedHeadingFont || editedBodyFont) ? {
+        heading: editedHeadingFont,
+        body: editedBodyFont,
       } : undefined,
     };
 
@@ -430,6 +436,38 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Brand Fonts */}
+            <div className="space-y-3">
+              <span className="text-sm font-medium">Brand Fonts</span>
+              {!editedHeadingFont && !editedBodyFont && (
+                <div className="p-3 rounded-lg border border-amber-500/50 bg-amber-500/10">
+                  <p className="text-xs text-amber-200">
+                    Fonts couldn&apos;t be automatically detected. Enter your brand fonts below for best carousel results.
+                  </p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Heading Font</label>
+                  <Input
+                    placeholder="e.g. Poppins, Montserrat"
+                    value={editedHeadingFont}
+                    onChange={(e) => setEditedHeadingFont(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Body Font</label>
+                  <Input
+                    placeholder="e.g. Open Sans, Roboto"
+                    value={editedBodyFont}
+                    onChange={(e) => setEditedBodyFont(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Strictness Slider */}
