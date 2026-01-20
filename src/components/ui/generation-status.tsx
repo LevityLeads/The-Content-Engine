@@ -1,11 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, AlertCircle, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, RefreshCw, XCircle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "./badge";
 import { Button } from "./button";
 import type { GenerationJob } from "@/hooks/use-generation-jobs";
+
+interface SlideStatus {
+  slideNumber: number;
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  error?: string;
+}
 
 interface GenerationStatusProps {
   job: GenerationJob | null;
@@ -21,6 +27,91 @@ interface GenerationStatusProps {
   className?: string;
 }
 
+/**
+ * Extract slide statuses from job metadata
+ */
+function getSlideStatuses(job: GenerationJob): SlideStatus[] | null {
+  if (job.type !== 'composite' || !job.metadata) return null;
+  const metadata = job.metadata as Record<string, unknown>;
+  const statuses = metadata.slideStatuses as SlideStatus[] | undefined;
+  return statuses || null;
+}
+
+/**
+ * Mini progress indicator for a single slide
+ */
+function SlideProgressIndicator({
+  slide,
+  index,
+}: {
+  slide: SlideStatus;
+  index: number;
+}) {
+  const statusColors = {
+    pending: 'bg-muted-foreground/30',
+    generating: 'bg-blue-500 animate-pulse',
+    completed: 'bg-emerald-500',
+    failed: 'bg-red-500',
+  };
+
+  const statusIcons = {
+    pending: null,
+    generating: <Loader2 className="h-2.5 w-2.5 animate-spin text-white" />,
+    completed: <Check className="h-2.5 w-2.5 text-white" />,
+    failed: <XCircle className="h-2.5 w-2.5 text-white" />,
+  };
+
+  return (
+    <div
+      className="flex flex-col items-center gap-0.5"
+      title={`Slide ${slide.slideNumber}: ${slide.status}${slide.error ? ` - ${slide.error}` : ''}`}
+    >
+      <div
+        className={cn(
+          "h-6 w-6 rounded flex items-center justify-center transition-colors",
+          statusColors[slide.status]
+        )}
+      >
+        {statusIcons[slide.status] || (
+          <span className="text-[9px] font-medium text-white/70">{slide.slideNumber}</span>
+        )}
+      </div>
+      <span className="text-[9px] text-muted-foreground">{slide.slideNumber}</span>
+    </div>
+  );
+}
+
+/**
+ * Carousel progress with individual slide indicators
+ */
+function CarouselProgress({
+  slideStatuses,
+  className,
+}: {
+  slideStatuses: SlideStatus[];
+  className?: string;
+}) {
+  const completed = slideStatuses.filter(s => s.status === 'completed').length;
+  const failed = slideStatuses.filter(s => s.status === 'failed').length;
+  const total = slideStatuses.length;
+
+  return (
+    <div className={cn("space-y-2", className)}>
+      {/* Mini slide indicators */}
+      <div className="flex gap-1.5 flex-wrap">
+        {slideStatuses.map((slide, index) => (
+          <SlideProgressIndicator key={slide.slideNumber} slide={slide} index={index} />
+        ))}
+      </div>
+      {/* Summary text */}
+      <p className="text-xs text-muted-foreground">
+        {completed}/{total} slides completed
+        {failed > 0 && <span className="text-red-400"> ({failed} failed)</span>}
+      </p>
+    </div>
+  );
+}
+
 export function GenerationStatus({
   job,
   compact = false,
@@ -34,10 +125,53 @@ export function GenerationStatus({
   if (!job) return null;
 
   const { status, progress, current_step, error_message, error_code, total_items, completed_items } = job;
+  const slideStatuses = getSlideStatuses(job);
+  const isCarousel = slideStatuses && slideStatuses.length > 1;
 
   // Compact badge for collapsed view
   if (compact) {
     if (status === "generating" || status === "pending") {
+      // For carousel, show mini indicators inline
+      if (isCarousel) {
+        const completed = slideStatuses.filter(s => s.status === 'completed').length;
+        const generating = slideStatuses.find(s => s.status === 'generating');
+        const tooltipText = generating
+          ? `Generating slide ${generating.slideNumber}/${total_items}`
+          : `${completed}/${total_items} slides`;
+
+        return (
+          <div
+            className={cn("flex items-center gap-1", className)}
+            title={tooltipText}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {slideStatuses.map((slide) => (
+              <div
+                key={slide.slideNumber}
+                className={cn(
+                  "h-4 w-4 rounded-sm flex items-center justify-center text-[8px] font-medium transition-all",
+                  slide.status === 'pending' && "bg-muted-foreground/20 text-muted-foreground",
+                  slide.status === 'generating' && "bg-blue-500 text-white animate-pulse",
+                  slide.status === 'completed' && "bg-emerald-500 text-white",
+                  slide.status === 'failed' && "bg-red-500 text-white"
+                )}
+              >
+                {slide.status === 'completed' ? (
+                  <Check className="h-2.5 w-2.5" />
+                ) : slide.status === 'generating' ? (
+                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                ) : slide.status === 'failed' ? (
+                  <XCircle className="h-2.5 w-2.5" />
+                ) : (
+                  slide.slideNumber
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      // Single image - show badge
       const tooltipText = current_step
         ? `${current_step}${total_items > 1 ? ` (${completed_items}/${total_items} slides)` : ""}`
         : "Generating...";
@@ -87,10 +221,10 @@ export function GenerationStatus({
   if (status === "generating" || status === "pending") {
     return (
       <div className={cn("rounded-lg border bg-blue-500/10 border-blue-500/30 p-3", className)}>
-        <div className="flex items-center gap-3">
-          <Loader2 className="h-5 w-5 text-blue-400 animate-spin flex-shrink-0" />
+        <div className="flex items-start gap-3">
+          <Loader2 className="h-5 w-5 text-blue-400 animate-spin flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-blue-400">
                 Generating...
               </span>
@@ -98,22 +232,31 @@ export function GenerationStatus({
                 {progress}%
               </span>
             </div>
-            {showProgress && (
-              <div className="h-1.5 bg-blue-500/20 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
+
+            {/* Show carousel slide indicators if available */}
+            {isCarousel ? (
+              <CarouselProgress slideStatuses={slideStatuses} />
+            ) : (
+              <>
+                {showProgress && (
+                  <div className="h-1.5 bg-blue-500/20 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                )}
+                {total_items > 1 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {completed_items}/{total_items} items completed
+                  </p>
+                )}
+              </>
             )}
+
             {current_step && (
-              <p className="text-xs text-muted-foreground mt-1 truncate">
+              <p className="text-xs text-muted-foreground mt-1.5 truncate">
                 {current_step}
-              </p>
-            )}
-            {total_items > 1 && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {completed_items}/{total_items} slides completed
               </p>
             )}
           </div>
@@ -136,9 +279,17 @@ export function GenerationStatus({
                 <p className="text-xs text-muted-foreground mt-1">
                   {error_message || "An error occurred during generation"}
                 </p>
+
+                {/* Show which slides failed if carousel */}
+                {isCarousel && (
+                  <div className="mt-2">
+                    <CarouselProgress slideStatuses={slideStatuses} />
+                  </div>
+                )}
+
                 {error_code && (
                   <button
-                    className="text-xs text-muted-foreground/70 mt-0.5 hover:text-muted-foreground underline"
+                    className="text-xs text-muted-foreground/70 mt-1 hover:text-muted-foreground underline"
                     onClick={() => setShowDetails(!showDetails)}
                   >
                     {showDetails ? "Hide details" : `Error code: ${error_code}`}
@@ -187,8 +338,8 @@ export function GenerationStatus({
     if (hasPartialError) {
       return (
         <div className={cn("rounded-lg border bg-yellow-500/10 border-yellow-500/30 p-3", className)}>
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 text-yellow-400 flex-shrink-0" />
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-medium text-yellow-400">
                 Completed with warnings
@@ -196,6 +347,13 @@ export function GenerationStatus({
               <p className="text-xs text-muted-foreground mt-1">
                 {job.error_message}
               </p>
+
+              {/* Show slide statuses if carousel */}
+              {isCarousel && (
+                <div className="mt-2">
+                  <CarouselProgress slideStatuses={slideStatuses} />
+                </div>
+              )}
             </div>
             {onDismiss && (
               <Button

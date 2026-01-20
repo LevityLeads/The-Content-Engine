@@ -299,6 +299,13 @@ export async function POST(request: NextRequest) {
 
     const totalSlides = slides.length;
 
+    // Initialize per-slide status tracking
+    // Each slide has: status ('pending' | 'generating' | 'completed' | 'failed'), error?
+    const initialSlideStatuses = slides.map((slide: { slideNumber: number }) => ({
+      slideNumber: slide.slideNumber,
+      status: 'pending' as const,
+    }));
+
     // Create a generation job
     const { data: job, error: jobError } = await supabase
       .from('generation_jobs')
@@ -315,6 +322,7 @@ export async function POST(request: NextRequest) {
           textStyle,
           textColor,
           slideCount: totalSlides,
+          slideStatuses: initialSlideStatuses,
         },
       })
       .select()
@@ -326,6 +334,39 @@ export async function POST(request: NextRequest) {
     } else {
       jobId = job.id;
     }
+
+    // Helper to update individual slide status in metadata
+    const updateSlideStatus = async (
+      slideNumber: number,
+      slideStatus: 'pending' | 'generating' | 'completed' | 'failed',
+      error?: string
+    ) => {
+      if (!jobId) return;
+
+      // Get current metadata
+      const { data: currentJob } = await supabase
+        .from('generation_jobs')
+        .select('metadata')
+        .eq('id', jobId)
+        .single();
+
+      if (currentJob?.metadata) {
+        const metadata = currentJob.metadata as Record<string, unknown>;
+        const slideStatuses = (metadata.slideStatuses as Array<{ slideNumber: number; status: string; error?: string }>) || [];
+
+        // Update the specific slide status
+        const updatedStatuses = slideStatuses.map(s =>
+          s.slideNumber === slideNumber
+            ? { ...s, status: slideStatus, ...(error ? { error } : {}) }
+            : s
+        );
+
+        await supabase
+          .from('generation_jobs')
+          .update({ metadata: { ...metadata, slideStatuses: updatedStatuses } })
+          .eq('id', jobId);
+      }
+    };
 
     // Resolve design system
     // Priority: 1) Full object, 2) textStyle+textColor combo, 3) legacy designPreset, 4) default
@@ -425,6 +466,9 @@ export async function POST(request: NextRequest) {
       const slideIndex = slide.slideNumber - 1;
       const templateType = getTemplateTypeForSlide(slideIndex, totalSlides, useNumberedSlides);
 
+      // Mark this slide as generating
+      await updateSlideStatus(slide.slideNumber, 'generating');
+
       // Update progress (10% for setup + 80% for slides + 10% for saving)
       const slideProgress = 10 + Math.round((i / totalSlides) * 80);
       if (jobId) {
@@ -474,6 +518,10 @@ export async function POST(request: NextRequest) {
         if (saveError) {
           console.error(`Error saving slide ${slide.slideNumber}:`, saveError);
           slideErrors.push({ slideNumber: slide.slideNumber, error: `Database save failed: ${saveError.message}` });
+          await updateSlideStatus(slide.slideNumber, 'failed', `Database save failed: ${saveError.message}`);
+        } else {
+          // Mark slide as completed
+          await updateSlideStatus(slide.slideNumber, 'completed');
         }
 
         generatedImages.push({
@@ -487,10 +535,12 @@ export async function POST(request: NextRequest) {
         });
       } catch (slideError) {
         console.error(`Error compositing slide ${slide.slideNumber}:`, slideError);
+        const errorMsg = slideError instanceof Error ? slideError.message : String(slideError);
         slideErrors.push({
           slideNumber: slide.slideNumber,
-          error: slideError instanceof Error ? slideError.message : String(slideError),
+          error: errorMsg,
         });
+        await updateSlideStatus(slide.slideNumber, 'failed', errorMsg);
       }
     }
 
