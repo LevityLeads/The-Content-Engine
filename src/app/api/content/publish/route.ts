@@ -36,13 +36,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fallback platform account IDs from environment (for backwards compatibility)
-    const fallbackAccountIds: Record<string, string | undefined> = {
-      instagram: process.env.LATE_INSTAGRAM_ACCOUNT_ID || process.env.LATE_INSTAGRAM_ACCOUNT_OCD_ID,
-      twitter: process.env.LATE_TWITTER_ACCOUNT_ID,
-      linkedin: process.env.LATE_LINKEDIN_ACCOUNT_ID,
-    };
-
     const supabase = await createClient();
     const adminClient = createAdminClient(); // For storage operations (bypasses RLS)
     const body = await request.json();
@@ -231,44 +224,47 @@ export async function POST(request: NextRequest) {
     }
 
     // Get account ID for this platform from social_accounts table
-    // First, try to find a connected account for this brand and platform
-    let accountId: string | undefined;
+    // Each client must have their own connected account - no fallback to shared accounts
+
+    if (!content.brand_id) {
+      console.error("Content has no brand_id - cannot determine which account to use");
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This content is not associated with a client. Please regenerate the content with a client selected.",
+        },
+        { status: 400 }
+      );
+    }
 
     const { data: socialAccount, error: socialError } = await supabase
       .from("social_accounts")
-      .select("late_account_id")
+      .select("late_account_id, platform_username")
       .eq("brand_id", content.brand_id)
       .eq("platform", content.platform)
       .eq("is_active", true)
       .single();
 
-    if (socialAccount?.late_account_id) {
-      accountId = socialAccount.late_account_id;
-      console.log(`Using connected account for ${content.platform}: ${accountId}`);
-    } else {
-      // Fall back to environment variable for backwards compatibility
-      accountId = fallbackAccountIds[content.platform];
-      if (accountId) {
-        console.log(`Using fallback env account for ${content.platform}: ${accountId}`);
-      }
-    }
-
-    if (!accountId) {
+    if (socialError || !socialAccount?.late_account_id) {
+      console.log(`No connected ${content.platform} account found for brand ${content.brand_id}`);
       return NextResponse.json(
         {
           success: false,
-          error: `No ${content.platform} account connected for this client. Please connect an account in Settings.`,
+          error: `No ${content.platform} account connected for this client. Go to Settings → Connected Accounts and sync your Late.dev accounts.`,
         },
         { status: 400 }
       );
     }
+
+    const accountId = socialAccount.late_account_id;
+    console.log(`Publishing to ${content.platform} account: ${socialAccount.platform_username || accountId} (brand: ${content.brand_id})`);
 
     // Build the Late.dev request with correct format
     const lateRequest: CreatePostRequest = {
       platforms: [
         {
           platform: content.platform as LatePlatform,
-          accountId: accountId,
+          accountId,
         },
       ],
       content: caption.trim(),
