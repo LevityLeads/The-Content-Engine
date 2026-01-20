@@ -103,6 +103,10 @@ export default function ContentPage() {
   const [scheduledDateTime, setScheduledDateTime] = useState<string>("");
   const [isScheduling, setIsScheduling] = useState(false);
   const [publishMessage, setPublishMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // Slide text editing state
+  const [editingSlideText, setEditingSlideText] = useState<{ contentId: string; slideNumber: number } | null>(null);
+  const [editedSlideText, setEditedSlideText] = useState<string>("");
+  const [savingSlideText, setSavingSlideText] = useState(false);
 
   useEffect(() => {
     fetchContent();
@@ -335,6 +339,46 @@ export default function ContentPage() {
       }
     } catch (err) {
       console.error("Error updating content:", err);
+    }
+  };
+
+  // Save edited slide text
+  const handleSaveSlideText = async (contentId: string, slideNumber: number, newText: string) => {
+    setSavingSlideText(true);
+    try {
+      // Find the content item
+      const contentItem = content.find((c) => c.id === contentId);
+      if (!contentItem || !contentItem.copy_carousel_slides) return;
+
+      // Update the specific slide's text
+      const updatedSlides = contentItem.copy_carousel_slides.map((slideData, idx) => {
+        // Parse if it's a JSON string
+        const slide = typeof slideData === 'string' ? JSON.parse(slideData) : slideData;
+        if (slide.slideNumber === slideNumber || idx + 1 === slideNumber) {
+          return JSON.stringify({ ...slide, text: newText });
+        }
+        return typeof slideData === 'string' ? slideData : JSON.stringify(slideData);
+      });
+
+      // Update via API
+      const res = await fetch("/api/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: contentId, copy_carousel_slides: updatedSlides }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Update local state
+        setContent((prev) =>
+          prev.map((c) => (c.id === contentId ? { ...c, copy_carousel_slides: updatedSlides } : c))
+        );
+        setEditingSlideText(null);
+        setEditedSlideText("");
+      }
+    } catch (err) {
+      console.error("Error saving slide text:", err);
+    } finally {
+      setSavingSlideText(false);
     }
   };
 
@@ -810,18 +854,67 @@ export default function ContentPage() {
       >
         {/* Left Panel: Slide Content */}
         <div className="w-[300px] flex-shrink-0 flex flex-col border-r border-muted/30 pr-4">
-          {/* Model Selector */}
-          <div className="mb-3">
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Model</label>
-            <select
-              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value as ImageModelKey)}
-            >
-              {MODEL_OPTIONS.map((model) => (
-                <option key={model.key} value={model.key}>{model.name}</option>
-              ))}
-            </select>
+          {/* Slide Text - Persistent above tabs */}
+          <div className="space-y-1.5 mb-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Slide Text</label>
+              <div className="flex gap-1">
+                {editingSlideText?.contentId === item.id && editingSlideText?.slideNumber === slide.slideNumber ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => {
+                        setEditingSlideText(null);
+                        setEditedSlideText("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => handleSaveSlideText(item.id, slide.slideNumber, editedSlideText)}
+                      disabled={savingSlideText}
+                    >
+                      {savingSlideText ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save"}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      title="Edit"
+                      onClick={() => {
+                        setEditingSlideText({ contentId: item.id, slideNumber: slide.slideNumber });
+                        setEditedSlideText(slide.text);
+                      }}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Regenerate (coming soon)" disabled>
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+            {editingSlideText?.contentId === item.id && editingSlideText?.slideNumber === slide.slideNumber ? (
+              <Textarea
+                value={editedSlideText}
+                onChange={(e) => setEditedSlideText(e.target.value)}
+                className="min-h-[80px] text-sm"
+                placeholder="Enter slide text..."
+              />
+            ) : (
+              <div className="rounded-lg bg-muted/30 p-2.5 text-sm leading-relaxed">
+                {slide.text}
+              </div>
+            )}
           </div>
 
           {/* AI Generation / Composite Tabs */}
@@ -839,38 +932,24 @@ export default function ContentPage() {
 
             {/* AI Generation Tab */}
             <TabsContent value="ai-generation" className="flex-1 flex flex-col mt-0 space-y-3 overflow-y-auto">
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Slide Content</div>
-
-              {/* Slide Text */}
+              {/* Model Selector */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground">Slide Text:</label>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit">
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Regenerate">
-                      <RefreshCw className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="rounded-lg bg-muted/30 p-2.5 text-sm leading-relaxed">
-                  {slide.text}
-                </div>
+                <label className="text-xs font-medium text-muted-foreground">Model</label>
+                <select
+                  className="w-full h-8 rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value as ImageModelKey)}
+                >
+                  {MODEL_OPTIONS.map((model) => (
+                    <option key={model.key} value={model.key}>{model.name}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Slide Prompt */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground">Slide Prompt:</label>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit">
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Regenerate">
-                      <RefreshCw className="h-3 w-3" />
-                    </Button>
-                  </div>
+                  <label className="text-xs font-medium text-muted-foreground">Slide Prompt</label>
                 </div>
                 <div className="rounded-lg bg-muted/30 p-2.5 text-xs text-muted-foreground leading-relaxed max-h-[80px] overflow-y-auto">
                   {slide.imagePrompt}
@@ -914,7 +993,7 @@ export default function ContentPage() {
                       </button>
                     ))
                   ) : (
-                    <div className="col-span-3 py-8 text-center text-xs text-muted-foreground">
+                    <div className="col-span-3 py-6 text-center text-xs text-muted-foreground">
                       No images generated yet
                     </div>
                   )}
@@ -924,13 +1003,11 @@ export default function ContentPage() {
 
             {/* Composite Tab */}
             <TabsContent value="composite" className="flex-1 flex flex-col mt-0 space-y-3 overflow-y-auto">
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Composite Settings</div>
-
               {/* Text Style */}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Text Style</label>
                 <select
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="w-full h-8 rounded-md border border-input bg-background px-3 text-sm"
                   value={selectedTextStyle}
                   onChange={(e) => setSelectedTextStyle(e.target.value)}
                 >
@@ -946,7 +1023,7 @@ export default function ContentPage() {
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Text Color</label>
                 <select
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="w-full h-8 rounded-md border border-input bg-background px-3 text-sm"
                   value={selectedTextColor}
                   onChange={(e) => setSelectedTextColor(e.target.value)}
                 >
@@ -963,7 +1040,7 @@ export default function ContentPage() {
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Background Style</label>
                 <select
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="w-full h-8 rounded-md border border-input bg-background px-3 text-sm"
                   value={selectedBackgroundStyle}
                   onChange={(e) => setSelectedBackgroundStyle(e.target.value)}
                 >
@@ -1028,9 +1105,33 @@ export default function ContentPage() {
                 )}
               </Button>
 
-              <p className="text-xs text-muted-foreground">
-                Composite mode generates all slides with consistent text styling and design.
-              </p>
+              {/* Style Variants (shared with AI tab) */}
+              <div className="space-y-2 flex-1">
+                <label className="text-xs font-medium text-muted-foreground">Style Variants</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {slideImgs.length > 0 ? (
+                    slideImgs.map((img, idx) => (
+                      <button
+                        key={img.id}
+                        onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
+                        className={cn(
+                          "aspect-[4/5] rounded-lg overflow-hidden border-2 transition-all",
+                          idx === safeVersionIdx
+                            ? "border-primary ring-2 ring-primary/30"
+                            : "border-muted opacity-70 hover:opacity-100"
+                        )}
+                        title={`Version ${idx + 1}${img.model ? ` (${IMAGE_MODELS[img.model as ImageModelKey]?.name || img.model})` : ''}`}
+                      >
+                        <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))
+                  ) : (
+                    <div className="col-span-3 py-6 text-center text-xs text-muted-foreground">
+                      No images generated yet
+                    </div>
+                  )}
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
@@ -1536,104 +1637,18 @@ export default function ContentPage() {
                           )}
                         </TabsList>
 
-                        {/* Generate All buttons for carousels */}
+                        {/* Generate All AI button for carousels (Composite controls are in the Slides tab) */}
                         {hasCarousel && carouselSlides && (
-                          <div className="flex items-center gap-2">
-                            {/* Composite generation with presets */}
-                            <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1">
-                              <select
-                                className="h-7 text-xs bg-transparent border-0 outline-none cursor-pointer"
-                                value={selectedTextStyle}
-                                onChange={(e) => setSelectedTextStyle(e.target.value)}
-                                title="Text Style"
-                              >
-                                <option value="bold-editorial">Bold</option>
-                                <option value="clean-modern">Clean</option>
-                                <option value="dramatic">Dramatic</option>
-                                <option value="minimal">Minimal</option>
-                                <option value="statement">Statement</option>
-                              </select>
-                              <select
-                                className="h-7 text-xs bg-transparent border-0 outline-none cursor-pointer"
-                                value={selectedTextColor}
-                                onChange={(e) => setSelectedTextColor(e.target.value)}
-                                title="Text Color"
-                              >
-                                <option value="white-coral">White/Coral</option>
-                                <option value="white-teal">White/Teal</option>
-                                <option value="white-gold">White/Gold</option>
-                                <option value="white-blue">White/Blue</option>
-                                <option value="dark-coral">Dark/Coral</option>
-                                <option value="dark-blue">Dark/Blue</option>
-                              </select>
-                              <select
-                                className="h-7 text-xs bg-transparent border-0 outline-none cursor-pointer"
-                                value={selectedBackgroundStyle}
-                                onChange={(e) => setSelectedBackgroundStyle(e.target.value)}
-                                title="Background Style"
-                              >
-                                <optgroup label="Typography">
-                                  <option value="gradient-dark">Dark Gradient</option>
-                                  <option value="gradient-warm">Warm Gradient</option>
-                                  <option value="abstract-shapes">Abstract</option>
-                                  <option value="bokeh-dark">Bokeh</option>
-                                  <option value="minimal-solid">Solid</option>
-                                </optgroup>
-                                <optgroup label="Photorealistic">
-                                  <option value="photo-landscape">Landscape</option>
-                                  <option value="photo-urban">Urban</option>
-                                  <option value="photo-nature">Nature</option>
-                                  <option value="photo-ocean">Ocean</option>
-                                </optgroup>
-                                <optgroup label="Illustration">
-                                  <option value="illust-flat">Flat</option>
-                                  <option value="illust-watercolor">Watercolor</option>
-                                  <option value="illust-geometric">Geometric</option>
-                                </optgroup>
-                                <optgroup label="3D Render">
-                                  <option value="3d-geometric">Geometric</option>
-                                  <option value="3d-abstract">Abstract</option>
-                                  <option value="3d-tech">Tech</option>
-                                </optgroup>
-                                <optgroup label="Art">
-                                  <option value="art-expressive">Expressive</option>
-                                  <option value="art-minimal">Minimal</option>
-                                </optgroup>
-                                <optgroup label="Collage">
-                                  <option value="collage-vintage">Vintage</option>
-                                  <option value="collage-modern">Modern</option>
-                                </optgroup>
-                              </select>
-                            </div>
-                            <Button
-                              size="sm"
-                              onClick={() => handleGenerateCompositeCarousel(item.id, carouselSlides)}
-                              disabled={generatingCompositeCarousel === item.id}
-                              title="Generate with consistent text styling"
-                            >
-                              {generatingCompositeCarousel === item.id ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Generating...
-                                </>
-                              ) : (
-                                <>
-                                  <Layers className="mr-2 h-4 w-4" />
-                                  Composite All
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
-                              disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
-                              title="Generate with AI image prompts"
-                            >
-                              <Sparkles className="mr-2 h-4 w-4" />
-                              AI All
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
+                            disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
+                            title="Generate all slides with AI image prompts"
+                          >
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            AI Generate All
+                          </Button>
                         )}
                       </div>
 
