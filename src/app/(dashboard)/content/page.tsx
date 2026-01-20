@@ -993,7 +993,8 @@ export default function ContentPage() {
     setSelectedVersionIndex((prev) => ({ ...prev, [key]: index }));
   };
 
-  const truncateText = (text: string, maxLength: number) => {
+  const truncateText = (text: string | null | undefined, maxLength: number) => {
+    if (!text) return "";
     if (text.length <= maxLength) return text;
     return text.slice(0, maxLength) + "...";
   };
@@ -1895,7 +1896,7 @@ export default function ContentPage() {
                   {/* Theme Badge */}
                   {item.ideas?.angle && (
                     <Badge variant="secondary" className="text-xs capitalize shrink-0">
-                      {item.ideas.angle}
+                      {item.ideas?.angle}
                     </Badge>
                   )}
 
