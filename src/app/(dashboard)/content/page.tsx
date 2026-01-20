@@ -317,10 +317,81 @@ export default function ContentPage() {
 
   const handleGenerateAllSlides = async (contentId: string, slides: CarouselSlide[]) => {
     setImageMessage("Generating all slide images...");
-    const promises = slides.map((slide) =>
-      handleGenerateImage(contentId, slide.imagePrompt, slide.slideNumber)
-    );
+
+    // Create a job to track all slides
+    const initialSlideStatuses = slides.map((slide) => ({
+      slideNumber: slide.slideNumber,
+      status: 'pending' as const,
+    }));
+
+    let jobId: string | null = null;
+    try {
+      const jobRes = await fetch("/api/images/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          type: 'carousel',
+          totalItems: slides.length,
+          metadata: { slideStatuses: initialSlideStatuses, mode: 'ai-generation' },
+        }),
+      });
+      const jobData = await jobRes.json();
+      if (jobData.success) {
+        jobId = jobData.job.id;
+      }
+    } catch (err) {
+      console.error("Error creating job:", err);
+    }
+
+    // Helper to update slide status in the job
+    const updateSlideStatus = async (slideNumber: number, slideStatus: 'generating' | 'completed' | 'failed') => {
+      if (!jobId) return;
+      try {
+        // Fetch current job to get metadata
+        const getRes = await fetch(`/api/images/jobs?jobId=${jobId}`);
+        const getData = await getRes.json();
+        if (!getData.success || !getData.job?.metadata) return;
+
+        const metadata = getData.job.metadata;
+        const slideStatuses = metadata.slideStatuses || [];
+        const updatedStatuses = slideStatuses.map((s: { slideNumber: number; status: string }) =>
+          s.slideNumber === slideNumber ? { ...s, status: slideStatus } : s
+        );
+
+        const completedCount = updatedStatuses.filter((s: { status: string }) => s.status === 'completed').length;
+        const failedCount = updatedStatuses.filter((s: { status: string }) => s.status === 'failed').length;
+        const allDone = completedCount + failedCount === slides.length;
+
+        await fetch("/api/images/jobs", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jobId,
+            status: allDone ? (failedCount === slides.length ? 'failed' : 'completed') : 'generating',
+            progress: Math.round(((completedCount + failedCount) / slides.length) * 100),
+            completedItems: completedCount,
+            metadata: { ...metadata, slideStatuses: updatedStatuses },
+          }),
+        });
+      } catch (err) {
+        console.error("Error updating slide status:", err);
+      }
+    };
+
+    // Generate all slides with status tracking
+    const promises = slides.map(async (slide) => {
+      await updateSlideStatus(slide.slideNumber, 'generating');
+      try {
+        await handleGenerateImage(contentId, slide.imagePrompt, slide.slideNumber);
+        await updateSlideStatus(slide.slideNumber, 'completed');
+      } catch (err) {
+        await updateSlideStatus(slide.slideNumber, 'failed');
+      }
+    });
+
     await Promise.all(promises);
+    await refreshJobs();
     setImageMessage("All slide images generated!");
     setTimeout(() => setImageMessage(null), 5000);
   };

@@ -39,51 +39,37 @@ function getSlideStatuses(job: GenerationJob): SlideStatus[] | null {
 }
 
 /**
- * Mini progress indicator for a single slide
+ * Mini progress bar for a single slide
  */
-function SlideProgressIndicator({
+function SlideProgressBar({
   slide,
   index,
 }: {
   slide: SlideStatus;
   index: number;
 }) {
-  const statusColors = {
-    pending: 'bg-muted-foreground/30',
-    generating: 'bg-blue-500 animate-pulse',
-    completed: 'bg-emerald-500',
-    failed: 'bg-red-500',
-  };
-
-  const statusIcons = {
-    pending: null,
-    generating: <Loader2 className="h-2.5 w-2.5 animate-spin text-white" />,
-    completed: <Check className="h-2.5 w-2.5 text-white" />,
-    failed: <XCircle className="h-2.5 w-2.5 text-white" />,
-  };
-
   return (
     <div
-      className="flex flex-col items-center gap-0.5"
+      className="flex-1 min-w-[40px] max-w-[60px]"
       title={`Slide ${slide.slideNumber}: ${slide.status}${slide.error ? ` - ${slide.error}` : ''}`}
     >
-      <div
-        className={cn(
-          "h-6 w-6 rounded flex items-center justify-center transition-colors",
-          statusColors[slide.status]
-        )}
-      >
-        {statusIcons[slide.status] || (
-          <span className="text-[9px] font-medium text-white/70">{slide.slideNumber}</span>
-        )}
+      <div className="h-2 bg-muted-foreground/20 rounded-full overflow-hidden">
+        <div
+          className={cn(
+            "h-full transition-all duration-300 rounded-full",
+            slide.status === 'pending' && "w-0",
+            slide.status === 'generating' && "w-1/2 bg-blue-500 animate-pulse",
+            slide.status === 'completed' && "w-full bg-emerald-500",
+            slide.status === 'failed' && "w-full bg-red-500"
+          )}
+        />
       </div>
-      <span className="text-[9px] text-muted-foreground">{slide.slideNumber}</span>
     </div>
   );
 }
 
 /**
- * Carousel progress with individual slide indicators
+ * Carousel progress with individual slide progress bars
  */
 function CarouselProgress({
   slideStatuses,
@@ -97,11 +83,11 @@ function CarouselProgress({
   const total = slideStatuses.length;
 
   return (
-    <div className={cn("space-y-2", className)}>
-      {/* Mini slide indicators */}
-      <div className="flex gap-1.5 flex-wrap">
+    <div className={cn("space-y-1.5", className)}>
+      {/* Row of progress bars */}
+      <div className="flex gap-1">
         {slideStatuses.map((slide, index) => (
-          <SlideProgressIndicator key={slide.slideNumber} slide={slide} index={index} />
+          <SlideProgressBar key={slide.slideNumber} slide={slide} index={index} />
         ))}
       </div>
       {/* Summary text */}
@@ -132,7 +118,7 @@ export function GenerationStatus({
   // Compact badge for collapsed view
   if (compact) {
     if (status === "generating" || status === "pending") {
-      // For carousel, show mini indicators inline
+      // For carousel, show mini progress bars inline
       if (isCarousel) {
         const completed = slideStatuses.filter(s => s.status === 'completed').length;
         const generating = slideStatuses.find(s => s.status === 'generating');
@@ -142,30 +128,24 @@ export function GenerationStatus({
 
         return (
           <div
-            className={cn("flex items-center gap-1", className)}
+            className={cn("flex items-center gap-0.5", className)}
             title={tooltipText}
             onClick={(e) => e.stopPropagation()}
           >
             {slideStatuses.map((slide) => (
               <div
                 key={slide.slideNumber}
-                className={cn(
-                  "h-4 w-4 rounded-sm flex items-center justify-center text-[8px] font-medium transition-all",
-                  slide.status === 'pending' && "bg-muted-foreground/20 text-muted-foreground",
-                  slide.status === 'generating' && "bg-blue-500 text-white animate-pulse",
-                  slide.status === 'completed' && "bg-emerald-500 text-white",
-                  slide.status === 'failed' && "bg-red-500 text-white"
-                )}
+                className="w-6 h-1.5 bg-muted-foreground/20 rounded-full overflow-hidden"
               >
-                {slide.status === 'completed' ? (
-                  <Check className="h-2.5 w-2.5" />
-                ) : slide.status === 'generating' ? (
-                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                ) : slide.status === 'failed' ? (
-                  <XCircle className="h-2.5 w-2.5" />
-                ) : (
-                  slide.slideNumber
-                )}
+                <div
+                  className={cn(
+                    "h-full transition-all duration-300 rounded-full",
+                    slide.status === 'pending' && "w-0",
+                    slide.status === 'generating' && "w-1/2 bg-blue-500 animate-pulse",
+                    slide.status === 'completed' && "w-full bg-emerald-500",
+                    slide.status === 'failed' && "w-full bg-red-500"
+                  )}
+                />
               </div>
             ))}
           </div>
