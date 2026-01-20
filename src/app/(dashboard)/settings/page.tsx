@@ -250,33 +250,58 @@ function SettingsPageContent() {
     }
   };
 
-  // Connect a social account via Late.dev OAuth
+  // Connect a social account - opens Late.dev dashboard for OAuth
   const handleConnectAccount = async (platform: string) => {
+    if (!selectedBrand?.id) {
+      setSaveMessage({ type: "error", text: "Please select a client first" });
+      setTimeout(() => setSaveMessage(null), 5000);
+      return;
+    }
+
+    // Open Late.dev dashboard to connect the account
+    // After connecting there, the account will appear when we sync
+    window.open("https://getlate.dev/dashboard", "_blank");
+
+    setSaveMessage({
+      type: "success",
+      text: `Connect your ${platform} account in Late.dev, then click "Sync Accounts" below.`
+    });
+    setTimeout(() => setSaveMessage(null), 10000);
+  };
+
+  // Sync accounts from Late.dev
+  const handleSyncAccounts = async () => {
     if (!selectedBrand?.id) return;
 
-    setConnectingPlatform(platform);
+    setLoadingAccounts(true);
+    setSaveMessage(null);
+
     try {
-      const res = await fetch("/api/social-accounts/connect", {
+      // First, get accounts from Late.dev
+      const lateRes = await fetch("/api/social-accounts/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ platform, brandId: selectedBrand.id }),
+        body: JSON.stringify({ brandId: selectedBrand.id }),
       });
 
-      const data = await res.json();
+      const data = await lateRes.json();
 
-      if (data.success && data.authUrl) {
-        // Redirect to Late.dev OAuth
-        window.location.href = data.authUrl;
+      if (data.success) {
+        setSocialAccounts(data.accounts || []);
+        if (data.newAccounts > 0) {
+          setSaveMessage({ type: "success", text: `Synced ${data.newAccounts} new account(s) from Late.dev` });
+        } else {
+          setSaveMessage({ type: "success", text: "Accounts are up to date" });
+        }
       } else {
-        setSaveMessage({ type: "error", text: data.error || "Failed to initiate connection" });
-        setTimeout(() => setSaveMessage(null), 5000);
+        setSaveMessage({ type: "error", text: data.error || "Failed to sync accounts" });
       }
     } catch (err) {
-      console.error("Error connecting account:", err);
-      setSaveMessage({ type: "error", text: "Network error. Please try again." });
-      setTimeout(() => setSaveMessage(null), 5000);
+      console.error("Error syncing accounts:", err);
+      setSaveMessage({ type: "error", text: "Failed to sync with Late.dev" });
     } finally {
-      setConnectingPlatform(null);
+      setLoadingAccounts(false);
+      setTimeout(() => setSaveMessage(null), 5000);
     }
   };
 
@@ -764,9 +789,24 @@ function SettingsPageContent() {
               })}
             </div>
           )}
-          <p className="text-xs text-muted-foreground">
-            Powered by Late.dev for secure OAuth connections. Connected accounts will be used for publishing content.
-          </p>
+          <div className="flex items-center justify-between pt-2 border-t">
+            <p className="text-xs text-muted-foreground">
+              Connect accounts in Late.dev dashboard, then sync here.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncAccounts}
+              disabled={loadingAccounts}
+            >
+              {loadingAccounts ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Sync Accounts
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
