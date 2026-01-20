@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import {
   LateClient,
   LateApiException,
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
     };
 
     const supabase = await createClient();
+    const adminClient = createAdminClient(); // For storage operations (bypasses RLS)
     const body = await request.json();
     const { contentId, scheduledFor } = body;
 
@@ -83,11 +84,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch associated images
-    const { data: images, error: imagesError } = await supabase
+    // For carousels, we only want the composite images (selected slides), not style variants
+    // Composite images have model: 'composite', while AI variants have other model names
+    // First try to get composite images (for carousels)
+    let { data: images, error: imagesError } = await supabase
       .from("images")
       .select("*")
       .eq("content_id", contentId)
+      .eq("model", "composite") // Only get composite/selected carousel images
       .order("created_at", { ascending: true });
+
+    // If no composite images found, fall back to all images (for single-image posts)
+    if ((!images || images.length === 0) && !imagesError) {
+      const fallbackResult = await supabase
+        .from("images")
+        .select("*")
+        .eq("content_id", contentId)
+        .order("created_at", { ascending: true });
+
+      images = fallbackResult.data;
+      imagesError = fallbackResult.error;
+
+      if (images && images.length > 0) {
+        console.log(`No composite images found, using ${images.length} regular image(s)`);
+      }
+    } else if (images && images.length > 0) {
+      console.log(`Found ${images.length} composite carousel image(s)`);
+    }
 
     if (imagesError) {
       console.error("Error fetching images:", imagesError);
@@ -95,9 +118,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Filter out placeholder images (those without real URLs)
-    const validImages = (images || []).filter(
+    let validImages = (images || []).filter(
       (img) => img.url && !img.url.startsWith("placeholder:")
     );
+
+    // Sort carousel images by slide number (extracted from prompt like "[Slide 1]")
+    validImages = validImages.sort((a, b) => {
+      const aMatch = a.prompt?.match(/\[Slide (\d+)\]/);
+      const bMatch = b.prompt?.match(/\[Slide (\d+)\]/);
+      const aNum = aMatch ? parseInt(aMatch[1], 10) : 999;
+      const bNum = bMatch ? parseInt(bMatch[1], 10) : 999;
+      return aNum - bNum;
+    });
 
     // Build the caption text
     let caption = content.copy_primary || "";
@@ -142,8 +174,8 @@ export async function POST(request: NextRequest) {
           // Generate unique filename
           const filename = `publish/${contentId}/${Date.now()}-${i}.${ext}`;
 
-          // Upload to Supabase Storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          // Upload to Supabase Storage (using admin client to bypass RLS)
+          const { error: uploadError } = await adminClient.storage
             .from("images")
             .upload(filename, buffer, {
               contentType: mimeType,
@@ -162,7 +194,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Get public URL
-          const { data: publicUrlData } = supabase.storage
+          const { data: publicUrlData } = adminClient.storage
             .from("images")
             .getPublicUrl(filename);
 
@@ -219,9 +251,7 @@ export async function POST(request: NextRequest) {
           accountId: accountId,
         },
       ],
-      content: {
-        text: caption.trim(),
-      },
+      content: caption.trim(),
       mediaItems: mediaItems.length > 0 ? mediaItems : undefined,
       externalId: contentId,
     };
@@ -289,9 +319,8 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    // Determine the new status based on the response
-    const newStatus = scheduledFor ? "scheduled" :
-      (lateResponse.status === "published" ? "published" : "scheduled");
+    // Determine the new status based on whether this was scheduled or immediate
+    const newStatus = scheduledFor ? "scheduled" : "published";
 
     // Update content with Late.dev post ID and status
     const { error: updateError } = await supabase
@@ -317,9 +346,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Clean up uploaded images from storage after successful publish
-    // (to keep storage usage minimal)
-    if (uploadedUrls.length > 0) {
-      const { error: deleteError } = await supabase.storage
+    // Only clean up for immediate posts - scheduled posts need images until publish time
+    if (uploadedUrls.length > 0 && !scheduledFor) {
+      const { error: deleteError } = await adminClient.storage
         .from("images")
         .remove(uploadedUrls);
 
@@ -329,6 +358,9 @@ export async function POST(request: NextRequest) {
       } else {
         console.log(`Cleaned up ${uploadedUrls.length} temporary images from storage`);
       }
+    } else if (uploadedUrls.length > 0 && scheduledFor) {
+      console.log(`Keeping ${uploadedUrls.length} images in storage for scheduled post`);
+      // TODO: Set up a cleanup job to delete after scheduled publish time
     }
 
     return NextResponse.json({
