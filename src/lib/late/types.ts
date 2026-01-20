@@ -55,13 +55,7 @@ export interface PlatformSpecificData {
   instagram?: InstagramSpecificData;
 }
 
-/**
- * Content payload for creating a post
- */
-export interface LatePostContent {
-  /** Main text/caption for the post */
-  text: string;
-}
+// Note: Late.dev expects content as a plain string, not an object
 
 /**
  * Platform target with account ID
@@ -91,8 +85,8 @@ export interface LateMediaItem {
 export interface CreatePostRequest {
   /** Target platforms with account IDs */
   platforms: LatePlatformTarget[];
-  /** The content to post */
-  content: LatePostContent;
+  /** The content/caption text to post */
+  content: string;
   /** Media items (images/videos) */
   mediaItems?: LateMediaItem[];
   /** ISO 8601 timestamp for scheduled posting (optional) */
@@ -146,7 +140,7 @@ export interface GetPostResponse {
   /** Results per platform */
   platforms: LatePlatformResult[];
   /** Original content */
-  content: LatePostContent;
+  content: string;
   /** Scheduled time if applicable */
   scheduledFor?: string;
   /** Actual publish time */
