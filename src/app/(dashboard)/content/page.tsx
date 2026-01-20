@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Calendar } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ImageCarousel, type CarouselImage } from "@/components/ui/image-carousel";
 import { PlatformPostMockup } from "@/components/ui/platform-mockups";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { GenerationStatus } from "@/components/ui/generation-status";
+import { useGenerationJobs, type GenerationJob } from "@/hooks/use-generation-jobs";
 import { cn } from "@/lib/utils";
 
 interface ContentImage {
@@ -123,6 +125,22 @@ export default function ContentPage() {
   const [editingSlideText, setEditingSlideText] = useState<{ contentId: string; slideNumber: number } | null>(null);
   const [editedSlideText, setEditedSlideText] = useState<string>("");
   const [savingSlideText, setSavingSlideText] = useState(false);
+
+  // Generation job tracking
+  const contentIds = content.map(c => c.id);
+  const {
+    getLatestJob,
+    getActiveJob,
+    isGenerating: isJobGenerating,
+    hasFailed: hasJobFailed,
+    getError,
+    refresh: refreshJobs,
+    clearJob,
+  } = useGenerationJobs({
+    contentIds: contentIds.length > 0 ? contentIds : undefined,
+    pollInterval: 2000,
+    autoPoll: true,
+  });
 
   useEffect(() => {
     fetchContent();
@@ -1451,6 +1469,24 @@ export default function ContentPage() {
                     )}
                   </div>
 
+                  {/* Generation Status (compact) */}
+                  <GenerationStatus
+                    job={getLatestJob(item.id)}
+                    compact
+                    onRetry={() => {
+                      const job = getLatestJob(item.id);
+                      if (job) {
+                        clearJob(job.id);
+                        // Re-trigger generation based on type
+                        if (job.type === 'composite') {
+                          handleGenerateCompositeCarousel(item.id, carouselSlides || []);
+                        } else if (item.metadata?.imagePrompt) {
+                          handleGenerateImage(item.id, item.metadata.imagePrompt);
+                        }
+                      }
+                    }}
+                  />
+
                   {/* Timestamp */}
                   <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
                     <Clock className="h-3 w-3" />
@@ -1541,6 +1577,31 @@ export default function ContentPage() {
                 {/* Expanded Content - Redesigned with Tabs */}
                 {isExpanded && (
                   <div className="border-t">
+                    {/* Generation Status (full display) */}
+                    {(isJobGenerating(item.id) || hasJobFailed(item.id)) && (
+                      <div className="p-4 border-b bg-muted/30">
+                        <GenerationStatus
+                          job={getLatestJob(item.id)}
+                          onRetry={() => {
+                            const job = getLatestJob(item.id);
+                            if (job) {
+                              clearJob(job.id);
+                              // Re-trigger generation based on type
+                              if (job.type === 'composite') {
+                                handleGenerateCompositeCarousel(item.id, carouselSlides || []);
+                              } else if (item.metadata?.imagePrompt) {
+                                handleGenerateImage(item.id, item.metadata.imagePrompt);
+                              }
+                            }
+                          }}
+                          onDismiss={() => {
+                            const job = getLatestJob(item.id);
+                            if (job) clearJob(job.id);
+                          }}
+                        />
+                      </div>
+                    )}
+
                     <Tabs defaultValue={hasCarousel ? "slides" : "preview"} className="w-full">
                       {/* Tab Navigation */}
                       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
