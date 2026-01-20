@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Palette, GripVertical } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Palette, GripVertical, Calendar } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ImageCarousel, type CarouselImage } from "@/components/ui/image-carousel";
 import { PlatformPostMockup } from "@/components/ui/platform-mockups";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -94,6 +96,12 @@ export default function ContentPage() {
   const [selectedBackgroundStyle, setSelectedBackgroundStyle] = useState<string>("gradient-dark");
   const [captionPanelWidth, setCaptionPanelWidth] = useState<number>(320); // Default ~1/3 width
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [schedulingContentId, setSchedulingContentId] = useState<string | null>(null);
+  const [scheduledDateTime, setScheduledDateTime] = useState<string>("");
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [publishMessage, setPublishMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     fetchContent();
@@ -342,6 +350,93 @@ export default function ContentPage() {
 
   const handleApprove = async (id: string) => {
     await handleUpdateContent(id, { status: "approved" });
+  };
+
+  const handlePublish = async (contentId: string) => {
+    setPublishingId(contentId);
+    setPublishMessage(null);
+    try {
+      const res = await fetch("/api/content/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPublishMessage({ type: "success", text: "Published successfully!" });
+        // Update local state
+        setContent((prev) =>
+          prev.map((c) =>
+            c.id === contentId ? { ...c, status: data.status || "published" } : c
+          )
+        );
+        // Clear message after 3 seconds
+        setTimeout(() => setPublishMessage(null), 3000);
+      } else {
+        setPublishMessage({ type: "error", text: data.error || "Failed to publish" });
+        setTimeout(() => setPublishMessage(null), 5000);
+      }
+    } catch (err) {
+      console.error("Error publishing:", err);
+      setPublishMessage({ type: "error", text: "Network error - please try again" });
+      setTimeout(() => setPublishMessage(null), 5000);
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
+  const openScheduleDialog = (contentId: string) => {
+    setSchedulingContentId(contentId);
+    // Default to tomorrow at 9:00 AM
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    const localDateTime = tomorrow.toISOString().slice(0, 16);
+    setScheduledDateTime(localDateTime);
+    setScheduleDialogOpen(true);
+  };
+
+  const handleSchedule = async () => {
+    if (!schedulingContentId || !scheduledDateTime) return;
+
+    setIsScheduling(true);
+    setPublishMessage(null);
+    try {
+      // Convert local datetime to ISO string
+      const scheduledFor = new Date(scheduledDateTime).toISOString();
+
+      const res = await fetch("/api/content/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId: schedulingContentId,
+          scheduledFor,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPublishMessage({ type: "success", text: `Scheduled for ${new Date(scheduledFor).toLocaleString()}` });
+        // Update local state
+        setContent((prev) =>
+          prev.map((c) =>
+            c.id === schedulingContentId
+              ? { ...c, status: "scheduled", scheduled_for: scheduledFor }
+              : c
+          )
+        );
+        setScheduleDialogOpen(false);
+        setTimeout(() => setPublishMessage(null), 3000);
+      } else {
+        setPublishMessage({ type: "error", text: data.error || "Failed to schedule" });
+        setTimeout(() => setPublishMessage(null), 5000);
+      }
+    } catch (err) {
+      console.error("Error scheduling:", err);
+      setPublishMessage({ type: "error", text: "Network error - please try again" });
+      setTimeout(() => setPublishMessage(null), 5000);
+    } finally {
+      setIsScheduling(false);
+    }
   };
 
   const handleDownloadImage = (url: string, platform: string, slideNumber?: number) => {
@@ -1689,14 +1784,43 @@ export default function ContentPage() {
                             Approve
                           </Button>
                         )}
-                        <Button variant="outline" size="sm">
-                          <Clock className="mr-2 h-4 w-4" />
-                          Schedule
-                        </Button>
-                        <Button size="sm">
-                          <Send className="mr-2 h-4 w-4" />
-                          Publish
-                        </Button>
+                        {item.status === "approved" && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openScheduleDialog(item.id)}
+                              disabled={publishingId === item.id}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              Schedule
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handlePublish(item.id)}
+                              disabled={publishingId === item.id}
+                            >
+                              {publishingId === item.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Send className="mr-2 h-4 w-4" />
+                              )}
+                              {publishingId === item.id ? "Publishing..." : "Publish Now"}
+                            </Button>
+                          </>
+                        )}
+                        {item.status === "scheduled" && item.scheduled_for && (
+                          <div className="flex items-center gap-2 text-sm text-blue-400">
+                            <Clock className="h-4 w-4" />
+                            <span>Scheduled for {new Date(item.scheduled_for).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {item.status === "published" && (
+                          <div className="flex items-center gap-2 text-sm text-emerald-400">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>Published</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1728,6 +1852,74 @@ export default function ContentPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Publish/Schedule Message Banner */}
+      {publishMessage && (
+        <div
+          className={cn(
+            "fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 shadow-lg",
+            publishMessage.type === "success"
+              ? "bg-emerald-500/90 text-white"
+              : "bg-red-500/90 text-white"
+          )}
+        >
+          {publishMessage.type === "success" ? (
+            <CheckCircle2 className="h-5 w-5" />
+          ) : (
+            <AlertCircle className="h-5 w-5" />
+          )}
+          <span>{publishMessage.text}</span>
+        </div>
+      )}
+
+      {/* Schedule Dialog */}
+      <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule Post</DialogTitle>
+            <DialogDescription>
+              Choose when you want this content to be published.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="block text-sm font-medium mb-2">
+              Date and Time
+            </label>
+            <Input
+              type="datetime-local"
+              value={scheduledDateTime}
+              onChange={(e) => setScheduledDateTime(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setScheduleDialogOpen(false)}
+              disabled={isScheduling}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSchedule}
+              disabled={isScheduling || !scheduledDateTime}
+            >
+              {isScheduling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scheduling...
+                </>
+              ) : (
+                <>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Schedule
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
