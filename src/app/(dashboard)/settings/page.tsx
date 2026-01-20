@@ -285,13 +285,17 @@ function SettingsPageContent() {
       });
 
       const data = await lateRes.json();
+      console.log("Sync response:", data);
 
       if (data.success) {
         setSocialAccounts(data.accounts || []);
+        const foundCount = data.totalFromLate || 0;
         if (data.newAccounts > 0) {
           setSaveMessage({ type: "success", text: `Synced ${data.newAccounts} new account(s) from Late.dev` });
+        } else if (foundCount === 0) {
+          setSaveMessage({ type: "error", text: "No accounts found in Late.dev. Make sure you have connected accounts there." });
         } else {
-          setSaveMessage({ type: "success", text: "Accounts are up to date" });
+          setSaveMessage({ type: "success", text: `Accounts synced (${foundCount} found in Late.dev)` });
         }
       } else {
         setSaveMessage({ type: "error", text: data.error || "Failed to sync accounts" });
