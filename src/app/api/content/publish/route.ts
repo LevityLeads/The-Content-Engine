@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import {
   LateClient,
   LateApiException,
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
     };
 
     const supabase = await createClient();
+    const adminClient = createAdminClient(); // For storage operations (bypasses RLS)
     const body = await request.json();
     const { contentId, scheduledFor } = body;
 
@@ -142,8 +143,8 @@ export async function POST(request: NextRequest) {
           // Generate unique filename
           const filename = `publish/${contentId}/${Date.now()}-${i}.${ext}`;
 
-          // Upload to Supabase Storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          // Upload to Supabase Storage (using admin client to bypass RLS)
+          const { error: uploadError } = await adminClient.storage
             .from("images")
             .upload(filename, buffer, {
               contentType: mimeType,
@@ -162,7 +163,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Get public URL
-          const { data: publicUrlData } = supabase.storage
+          const { data: publicUrlData } = adminClient.storage
             .from("images")
             .getPublicUrl(filename);
 
@@ -319,7 +320,7 @@ export async function POST(request: NextRequest) {
     // Clean up uploaded images from storage after successful publish
     // (to keep storage usage minimal)
     if (uploadedUrls.length > 0) {
-      const { error: deleteError } = await supabase.storage
+      const { error: deleteError } = await adminClient.storage
         .from("images")
         .remove(uploadedUrls);
 
