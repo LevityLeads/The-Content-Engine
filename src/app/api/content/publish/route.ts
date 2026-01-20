@@ -25,6 +25,17 @@ import {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Check for API key early
+    if (!process.env.LATE_API_KEY) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Late.dev API key not configured. Please set LATE_API_KEY in your environment variables.",
+        },
+        { status: 500 }
+      );
+    }
+
     const supabase = await createClient();
     const body = await request.json();
     const { contentId, scheduledFor } = body;
