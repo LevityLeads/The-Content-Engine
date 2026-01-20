@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check } from "lucide-react";
+import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,10 @@ export default function SettingsPage() {
   const [newKeyword, setNewKeyword] = useState("");
   const [newAvoidWord, setNewAvoidWord] = useState("");
 
+  // Re-analyze state
+  const [analyzeUrl, setAnalyzeUrl] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   // UI state
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -32,6 +36,8 @@ export default function SettingsPage() {
       setDescription(selectedBrand.description || "");
       setVoiceConfig(selectedBrand.voice_config || {});
       setVisualConfig(selectedBrand.visual_config || {});
+      // Pre-fill analyze URL with existing source URL if available
+      setAnalyzeUrl(selectedBrand.voice_config?.source_url || "");
     }
   }, [selectedBrand]);
 
@@ -98,6 +104,75 @@ export default function SettingsPage() {
       ...voiceConfig,
       words_to_avoid: voiceConfig.words_to_avoid?.filter((w) => w !== word) || [],
     });
+  };
+
+  const handleReanalyze = async () => {
+    if (!analyzeUrl.trim() || !selectedBrand) return;
+
+    setIsAnalyzing(true);
+    setSaveMessage(null);
+
+    try {
+      const res = await fetch("/api/brands/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: analyzeUrl.trim() }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.analysis) {
+        // Preserve existing strictness setting
+        const currentStrictness = voiceConfig.strictness ?? 0.7;
+
+        // Update local state with new analysis
+        const newVoiceConfig: VoiceConfig = {
+          tone_keywords: data.analysis.voice.tone_keywords || [],
+          words_to_avoid: data.analysis.voice.words_to_avoid || [],
+          strictness: currentStrictness,
+          source_url: analyzeUrl.trim(),
+          extracted_voice: {
+            tone_description: data.analysis.voice.writing_style,
+            messaging_themes: data.analysis.voice.messaging_themes,
+            writing_style: data.analysis.voice.writing_style,
+          },
+        };
+
+        const newVisualConfig: VisualConfig = {
+          primary_color: data.analysis.visual.primary_color,
+          secondary_color: data.analysis.visual.secondary_color,
+          accent_color: data.analysis.visual.accent_color,
+          image_style: data.analysis.visual.image_style,
+          color_palette: data.analysis.visual.color_palette,
+          extracted_images: data.analysis.visual.sample_images,
+        };
+
+        setVoiceConfig(newVoiceConfig);
+        setVisualConfig(newVisualConfig);
+        setDescription(data.analysis.summary || description);
+
+        // Save to database
+        const result = await updateBrand(selectedBrand.id, {
+          description: data.analysis.summary || description,
+          voice_config: newVoiceConfig,
+          visual_config: newVisualConfig,
+        });
+
+        if (result) {
+          setSaveMessage({ type: "success", text: "Brand re-analyzed and updated!" });
+        } else {
+          setSaveMessage({ type: "error", text: "Analysis succeeded but failed to save" });
+        }
+      } else {
+        setSaveMessage({ type: "error", text: data.error || "Failed to analyze website" });
+      }
+    } catch (err) {
+      console.error("Error re-analyzing:", err);
+      setSaveMessage({ type: "error", text: "Network error. Please try again." });
+    } finally {
+      setIsAnalyzing(false);
+      setTimeout(() => setSaveMessage(null), 5000);
+    }
   };
 
   if (brandLoading) {
@@ -194,6 +269,51 @@ export default function SettingsPage() {
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Save Changes
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Re-analyze Website */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Analyze Website
+          </CardTitle>
+          <CardDescription>
+            Extract or refresh brand voice and visual style from a website
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Website URL</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="https://yourwebsite.com"
+                  value={analyzeUrl}
+                  onChange={(e) => setAnalyzeUrl(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Button onClick={handleReanalyze} disabled={isAnalyzing || !analyzeUrl.trim()}>
+                {isAnalyzing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                {isAnalyzing ? "Analyzing..." : voiceConfig.source_url ? "Re-analyze" : "Analyze"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              AI will extract colors, brand voice, tone keywords, and visual style from this website.
+              {voiceConfig.source_url && (
+                <span className="block mt-1">
+                  Last analyzed: <span className="text-foreground">{voiceConfig.source_url}</span>
+                </span>
+              )}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
