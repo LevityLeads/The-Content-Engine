@@ -947,11 +947,45 @@ export default function ContentPage() {
                   value={selectedBackgroundStyle}
                   onChange={(e) => setSelectedBackgroundStyle(e.target.value)}
                 >
-                  <option value="gradient-dark">Dark Gradient</option>
-                  <option value="gradient-warm">Warm Gradient</option>
-                  <option value="abstract-shapes">Abstract</option>
-                  <option value="bokeh-dark">Bokeh</option>
-                  <option value="minimal-solid">Solid</option>
+                  <optgroup label="Typography">
+                    <option value="gradient-dark">Dark Gradient</option>
+                    <option value="gradient-warm">Warm Gradient</option>
+                    <option value="abstract-shapes">Abstract Shapes</option>
+                    <option value="bokeh-dark">Bokeh</option>
+                    <option value="minimal-solid">Solid</option>
+                  </optgroup>
+                  <optgroup label="Photorealistic">
+                    <option value="photo-landscape">Landscape</option>
+                    <option value="photo-urban">Urban/City</option>
+                    <option value="photo-nature">Nature Close-up</option>
+                    <option value="photo-ocean">Ocean/Sunset</option>
+                    <option value="photo-minimal">Minimal Interior</option>
+                    <option value="photo-texture">Texture</option>
+                  </optgroup>
+                  <optgroup label="Illustration">
+                    <option value="illust-flat">Flat Vector</option>
+                    <option value="illust-watercolor">Watercolor</option>
+                    <option value="illust-geometric">Geometric</option>
+                    <option value="illust-nature">Nature Scene</option>
+                    <option value="illust-abstract">Abstract</option>
+                  </optgroup>
+                  <optgroup label="3D Render">
+                    <option value="3d-geometric">Geometric Objects</option>
+                    <option value="3d-abstract">Abstract Forms</option>
+                    <option value="3d-minimal">Minimal</option>
+                    <option value="3d-tech">Tech/Futuristic</option>
+                  </optgroup>
+                  <optgroup label="Abstract Art">
+                    <option value="art-expressive">Expressive</option>
+                    <option value="art-minimal">Minimal</option>
+                    <option value="art-textured">Textured</option>
+                    <option value="art-geometric">Geometric</option>
+                  </optgroup>
+                  <optgroup label="Collage">
+                    <option value="collage-vintage">Vintage</option>
+                    <option value="collage-modern">Modern</option>
+                    <option value="collage-texture">Textured</option>
+                  </optgroup>
                 </select>
               </div>
 
@@ -1504,11 +1538,37 @@ export default function ContentPage() {
                                 onChange={(e) => setSelectedBackgroundStyle(e.target.value)}
                                 title="Background Style"
                               >
-                                <option value="gradient-dark">Dark Gradient</option>
-                                <option value="gradient-warm">Warm Gradient</option>
-                                <option value="abstract-shapes">Abstract</option>
-                                <option value="bokeh-dark">Bokeh</option>
-                                <option value="minimal-solid">Solid</option>
+                                <optgroup label="Typography">
+                                  <option value="gradient-dark">Dark Gradient</option>
+                                  <option value="gradient-warm">Warm Gradient</option>
+                                  <option value="abstract-shapes">Abstract</option>
+                                  <option value="bokeh-dark">Bokeh</option>
+                                  <option value="minimal-solid">Solid</option>
+                                </optgroup>
+                                <optgroup label="Photorealistic">
+                                  <option value="photo-landscape">Landscape</option>
+                                  <option value="photo-urban">Urban</option>
+                                  <option value="photo-nature">Nature</option>
+                                  <option value="photo-ocean">Ocean</option>
+                                </optgroup>
+                                <optgroup label="Illustration">
+                                  <option value="illust-flat">Flat</option>
+                                  <option value="illust-watercolor">Watercolor</option>
+                                  <option value="illust-geometric">Geometric</option>
+                                </optgroup>
+                                <optgroup label="3D Render">
+                                  <option value="3d-geometric">Geometric</option>
+                                  <option value="3d-abstract">Abstract</option>
+                                  <option value="3d-tech">Tech</option>
+                                </optgroup>
+                                <optgroup label="Art">
+                                  <option value="art-expressive">Expressive</option>
+                                  <option value="art-minimal">Minimal</option>
+                                </optgroup>
+                                <optgroup label="Collage">
+                                  <option value="collage-vintage">Vintage</option>
+                                  <option value="collage-modern">Modern</option>
+                                </optgroup>
                               </select>
                             </div>
                             <Button
