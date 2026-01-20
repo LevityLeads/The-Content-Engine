@@ -37,8 +37,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Map platform to account ID environment variable
+    // TODO: Support multiple accounts per platform via brand settings
     const platformAccountIds: Record<string, string | undefined> = {
-      instagram: process.env.LATE_INSTAGRAM_ACCOUNT_ID,
+      instagram: process.env.LATE_INSTAGRAM_ACCOUNT_ID || process.env.LATE_INSTAGRAM_ACCOUNT_OCD_ID,
       twitter: process.env.LATE_TWITTER_ACCOUNT_ID,
       linkedin: process.env.LATE_LINKEDIN_ACCOUNT_ID,
     };
