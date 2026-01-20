@@ -35,7 +35,7 @@ interface Content {
   id: string;
   platform: string;
   copy_primary: string;
-  copy_hashtags: string[];
+  copy_hashtags: string[] | null;
   copy_cta: string | null;
   copy_thread_parts: string[] | null;
   copy_carousel_slides: CarouselSlide[] | string[] | null;
