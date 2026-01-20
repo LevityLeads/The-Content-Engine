@@ -26,6 +26,7 @@ AI-powered content automation system that transforms raw inputs into polished, p
 | CI/CD, GitHub Actions, deployment, environment, infrastructure | **DevOps** | `.claude/roles/devops.md` |
 | end-to-end, full feature, both UI and API, spans multiple areas | **Full Stack** | `.claude/roles/fullstack.md` |
 | update docs, document, sync, architecture, CLAUDE.md, RULES.md | **Docs** | `.claude/roles/docs.md` |
+| debug, investigate, root cause, stack trace, performance issue, race condition, why is this | **Debug** | `.claude/roles/debug.md` |
 
 ### Role Announcement Format (ALWAYS USE THIS)
 
@@ -72,8 +73,8 @@ npm run dev          # Start dev server (localhost:3000)
 npm run build        # Production build
 npm run lint         # Run ESLint
 
-# Deployment
-git push origin main # Triggers Vercel deployment automatically
+# Deployment (always use claude/* branches)
+git push -u origin claude/your-branch  # Auto-merges to main → Vercel deploys
 ```
 
 ## Tech Stack
@@ -148,27 +149,34 @@ INPUT → PARSE → IDEATE → [HUMAN REVIEW] → GENERATE → [HUMAN REVIEW] �
 
 ### Branch Strategy
 - **`main`** = production (auto-deploys to Vercel)
-- **`claude/*`** branches auto-merge to main via GitHub Actions
+- **`claude/*`** branches = ALL development (auto-merge to main)
 
-### For Normal Changes (Safe)
-```bash
-# Work directly or use claude/ branch
-git add .
-git commit -m "Clear description of change"
-git push origin main
-# OR
-git push origin claude/feature-name
-# Auto-merges to main → auto-deploys
+### How It Works (Fully Automatic)
+```
+Push to claude/* → GitHub Actions → PR Created → Auto-Merged → Vercel Deploys
 ```
 
-### For Risky Changes (Database migrations, auth, major refactors)
-1. Create branch: `git checkout -b claude/risky-change-name`
-2. Make changes and test thoroughly
-3. Push and create PR manually if auto-merge is concerning
-4. Or push to claude/ branch and monitor deployment
+**Never push directly to main.** Always use `claude/*` branches - they auto-merge within seconds.
+
+### Standard Workflow (All Changes)
+```bash
+# 1. Work on a claude/ branch
+git checkout -b claude/[description]
+
+# 2. Make changes and verify
+npm run build
+npm run lint
+
+# 3. Commit and push
+git add .
+git commit -m "Description of change"
+git push -u origin claude/[description]
+
+# 4. Done! Auto-merge handles the rest automatically
+# Your changes will be on main and deployed within ~2 minutes
+```
 
 ### Verification Before Push
-Every push to main should pass:
 - [ ] `npm run build` succeeds
 - [ ] `npm run lint` passes (or no new errors)
 - [ ] Changed functionality tested manually
@@ -274,6 +282,7 @@ The system automatically hands off between roles:
 | Task crosses into prompts/AI | Switch to **AI** role or consult guidelines |
 | Multiple parallel sessions done | **QA** merges all branches |
 | Something is broken | **QA** investigates and coordinates fix |
+| Complex bug needs deep investigation | **QA** hands to **Debug** for root cause analysis |
 
 ### Available Roles
 
@@ -285,6 +294,7 @@ The system automatically hands off between roles:
 | **Backend** | APIs, Supabase, integrations | `src/app/api/`, `src/lib/supabase/` |
 | **Full Stack** | Cross-cutting frontend + backend | Both frontend and backend |
 | **QA** | Testing, verification, merge & deploy | Test suite, quality gates |
+| **Debug** | Deep investigation, root cause analysis | All files (investigation access) |
 | **DevOps** | CI/CD, deployment, infrastructure | `.github/`, deployment config |
 | **Docs** | Documentation sync, architecture review | `CLAUDE.md`, `RULES.md`, `docs/`, `.claude/` |
 
@@ -297,6 +307,7 @@ You can explicitly select a role if you prefer:
 - `/role:backend` - Backend Developer
 - `/role:fullstack` - Full Stack Developer
 - `/role:qa` - QA & Merge Coordinator
+- `/role:debug` - Expert Debug Specialist
 - `/role:devops` - DevOps Engineer
 - `/role:docs` - Documentation & Sync Specialist
 

@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
       threadParts?: string[] | null;
       carouselSlides?: Array<{ slideNumber: number; text: string; imagePrompt: string }> | null;
       imagePrompt?: string;
-      carouselStyle?: string;
+      carouselStyle?: Record<string, unknown> | string;
     }) => ({
       idea_id: ideaId,
       brand_id: ideaData.brand_id,
@@ -142,7 +142,10 @@ export async function POST(request: NextRequest) {
       copy_hashtags: post.hashtags || [],
       copy_cta: post.cta || null,
       copy_thread_parts: post.threadParts || null,
-      copy_carousel_slides: post.carouselSlides || null,
+      // Convert carousel slides objects to JSON strings for TEXT[] column
+      copy_carousel_slides: post.carouselSlides
+        ? post.carouselSlides.map((slide) => JSON.stringify(slide))
+        : null,
       status: "draft",
       metadata: {
         imagePrompt: post.imagePrompt || null,
@@ -175,8 +178,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error in POST /api/content/generate:", error);
+    // Return more specific error message for debugging
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

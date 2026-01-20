@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Palette, GripVertical, Calendar } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ImageCarousel, type CarouselImage } from "@/components/ui/image-carousel";
 import { PlatformPostMockup } from "@/components/ui/platform-mockups";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -89,11 +91,47 @@ export default function ContentPage() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkApproving, setIsBulkApproving] = useState(false);
   const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
+  const [generatingCompositeCarousel, setGeneratingCompositeCarousel] = useState<string | null>(null);
+  const [selectedDesignPreset, setSelectedDesignPreset] = useState<string>("dark-coral");
+  const [selectedBackgroundStyle, setSelectedBackgroundStyle] = useState<string>("gradient-dark");
+  const [captionPanelWidth, setCaptionPanelWidth] = useState<number>(320); // Default ~1/3 width
+  const [isDraggingDivider, setIsDraggingDivider] = useState(false);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [schedulingContentId, setSchedulingContentId] = useState<string | null>(null);
+  const [scheduledDateTime, setScheduledDateTime] = useState<string>("");
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [publishMessage, setPublishMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     fetchContent();
     setSelectedItems(new Set());
   }, [filter]);
+
+  // Handle divider drag for resizing caption panel
+  useEffect(() => {
+    if (!isDraggingDivider) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = document.getElementById('slides-container');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const newWidth = rect.right - e.clientX;
+      // Clamp between 200px and 500px
+      setCaptionPanelWidth(Math.max(200, Math.min(500, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingDivider(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingDivider]);
 
   const fetchContent = async () => {
     try {
@@ -242,6 +280,43 @@ export default function ContentPage() {
     setTimeout(() => setImageMessage(null), 5000);
   };
 
+  // Generate carousel with composite system (consistent text rendering)
+  const handleGenerateCompositeCarousel = async (contentId: string, slides: CarouselSlide[]) => {
+    setGeneratingCompositeCarousel(contentId);
+    setImageMessage("Generating carousel with consistent styling...");
+    try {
+      const response = await fetch("/api/images/carousel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          slides: slides.map((s) => ({
+            slideNumber: s.slideNumber,
+            text: s.text,
+          })),
+          designPreset: selectedDesignPreset,
+          backgroundStyle: selectedBackgroundStyle,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setImageMessage(`Generated ${data.images.length} slides with consistent styling!`);
+        // Refresh images for this content
+        fetchImagesForContent(contentId);
+      } else {
+        setImageMessage(`Error: ${data.error || "Failed to generate carousel"}`);
+      }
+    } catch (error) {
+      console.error("Error generating composite carousel:", error);
+      setImageMessage("Error generating composite carousel");
+    } finally {
+      setGeneratingCompositeCarousel(null);
+      setTimeout(() => setImageMessage(null), 5000);
+    }
+  };
+
   const handleUpdateContent = async (id: string, updates: Partial<Content>) => {
     try {
       const res = await fetch("/api/content", {
@@ -275,6 +350,124 @@ export default function ContentPage() {
 
   const handleApprove = async (id: string) => {
     await handleUpdateContent(id, { status: "approved" });
+  };
+
+  const handlePublish = async (contentId: string) => {
+    setPublishingId(contentId);
+    setPublishMessage(null);
+    try {
+      const res = await fetch("/api/content/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPublishMessage({ type: "success", text: "Published successfully!" });
+        // Update local state
+        setContent((prev) =>
+          prev.map((c) =>
+            c.id === contentId ? { ...c, status: data.status || "published" } : c
+          )
+        );
+        // Clear message after 3 seconds
+        setTimeout(() => setPublishMessage(null), 3000);
+      } else {
+        setPublishMessage({ type: "error", text: data.error || "Failed to publish" });
+        setTimeout(() => setPublishMessage(null), 5000);
+      }
+    } catch (err) {
+      console.error("Error publishing:", err);
+      setPublishMessage({ type: "error", text: "Network error - please try again" });
+      setTimeout(() => setPublishMessage(null), 5000);
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
+  const handleRetry = async (contentId: string) => {
+    // Reset status to approved and try publishing again
+    setPublishingId(contentId);
+    setPublishMessage(null);
+    try {
+      // First reset status to approved
+      const resetRes = await fetch("/api/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: contentId, status: "approved" }),
+      });
+      if (!resetRes.ok) {
+        throw new Error("Failed to reset status");
+      }
+      // Update local state
+      setContent((prev) =>
+        prev.map((c) =>
+          c.id === contentId ? { ...c, status: "approved" } : c
+        )
+      );
+      setPublishMessage({ type: "success", text: "Status reset to approved. You can now publish again." });
+      setTimeout(() => setPublishMessage(null), 3000);
+    } catch (err) {
+      console.error("Error retrying:", err);
+      setPublishMessage({ type: "error", text: "Failed to reset status" });
+      setTimeout(() => setPublishMessage(null), 5000);
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
+  const openScheduleDialog = (contentId: string) => {
+    setSchedulingContentId(contentId);
+    // Default to tomorrow at 9:00 AM
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    const localDateTime = tomorrow.toISOString().slice(0, 16);
+    setScheduledDateTime(localDateTime);
+    setScheduleDialogOpen(true);
+  };
+
+  const handleSchedule = async () => {
+    if (!schedulingContentId || !scheduledDateTime) return;
+
+    setIsScheduling(true);
+    setPublishMessage(null);
+    try {
+      // Convert local datetime to ISO string
+      const scheduledFor = new Date(scheduledDateTime).toISOString();
+
+      const res = await fetch("/api/content/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId: schedulingContentId,
+          scheduledFor,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPublishMessage({ type: "success", text: `Scheduled for ${new Date(scheduledFor).toLocaleString()}` });
+        // Update local state
+        setContent((prev) =>
+          prev.map((c) =>
+            c.id === schedulingContentId
+              ? { ...c, status: "scheduled", scheduled_for: scheduledFor }
+              : c
+          )
+        );
+        setScheduleDialogOpen(false);
+        setTimeout(() => setPublishMessage(null), 3000);
+      } else {
+        setPublishMessage({ type: "error", text: data.error || "Failed to schedule" });
+        setTimeout(() => setPublishMessage(null), 5000);
+      }
+    } catch (err) {
+      console.error("Error scheduling:", err);
+      setPublishMessage({ type: "error", text: "Network error - please try again" });
+      setTimeout(() => setPublishMessage(null), 5000);
+    } finally {
+      setIsScheduling(false);
+    }
   };
 
   const handleDownloadImage = (url: string, platform: string, slideNumber?: number) => {
@@ -578,7 +771,7 @@ export default function ContentPage() {
     );
   };
 
-  // Render compact slide detail (filmstrip + single slide view)
+  // Render 3-column layout: Left (slide content), Center (carousel), Right (caption)
   const renderSlideFilmstripAndDetail = (
     item: Content,
     slides: CarouselSlide[],
@@ -590,187 +783,360 @@ export default function ContentPage() {
     const slideImgs = getSlideImages(item.id, slide.slideNumber);
     const versionIdx = getVersionIndex(item.id, slide.slideNumber);
     const safeVersionIdx = Math.min(versionIdx, Math.max(0, slideImgs.length - 1));
-    const currentImage = slideImgs[safeVersionIdx];
     const isGenerating = isSlideGenerating(item.id, slide.slideNumber);
-    const promptKey = `${item.id}-${slide.slideNumber}`;
-    const isPromptExpanded = expandedPrompts.has(promptKey);
+
+    // Get slide image for any index
+    const getSlideImage = (idx: number) => {
+      const s = slides[idx];
+      if (!s) return null;
+      const imgs = getSlideImages(item.id, s.slideNumber);
+      const vIdx = getVersionIndex(item.id, s.slideNumber);
+      return imgs[Math.min(vIdx, imgs.length - 1)] || null;
+    };
+
+    // Calculate card positions for fanned/overlapping effect
+    // Larger cards to fill vertical space, with more overlap so side cards go behind
+    const cardWidth = 320;
+    const cardOverlap = 220; // Heavy overlap so side cards peek out less
+    const visibleCardWidth = cardWidth - cardOverlap;
 
     return (
-      <div className="space-y-4">
-        {/* Filmstrip - Horizontal slide navigator */}
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 overflow-x-auto">
-          {slides.map((s, idx) => {
-            const sImgs = getSlideImages(item.id, s.slideNumber);
-            const vIdx = getVersionIndex(item.id, s.slideNumber);
-            const displayImg = sImgs[Math.min(vIdx, sImgs.length - 1)];
-            const hasImage = sImgs.length > 0;
-            const isActive = idx === currentSlideIdx;
-
-            return (
-              <button
-                key={s.slideNumber}
-                onClick={() => setCurrentSlide(item.id, idx)}
-                className={cn(
-                  "relative flex-shrink-0 rounded-lg overflow-hidden transition-all",
-                  "w-16 h-20",
-                  isActive
-                    ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-                    : "opacity-60 hover:opacity-100"
-                )}
-              >
-                {hasImage && displayImg ? (
-                  <img
-                    src={displayImg.url}
-                    alt={`Slide ${s.slideNumber}`}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                )}
-                <span className={cn(
-                  "absolute bottom-0.5 left-0.5 text-[10px] font-medium px-1 rounded",
-                  isActive ? "bg-primary text-primary-foreground" : "bg-black/60 text-white"
-                )}>
-                  {idx + 1}
-                </span>
-                {sImgs.length > 1 && (
-                  <span className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[9px] px-1 rounded">
-                    {sImgs.length}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Selected Slide Detail - Compact two-column layout */}
-        <div className="grid grid-cols-[280px_1fr] gap-4 items-start">
-          {/* Left: Constrained image */}
-          <div className="relative aspect-[4/5] rounded-lg overflow-hidden bg-black/20">
-            {currentImage ? (
-              <>
-                <img
-                  src={currentImage.url}
-                  alt={`Slide ${slide.slideNumber}`}
-                  className="w-full h-full object-cover"
-                />
-                {currentImage.model && (
-                  <div className="absolute top-2 left-2 z-10">
-                    {renderModelBadge(currentImage.model)}
-                  </div>
-                )}
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-7 w-7 p-0 z-10"
-                  onClick={() => handleDownloadImage(currentImage.url, item.platform, slide.slideNumber)}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                </Button>
-              </>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="text-center">
-                  <ImageIcon className="h-8 w-8 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">No image</p>
-                </div>
-              </div>
-            )}
+      <div
+        id="slides-container"
+        className="flex h-[580px] gap-4"
+        style={{ userSelect: isDraggingDivider ? 'none' : 'auto' }}
+      >
+        {/* Left Panel: Slide Content */}
+        <div className="w-[300px] flex-shrink-0 flex flex-col border-r border-muted/30 pr-4">
+          {/* Model Selector */}
+          <div className="mb-3">
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Model</label>
+            <select
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value as ImageModelKey)}
+            >
+              {MODEL_OPTIONS.map((model) => (
+                <option key={model.key} value={model.key}>{model.name}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Right: Content panel */}
-          <div className="space-y-3">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold">
-                Slide {currentSlideIdx + 1} of {slides.length}
-              </h4>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0"
-                  onClick={() => setCurrentSlide(item.id, currentSlideIdx > 0 ? currentSlideIdx - 1 : slides.length - 1)}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0"
-                  onClick={() => setCurrentSlide(item.id, currentSlideIdx < slides.length - 1 ? currentSlideIdx + 1 : 0)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+          {/* AI Generation / Composite Tabs */}
+          <Tabs defaultValue="ai-generation" className="flex-1 flex flex-col">
+            <TabsList className="w-full mb-3">
+              <TabsTrigger value="ai-generation" className="flex-1 text-xs">
+                <Sparkles className="h-3 w-3 mr-1" />
+                AI Generation
+              </TabsTrigger>
+              <TabsTrigger value="composite" className="flex-1 text-xs">
+                <Layers className="h-3 w-3 mr-1" />
+                Composite
+              </TabsTrigger>
+            </TabsList>
 
-            {/* Slide text */}
-            <div className="rounded-lg bg-muted/30 p-3">
-              <p className="text-sm leading-relaxed">{slide.text}</p>
-            </div>
+            {/* AI Generation Tab */}
+            <TabsContent value="ai-generation" className="flex-1 flex flex-col mt-0 space-y-3 overflow-y-auto">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Slide Content</div>
 
-            {/* Collapsible Image Prompt */}
-            <div>
-              <button
-                onClick={() => togglePrompt(promptKey)}
-                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full text-left"
-              >
-                {isPromptExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                Image Prompt
-                {!isPromptExpanded && (
-                  <span className="text-muted-foreground/60 truncate flex-1">
-                    — {truncateText(slide.imagePrompt, 60)}
-                  </span>
-                )}
-              </button>
-              {isPromptExpanded && (
-                <p className="text-xs text-muted-foreground mt-2 leading-relaxed pl-5">
-                  {slide.imagePrompt}
-                </p>
-              )}
-            </div>
-
-            {/* Version thumbnails (inline) */}
-            {slideImgs.length > 1 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Versions:</span>
-                <div className="flex gap-1">
-                  {slideImgs.map((img, idx) => (
-                    <button
-                      key={img.id}
-                      onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
-                      className={cn(
-                        "w-10 h-10 rounded overflow-hidden border-2 transition-all",
-                        idx === safeVersionIdx
-                          ? "border-primary"
-                          : "border-transparent opacity-50 hover:opacity-100"
-                      )}
-                    >
-                      <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+              {/* Slide Text */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Slide Text:</label>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit">
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Regenerate">
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-lg bg-muted/30 p-2.5 text-sm leading-relaxed">
+                  {slide.text}
                 </div>
               </div>
-            )}
 
-            {/* Actions */}
+              {/* Slide Prompt */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Slide Prompt:</label>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit">
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" title="Regenerate">
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-lg bg-muted/30 p-2.5 text-xs text-muted-foreground leading-relaxed max-h-[80px] overflow-y-auto">
+                  {slide.imagePrompt}
+                </div>
+              </div>
+
+              {/* Style Variants */}
+              <div className="space-y-2 flex-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Style Variants</label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <ImageIcon className="mr-1 h-3 w-3" />
+                    )}
+                    Generate Another
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {slideImgs.length > 0 ? (
+                    slideImgs.map((img, idx) => (
+                      <button
+                        key={img.id}
+                        onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
+                        className={cn(
+                          "aspect-[4/5] rounded-lg overflow-hidden border-2 transition-all",
+                          idx === safeVersionIdx
+                            ? "border-primary ring-2 ring-primary/30"
+                            : "border-muted opacity-70 hover:opacity-100"
+                        )}
+                        title={`Version ${idx + 1}${img.model ? ` (${IMAGE_MODELS[img.model as ImageModelKey]?.name || img.model})` : ''}`}
+                      >
+                        <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))
+                  ) : (
+                    <div className="col-span-3 py-8 text-center text-xs text-muted-foreground">
+                      No images generated yet
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Composite Tab */}
+            <TabsContent value="composite" className="flex-1 flex flex-col mt-0 space-y-3 overflow-y-auto">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Composite Settings</div>
+
+              {/* Design Preset */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Design Preset</label>
+                <select
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedDesignPreset}
+                  onChange={(e) => setSelectedDesignPreset(e.target.value)}
+                >
+                  <option value="dark-coral">Dark Coral</option>
+                  <option value="navy-gold">Navy Gold</option>
+                  <option value="light-minimal">Light Minimal</option>
+                  <option value="teal-cream">Teal Cream</option>
+                </select>
+              </div>
+
+              {/* Background Style */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Background Style</label>
+                <select
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedBackgroundStyle}
+                  onChange={(e) => setSelectedBackgroundStyle(e.target.value)}
+                >
+                  <option value="gradient-dark">Dark Gradient</option>
+                  <option value="gradient-warm">Warm Gradient</option>
+                  <option value="abstract-shapes">Abstract</option>
+                  <option value="bokeh-dark">Bokeh</option>
+                  <option value="minimal-solid">Solid</option>
+                </select>
+              </div>
+
+              {/* Generate Composite Button */}
+              <Button
+                className="w-full"
+                onClick={() => handleGenerateCompositeCarousel(item.id, slides)}
+                disabled={generatingCompositeCarousel === item.id}
+              >
+                {generatingCompositeCarousel === item.id ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Layers className="mr-2 h-4 w-4" />
+                    Generate Composite Carousel
+                  </>
+                )}
+              </Button>
+
+              <p className="text-xs text-muted-foreground">
+                Composite mode generates all slides with consistent text styling and design.
+              </p>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Center: Carousel */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Fanned card carousel */}
+          <div className="relative flex-1 flex items-center justify-center overflow-hidden rounded-xl bg-muted/20">
+            {/* Left Arrow */}
             <Button
-              size="sm"
+              size="icon"
               variant="outline"
-              onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)}
-              disabled={isGenerating}
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-30 h-10 w-10 rounded-full bg-background/90 backdrop-blur shadow-lg"
+              onClick={() => setCurrentSlide(item.id, currentSlideIdx > 0 ? currentSlideIdx - 1 : slides.length - 1)}
             >
-              {isGenerating ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
-              ) : currentImage ? (
-                <><RefreshCw className="mr-2 h-4 w-4" />Regenerate</>
-              ) : (
-                <><ImageIcon className="mr-2 h-4 w-4" />Generate Image</>
-              )}
+              <ChevronLeft className="h-5 w-5" />
             </Button>
+
+            {/* Fanned overlapping cards */}
+            <div className="relative flex items-center justify-center h-full w-full">
+              {slides.map((s, idx) => {
+                const cardImage = getSlideImage(idx);
+                const isCurrent = idx === currentSlideIdx;
+                const offset = idx - currentSlideIdx;
+
+                const translateX = offset * visibleCardWidth;
+                const scale = isCurrent ? 1 : 0.85;
+                const zIndex = isCurrent ? 20 : 10 - Math.abs(offset);
+                const opacity = Math.abs(offset) > 2 ? 0 : isCurrent ? 1 : 0.7;
+
+                return (
+                  <div
+                    key={s.slideNumber}
+                    className={cn(
+                      "absolute rounded-xl overflow-hidden cursor-pointer transition-all duration-300 ease-out shadow-xl",
+                      isCurrent && "ring-2 ring-primary shadow-2xl"
+                    )}
+                    style={{
+                      width: `${cardWidth}px`,
+                      height: `${cardWidth * 1.25}px`,
+                      transform: `translateX(${translateX}px) scale(${scale})`,
+                      zIndex,
+                      opacity,
+                    }}
+                    onClick={() => setCurrentSlide(item.id, idx)}
+                  >
+                    {cardImage ? (
+                      <div className="relative w-full h-full">
+                        <img
+                          src={cardImage.url}
+                          alt={`Slide ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <Badge
+                          className={cn(
+                            "absolute top-2 right-2 border-0",
+                            isCurrent ? "bg-primary text-primary-foreground" : "bg-black/60 text-white"
+                          )}
+                        >
+                          {idx + 1}
+                        </Badge>
+                        {isCurrent && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white border-0 h-7 w-7 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownloadImage(cardImage.url, item.platform, s.slideNumber);
+                            }}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-full h-full bg-muted/80 flex items-center justify-center border-2 border-dashed border-muted-foreground/30">
+                        <div className="text-center">
+                          <ImageIcon className="h-8 w-8 mx-auto mb-1 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">{idx + 1}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Right Arrow */}
+            <Button
+              size="icon"
+              variant="outline"
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-30 h-10 w-10 rounded-full bg-background/90 backdrop-blur shadow-lg"
+              onClick={() => setCurrentSlide(item.id, currentSlideIdx < slides.length - 1 ? currentSlideIdx + 1 : 0)}
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Thumbnail strip */}
+          <div className="mt-3 flex items-center justify-center gap-2">
+            {slides.map((s, idx) => {
+              const thumbImage = getSlideImage(idx);
+              const isCurrent = idx === currentSlideIdx;
+              return (
+                <button
+                  key={s.slideNumber}
+                  onClick={() => setCurrentSlide(item.id, idx)}
+                  className={cn(
+                    "w-16 h-20 rounded-lg overflow-hidden border-2 transition-all",
+                    isCurrent
+                      ? "border-primary ring-2 ring-primary/30 scale-105"
+                      : "border-muted opacity-60 hover:opacity-100"
+                  )}
+                >
+                  {thumbImage ? (
+                    <img src={thumbImage.url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-muted/50 flex items-center justify-center">
+                      <span className="text-xs text-muted-foreground">{idx + 1}</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Draggable Divider */}
+        <div
+          className={cn(
+            "w-3 flex items-center justify-center cursor-col-resize group hover:bg-primary/10 transition-colors rounded",
+            isDraggingDivider && "bg-primary/20"
+          )}
+          onMouseDown={() => setIsDraggingDivider(true)}
+        >
+          <div className={cn(
+            "w-1 h-12 rounded-full bg-muted-foreground/30 group-hover:bg-primary/50 transition-colors",
+            isDraggingDivider && "bg-primary"
+          )} />
+        </div>
+
+        {/* Right Panel: Caption */}
+        <div
+          className="flex flex-col"
+          style={{ width: `${captionPanelWidth}px` }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs font-medium text-muted-foreground">Caption</label>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex-1 rounded-lg bg-muted/20 p-4 overflow-y-auto">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{item.copy_primary}</p>
+            {item.copy_hashtags && item.copy_hashtags.length > 0 && (
+              <p className="text-sm text-primary mt-4">
+                {item.copy_hashtags.map((h) => `#${h}`).join(" ")}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -1116,17 +1482,64 @@ export default function ContentPage() {
                           )}
                         </TabsList>
 
-                        {/* Generate All button for carousels */}
+                        {/* Generate All buttons for carousels */}
                         {hasCarousel && carouselSlides && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
-                            disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
-                          >
-                            <Images className="mr-2 h-4 w-4" />
-                            Generate All Images
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            {/* Composite generation with presets */}
+                            <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1">
+                              <select
+                                className="h-7 text-xs bg-transparent border-0 outline-none cursor-pointer"
+                                value={selectedDesignPreset}
+                                onChange={(e) => setSelectedDesignPreset(e.target.value)}
+                                title="Design Preset"
+                              >
+                                <option value="dark-coral">Dark Coral</option>
+                                <option value="navy-gold">Navy Gold</option>
+                                <option value="light-minimal">Light Minimal</option>
+                                <option value="teal-cream">Teal Cream</option>
+                              </select>
+                              <select
+                                className="h-7 text-xs bg-transparent border-0 outline-none cursor-pointer"
+                                value={selectedBackgroundStyle}
+                                onChange={(e) => setSelectedBackgroundStyle(e.target.value)}
+                                title="Background Style"
+                              >
+                                <option value="gradient-dark">Dark Gradient</option>
+                                <option value="gradient-warm">Warm Gradient</option>
+                                <option value="abstract-shapes">Abstract</option>
+                                <option value="bokeh-dark">Bokeh</option>
+                                <option value="minimal-solid">Solid</option>
+                              </select>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => handleGenerateCompositeCarousel(item.id, carouselSlides)}
+                              disabled={generatingCompositeCarousel === item.id}
+                              title="Generate with consistent text styling"
+                            >
+                              {generatingCompositeCarousel === item.id ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <Layers className="mr-2 h-4 w-4" />
+                                  Composite All
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleGenerateAllSlides(item.id, carouselSlides)}
+                              disabled={Object.keys(generatingSlides[item.id] || {}).length > 0}
+                              title="Generate with AI image prompts"
+                            >
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              AI All
+                            </Button>
+                          </div>
                         )}
                       </div>
 
@@ -1402,14 +1815,60 @@ export default function ContentPage() {
                             Approve
                           </Button>
                         )}
-                        <Button variant="outline" size="sm">
-                          <Clock className="mr-2 h-4 w-4" />
-                          Schedule
-                        </Button>
-                        <Button size="sm">
-                          <Send className="mr-2 h-4 w-4" />
-                          Publish
-                        </Button>
+                        {item.status === "approved" && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openScheduleDialog(item.id)}
+                              disabled={publishingId === item.id}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              Schedule
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handlePublish(item.id)}
+                              disabled={publishingId === item.id}
+                            >
+                              {publishingId === item.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Send className="mr-2 h-4 w-4" />
+                              )}
+                              {publishingId === item.id ? "Publishing..." : "Publish Now"}
+                            </Button>
+                          </>
+                        )}
+                        {item.status === "scheduled" && item.scheduled_for && (
+                          <div className="flex items-center gap-2 text-sm text-blue-400">
+                            <Clock className="h-4 w-4" />
+                            <span>Scheduled for {new Date(item.scheduled_for).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {item.status === "published" && (
+                          <div className="flex items-center gap-2 text-sm text-emerald-400">
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span>Published</span>
+                          </div>
+                        )}
+                        {item.status === "failed" && (
+                          <>
+                            <div className="flex items-center gap-2 text-sm text-red-400">
+                              <AlertCircle className="h-4 w-4" />
+                              <span>Failed</span>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRetry(item.id)}
+                              disabled={publishingId === item.id}
+                            >
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Retry
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1441,6 +1900,74 @@ export default function ContentPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Publish/Schedule Message Banner */}
+      {publishMessage && (
+        <div
+          className={cn(
+            "fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 shadow-lg",
+            publishMessage.type === "success"
+              ? "bg-emerald-500/90 text-white"
+              : "bg-red-500/90 text-white"
+          )}
+        >
+          {publishMessage.type === "success" ? (
+            <CheckCircle2 className="h-5 w-5" />
+          ) : (
+            <AlertCircle className="h-5 w-5" />
+          )}
+          <span>{publishMessage.text}</span>
+        </div>
+      )}
+
+      {/* Schedule Dialog */}
+      <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule Post</DialogTitle>
+            <DialogDescription>
+              Choose when you want this content to be published.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="block text-sm font-medium mb-2">
+              Date and Time
+            </label>
+            <Input
+              type="datetime-local"
+              value={scheduledDateTime}
+              onChange={(e) => setScheduledDateTime(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+              className="w-full"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setScheduleDialogOpen(false)}
+              disabled={isScheduling}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSchedule}
+              disabled={isScheduling || !scheduledDateTime}
+            >
+              {isScheduling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scheduling...
+                </>
+              ) : (
+                <>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Schedule
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
