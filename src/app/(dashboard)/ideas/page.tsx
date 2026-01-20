@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { type VisualStyle } from "@/lib/prompts";
+import { useBrand } from "@/contexts/brand-context";
 
 interface Idea {
   id: string;
@@ -123,6 +124,7 @@ const STYLE_OPTIONS: StyleOption[] = ["auto", "typography", "photorealistic", "i
 
 export default function IdeasPage() {
   const router = useRouter();
+  const { selectedBrand } = useBrand();
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -136,7 +138,7 @@ export default function IdeasPage() {
 
   useEffect(() => {
     fetchIdeas();
-  }, [filter]);
+  }, [filter, selectedBrand?.id]);
 
   // Initialize selected platforms when ideas load
   useEffect(() => {
@@ -155,7 +157,10 @@ export default function IdeasPage() {
   const fetchIdeas = async () => {
     try {
       setIsLoading(true);
-      const url = filter ? `/api/ideas?status=${filter}` : "/api/ideas";
+      const params = new URLSearchParams();
+      if (filter) params.set("status", filter);
+      if (selectedBrand?.id) params.set("brandId", selectedBrand.id);
+      const url = `/api/ideas?${params.toString()}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.success) {

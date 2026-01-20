@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GenerationStatus } from "@/components/ui/generation-status";
 import { useGenerationJobs, type GenerationJob } from "@/hooks/use-generation-jobs";
 import { cn } from "@/lib/utils";
+import { useBrand } from "@/contexts/brand-context";
 
 interface ContentImage {
   id: string;
@@ -87,6 +88,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function ContentPage() {
+  const { selectedBrand } = useBrand();
   const [content, setContent] = useState<Content[]>([]);
   const [images, setImages] = useState<Record<string, ContentImage[]>>({});
   const [slideImages, setSlideImages] = useState<Record<string, Record<number, CarouselImage[]>>>({});
@@ -145,7 +147,7 @@ export default function ContentPage() {
   useEffect(() => {
     fetchContent();
     setSelectedItems(new Set());
-  }, [filter]);
+  }, [filter, selectedBrand?.id]);
 
   // Handle divider drag for resizing caption panel
   useEffect(() => {
@@ -175,7 +177,10 @@ export default function ContentPage() {
   const fetchContent = async () => {
     try {
       setIsLoading(true);
-      const url = filter ? `/api/content?status=${filter}` : "/api/content";
+      const params = new URLSearchParams();
+      if (filter) params.set("status", filter);
+      if (selectedBrand?.id) params.set("brandId", selectedBrand.id);
+      const url = `/api/content?${params.toString()}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
