@@ -10,6 +10,9 @@
  * - Basic positioning
  * - Colors, padding, margin
  * - Font styling
+ *
+ * All templates now use centered layouts with semi-transparent
+ * text backing for readability over photo backgrounds.
  */
 
 import React from 'react';
@@ -21,6 +24,41 @@ interface TemplateProps {
   width: number;
   height: number;
   hasBackground?: boolean; // If true, makes background transparent for compositing
+}
+
+/**
+ * Text container with semi-transparent backing
+ * Used across all templates for consistent readability over photos
+ */
+function TextContainer({
+  children,
+  design,
+  hasBackground,
+  centered = true,
+  maxWidth = '90%',
+}: {
+  children: React.ReactNode;
+  design: CarouselDesignSystem;
+  hasBackground: boolean;
+  centered?: boolean;
+  maxWidth?: string;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: centered ? 'center' : 'flex-start',
+        justifyContent: 'center',
+        backgroundColor: hasBackground ? 'rgba(0, 0, 0, 0.55)' : 'transparent',
+        borderRadius: hasBackground ? 16 : 0,
+        padding: hasBackground ? '40px 50px' : 0,
+        maxWidth,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 /**
@@ -50,15 +88,8 @@ export function HookSlideTemplate({
         fontFamily: design.fontFamily,
       }}
     >
-      {content.headline && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center',
-          }}
-        >
+      <TextContainer design={design} hasBackground={hasBackground} centered={true}>
+        {content.headline && (
           <span
             style={{
               fontSize: design.headlineFontSize,
@@ -66,24 +97,39 @@ export function HookSlideTemplate({
               color: design.primaryColor,
               lineHeight: 1.2,
               textAlign: 'center',
-              maxWidth: '90%',
             }}
           >
             {content.headline}
           </span>
-        </div>
-      )}
+        )}
 
-      {/* Accent line under headline */}
-      <div
-        style={{
-          marginTop: 30,
-          width: 120,
-          height: 4,
-          backgroundColor: design.accentColor,
-          borderRadius: 2,
-        }}
-      />
+        {/* Accent text below headline */}
+        {content.accentText && (
+          <span
+            style={{
+              fontSize: design.bodyFontSize * 1.2,
+              fontWeight: design.headlineFontWeight,
+              color: design.accentColor,
+              lineHeight: 1.3,
+              textAlign: 'center',
+              marginTop: 24,
+            }}
+          >
+            {content.accentText}
+          </span>
+        )}
+
+        {/* Accent line under text */}
+        <div
+          style={{
+            marginTop: 30,
+            width: 80,
+            height: 4,
+            backgroundColor: design.accentColor,
+            borderRadius: 2,
+          }}
+        />
+      </TextContainer>
     </div>
   );
 }
@@ -91,7 +137,7 @@ export function HookSlideTemplate({
 /**
  * Content Slide Template (Slides 2-5)
  *
- * Header at top, body text below.
+ * Centered text with headline and body.
  * Good for delivering value points.
  */
 export function ContentSlideTemplate({
@@ -108,56 +154,62 @@ export function ContentSlideTemplate({
         height,
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'flex-start',
+        alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: hasBackground ? 'transparent' : design.backgroundColor,
         padding: `${design.paddingY}px ${design.paddingX}px`,
         fontFamily: design.fontFamily,
       }}
     >
-      {/* Headline at top */}
-      {content.headline && (
-        <span
-          style={{
-            fontSize: design.headlineFontSize * 0.8,
-            fontWeight: design.headlineFontWeight,
-            color: design.primaryColor,
-            lineHeight: 1.3,
-            marginBottom: 40,
-          }}
-        >
-          {content.headline}
-        </span>
-      )}
+      <TextContainer design={design} hasBackground={hasBackground} centered={true} maxWidth="85%">
+        {/* Headline */}
+        {content.headline && (
+          <span
+            style={{
+              fontSize: design.headlineFontSize * 0.85,
+              fontWeight: design.headlineFontWeight,
+              color: design.primaryColor,
+              lineHeight: 1.25,
+              textAlign: 'center',
+              marginBottom: content.body || content.accentText ? 24 : 0,
+            }}
+          >
+            {content.headline}
+          </span>
+        )}
 
-      {/* Accent text (highlighted) */}
-      {content.accentText && (
-        <span
-          style={{
-            fontSize: design.bodyFontSize * 1.2,
-            fontWeight: design.headlineFontWeight,
-            color: design.accentColor,
-            lineHeight: 1.4,
-            marginBottom: 30,
-          }}
-        >
-          {content.accentText}
-        </span>
-      )}
+        {/* Accent text (highlighted) */}
+        {content.accentText && (
+          <span
+            style={{
+              fontSize: design.bodyFontSize * 1.15,
+              fontWeight: design.headlineFontWeight,
+              color: design.accentColor,
+              lineHeight: 1.35,
+              textAlign: 'center',
+              marginBottom: content.body ? 20 : 0,
+            }}
+          >
+            {content.accentText}
+          </span>
+        )}
 
-      {/* Body text */}
-      {content.body && (
-        <span
-          style={{
-            fontSize: design.bodyFontSize,
-            fontWeight: design.bodyFontWeight,
-            color: design.primaryColor,
-            lineHeight: 1.6,
-            opacity: 0.9,
-          }}
-        >
-          {content.body}
-        </span>
-      )}
+        {/* Body text */}
+        {content.body && (
+          <span
+            style={{
+              fontSize: design.bodyFontSize,
+              fontWeight: design.bodyFontWeight,
+              color: design.primaryColor,
+              lineHeight: 1.5,
+              textAlign: 'center',
+              opacity: 0.9,
+            }}
+          >
+            {content.body}
+          </span>
+        )}
+      </TextContainer>
     </div>
   );
 }
@@ -165,7 +217,7 @@ export function ContentSlideTemplate({
 /**
  * Numbered Slide Template
  *
- * Large number + title + description.
+ * Large number + title + description, all centered.
  * Great for listicles and step-by-step content.
  */
 export function NumberedSlideTemplate({
@@ -182,54 +234,59 @@ export function NumberedSlideTemplate({
         height,
         display: 'flex',
         flexDirection: 'column',
+        alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: hasBackground ? 'transparent' : design.backgroundColor,
         padding: `${design.paddingY}px ${design.paddingX}px`,
         fontFamily: design.fontFamily,
       }}
     >
-      {/* Large slide number */}
-      <span
-        style={{
-          fontSize: design.headlineFontSize * 1.5,
-          fontWeight: design.headlineFontWeight,
-          color: design.accentColor,
-          lineHeight: 1,
-          marginBottom: 20,
-        }}
-      >
-        {content.slideNumber.toString().padStart(2, '0')}
-      </span>
-
-      {/* Headline */}
-      {content.headline && (
+      <TextContainer design={design} hasBackground={hasBackground} centered={true} maxWidth="85%">
+        {/* Large slide number */}
         <span
           style={{
-            fontSize: design.headlineFontSize * 0.7,
+            fontSize: design.headlineFontSize * 1.3,
             fontWeight: design.headlineFontWeight,
-            color: design.primaryColor,
-            lineHeight: 1.3,
-            marginBottom: 24,
+            color: design.accentColor,
+            lineHeight: 1,
+            marginBottom: 16,
           }}
         >
-          {content.headline}
+          {content.slideNumber}
         </span>
-      )}
 
-      {/* Body text */}
-      {content.body && (
-        <span
-          style={{
-            fontSize: design.bodyFontSize,
-            fontWeight: design.bodyFontWeight,
-            color: design.primaryColor,
-            lineHeight: 1.6,
-            opacity: 0.85,
-          }}
-        >
-          {content.body}
-        </span>
-      )}
+        {/* Headline */}
+        {content.headline && (
+          <span
+            style={{
+              fontSize: design.headlineFontSize * 0.75,
+              fontWeight: design.headlineFontWeight,
+              color: design.primaryColor,
+              lineHeight: 1.25,
+              textAlign: 'center',
+              marginBottom: content.body ? 20 : 0,
+            }}
+          >
+            {content.headline}
+          </span>
+        )}
+
+        {/* Body text */}
+        {content.body && (
+          <span
+            style={{
+              fontSize: design.bodyFontSize,
+              fontWeight: design.bodyFontWeight,
+              color: design.primaryColor,
+              lineHeight: 1.5,
+              textAlign: 'center',
+              opacity: 0.85,
+            }}
+          >
+            {content.body}
+          </span>
+        )}
+      </TextContainer>
     </div>
   );
 }
@@ -237,7 +294,7 @@ export function NumberedSlideTemplate({
 /**
  * CTA Slide Template (Final slide)
  *
- * Summary/takeaway with call to action.
+ * Summary/takeaway with call to action button.
  * Designed to drive engagement.
  */
 export function CTASlideTemplate({
@@ -261,62 +318,64 @@ export function CTASlideTemplate({
         fontFamily: design.fontFamily,
       }}
     >
-      {/* Headline (summary/takeaway) */}
-      {content.headline && (
-        <span
-          style={{
-            fontSize: design.headlineFontSize * 0.85,
-            fontWeight: design.headlineFontWeight,
-            color: design.primaryColor,
-            lineHeight: 1.3,
-            textAlign: 'center',
-            marginBottom: 40,
-          }}
-        >
-          {content.headline}
-        </span>
-      )}
-
-      {/* CTA Button-like element */}
-      {content.ctaText && (
-        <div
-          style={{
-            display: 'flex',
-            backgroundColor: design.accentColor,
-            paddingLeft: 40,
-            paddingRight: 40,
-            paddingTop: 16,
-            paddingBottom: 16,
-            borderRadius: 8,
-          }}
-        >
+      <TextContainer design={design} hasBackground={hasBackground} centered={true} maxWidth="85%">
+        {/* Headline (summary/takeaway) */}
+        {content.headline && (
           <span
             style={{
-              fontSize: design.bodyFontSize,
+              fontSize: design.headlineFontSize * 0.8,
               fontWeight: design.headlineFontWeight,
-              color: design.backgroundColor,
+              color: design.primaryColor,
+              lineHeight: 1.25,
+              textAlign: 'center',
+              marginBottom: content.ctaText ? 32 : 0,
             }}
           >
-            {content.ctaText}
+            {content.headline}
           </span>
-        </div>
-      )}
+        )}
 
-      {/* Secondary text below CTA */}
-      {content.body && (
-        <span
-          style={{
-            fontSize: design.bodyFontSize * 0.9,
-            fontWeight: design.bodyFontWeight,
-            color: design.primaryColor,
-            opacity: 0.7,
-            marginTop: 30,
-            textAlign: 'center',
-          }}
-        >
-          {content.body}
-        </span>
-      )}
+        {/* CTA Button-like element */}
+        {content.ctaText && (
+          <div
+            style={{
+              display: 'flex',
+              backgroundColor: design.accentColor,
+              paddingLeft: 36,
+              paddingRight: 36,
+              paddingTop: 14,
+              paddingBottom: 14,
+              borderRadius: 8,
+              marginBottom: content.body ? 24 : 0,
+            }}
+          >
+            <span
+              style={{
+                fontSize: design.bodyFontSize,
+                fontWeight: design.headlineFontWeight,
+                color: '#ffffff',
+              }}
+            >
+              {content.ctaText}
+            </span>
+          </div>
+        )}
+
+        {/* Secondary text below CTA */}
+        {content.body && (
+          <span
+            style={{
+              fontSize: design.bodyFontSize * 0.9,
+              fontWeight: design.bodyFontWeight,
+              color: design.primaryColor,
+              opacity: 0.8,
+              textAlign: 'center',
+            }}
+          >
+            {content.body}
+          </span>
+        )}
+      </TextContainer>
     </div>
   );
 }

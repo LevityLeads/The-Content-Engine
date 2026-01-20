@@ -92,7 +92,8 @@ export default function ContentPage() {
   const [isBulkApproving, setIsBulkApproving] = useState(false);
   const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
   const [generatingCompositeCarousel, setGeneratingCompositeCarousel] = useState<string | null>(null);
-  const [selectedDesignPreset, setSelectedDesignPreset] = useState<string>("dark-coral");
+  const [selectedTextStyle, setSelectedTextStyle] = useState<string>("bold-editorial");
+  const [selectedTextColor, setSelectedTextColor] = useState<string>("white-coral");
   const [selectedBackgroundStyle, setSelectedBackgroundStyle] = useState<string>("gradient-dark");
   const [captionPanelWidth, setCaptionPanelWidth] = useState<number>(320); // Default ~1/3 width
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
@@ -294,7 +295,8 @@ export default function ContentPage() {
             slideNumber: s.slideNumber,
             text: s.text,
           })),
-          designPreset: selectedDesignPreset,
+          textStyle: selectedTextStyle,
+          textColor: selectedTextColor,
           backgroundStyle: selectedBackgroundStyle,
         }),
       });
@@ -924,18 +926,36 @@ export default function ContentPage() {
             <TabsContent value="composite" className="flex-1 flex flex-col mt-0 space-y-3 overflow-y-auto">
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Composite Settings</div>
 
-              {/* Design Preset */}
+              {/* Text Style */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Design Preset</label>
+                <label className="text-xs font-medium text-muted-foreground">Text Style</label>
                 <select
                   className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  value={selectedDesignPreset}
-                  onChange={(e) => setSelectedDesignPreset(e.target.value)}
+                  value={selectedTextStyle}
+                  onChange={(e) => setSelectedTextStyle(e.target.value)}
                 >
-                  <option value="dark-coral">Dark Coral</option>
-                  <option value="navy-gold">Navy Gold</option>
-                  <option value="light-minimal">Light Minimal</option>
-                  <option value="teal-cream">Teal Cream</option>
+                  <option value="bold-editorial">Bold Editorial</option>
+                  <option value="clean-modern">Clean Modern</option>
+                  <option value="dramatic">Dramatic</option>
+                  <option value="minimal">Minimal</option>
+                  <option value="statement">Statement</option>
+                </select>
+              </div>
+
+              {/* Text Color */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Text Color</label>
+                <select
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedTextColor}
+                  onChange={(e) => setSelectedTextColor(e.target.value)}
+                >
+                  <option value="white-coral">White & Coral</option>
+                  <option value="white-teal">White & Teal</option>
+                  <option value="white-gold">White & Gold</option>
+                  <option value="white-blue">White & Blue</option>
+                  <option value="dark-coral">Dark & Coral</option>
+                  <option value="dark-blue">Dark & Blue</option>
                 </select>
               </div>
 
@@ -1523,14 +1543,28 @@ export default function ContentPage() {
                             <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1">
                               <select
                                 className="h-7 text-xs bg-transparent border-0 outline-none cursor-pointer"
-                                value={selectedDesignPreset}
-                                onChange={(e) => setSelectedDesignPreset(e.target.value)}
-                                title="Design Preset"
+                                value={selectedTextStyle}
+                                onChange={(e) => setSelectedTextStyle(e.target.value)}
+                                title="Text Style"
                               >
-                                <option value="dark-coral">Dark Coral</option>
-                                <option value="navy-gold">Navy Gold</option>
-                                <option value="light-minimal">Light Minimal</option>
-                                <option value="teal-cream">Teal Cream</option>
+                                <option value="bold-editorial">Bold</option>
+                                <option value="clean-modern">Clean</option>
+                                <option value="dramatic">Dramatic</option>
+                                <option value="minimal">Minimal</option>
+                                <option value="statement">Statement</option>
+                              </select>
+                              <select
+                                className="h-7 text-xs bg-transparent border-0 outline-none cursor-pointer"
+                                value={selectedTextColor}
+                                onChange={(e) => setSelectedTextColor(e.target.value)}
+                                title="Text Color"
+                              >
+                                <option value="white-coral">White/Coral</option>
+                                <option value="white-teal">White/Teal</option>
+                                <option value="white-gold">White/Gold</option>
+                                <option value="white-blue">White/Blue</option>
+                                <option value="dark-coral">Dark/Coral</option>
+                                <option value="dark-blue">Dark/Blue</option>
                               </select>
                               <select
                                 className="h-7 text-xs bg-transparent border-0 outline-none cursor-pointer"
