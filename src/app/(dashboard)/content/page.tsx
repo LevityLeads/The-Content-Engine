@@ -649,11 +649,11 @@ export default function ContentPage() {
       const diff = cardIdx - currentSlideIdx;
       // For cards behind (positive diff), fan to the right and back
       // For cards ahead (negative diff), fan to the left and back
-      const rotation = diff * 8; // degrees of rotation per card
-      const translateX = diff * 45; // horizontal spread
-      const translateZ = -Math.abs(diff) * 80; // push back into screen
-      const scale = 1 - Math.abs(diff) * 0.08; // shrink as they go back
-      const opacity = Math.max(0.3, 1 - Math.abs(diff) * 0.25);
+      const rotation = diff * 12; // degrees of rotation per card
+      const translateX = diff * 70; // horizontal spread (increased for larger cards)
+      const translateZ = -Math.abs(diff) * 100; // push back into screen
+      const scale = 1 - Math.abs(diff) * 0.1; // shrink as they go back
+      const opacity = Math.max(0.4, 1 - Math.abs(diff) * 0.2);
       const zIndex = 10 - Math.abs(diff);
 
       return { rotation, translateX, translateZ, scale, opacity, zIndex };
@@ -684,8 +684,8 @@ export default function ContentPage() {
         <div className="space-y-4">
           {/* Card fan container with perspective */}
           <div
-            className="relative h-[420px] flex items-center justify-center"
-            style={{ perspective: '1000px' }}
+            className="relative h-[480px] flex items-center justify-center"
+            style={{ perspective: '1200px' }}
           >
             {visibleCards.map(({ idx, offset }) => {
               const cardImage = getSlideImage(idx);
@@ -696,7 +696,7 @@ export default function ContentPage() {
                 <div
                   key={idx}
                   className={cn(
-                    "absolute w-56 aspect-[4/5] rounded-xl overflow-hidden shadow-xl cursor-pointer transition-all duration-300",
+                    "absolute w-72 aspect-[4/5] rounded-xl overflow-hidden shadow-xl cursor-pointer transition-all duration-300",
                     isCurrent ? "ring-2 ring-primary shadow-2xl" : "hover:opacity-90"
                   )}
                   style={{
