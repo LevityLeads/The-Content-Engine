@@ -74,7 +74,13 @@ async function generateBackground(
   style: string,
   googleApiKey: string,
   modelConfig: { id: string; name: string },
-  brandColors?: { primary_color?: string; accent_color?: string; secondary_color?: string; image_style?: string }
+  brandColors?: {
+    primary_color?: string;
+    accent_color?: string;
+    secondary_color?: string;
+    image_style?: string;
+    fonts?: { heading?: string; body?: string };
+  }
 ): Promise<string | null> {
   // Typography/Abstract backgrounds (text-overlay optimized)
   const TYPOGRAPHY_BACKGROUNDS: Record<string, string> = {
@@ -160,6 +166,13 @@ BRAND COLOR REQUIREMENTS (MUST FOLLOW):
     prompt = prompt + brandColorDirective;
 
     console.log(`Background prompt enhanced with brand colors: ${primaryHex}, ${accentHex}`);
+  }
+
+  // BRAND FONTS: If detected, mention for any text elements in the background
+  if (brandColors?.fonts?.heading || brandColors?.fonts?.body) {
+    const headingFont = brandColors.fonts.heading || 'Inter';
+    const bodyFont = brandColors.fonts.body || headingFont;
+    prompt = prompt + `\n\nTYPOGRAPHY HINT: If any text elements appear, use fonts similar to "${headingFont}" for headlines and "${bodyFont}" for body text.`;
   }
 
   // If brand has a preferred image style, factor it in
@@ -305,8 +318,17 @@ export async function POST(request: NextRequest) {
       useNumberedSlides,   // If true, use numbered template for middle slides
       model: requestedModel,
       jobId: providedJobId, // Allow passing existing job ID for tracking
-      brandColors,         // NEW: Brand visual config { primary_color, accent_color, image_style, etc. }
+      brandColors,         // NEW: Brand visual config { primary_color, accent_color, image_style, fonts, etc. }
     } = body;
+
+    // Type the brandColors for TypeScript
+    const typedBrandColors = brandColors as {
+      primary_color?: string;
+      accent_color?: string;
+      secondary_color?: string;
+      image_style?: string;
+      fonts?: { heading?: string; body?: string };
+    } | undefined;
 
     // Map visual styles to default background styles
     const VISUAL_STYLE_TO_BACKGROUND: Record<string, string> = {
@@ -430,14 +452,14 @@ export async function POST(request: NextRequest) {
     if (typeof designPreset === 'object' && designPreset !== null) {
       // Full design system object passed directly
       design = designPreset as CarouselDesignSystem;
-    } else if (brandColors?.primary_color || brandColors?.accent_color) {
+    } else if (typedBrandColors?.primary_color || typedBrandColors?.accent_color) {
       // NEW: Build design system from brand colors
       const stylePreset = TEXT_STYLE_PRESETS[textStyle] || TEXT_STYLE_PRESETS['bold-editorial'];
 
       // Create a custom color preset from brand colors
       // For text visibility: use white text on dark backgrounds, dark text on light backgrounds
-      const primaryBrandColor = brandColors.primary_color || '#cc100a';
-      const accentBrandColor = brandColors.accent_color || brandColors.primary_color || '#ffffff';
+      const primaryBrandColor = typedBrandColors.primary_color || '#cc100a';
+      const accentBrandColor = typedBrandColors.accent_color || typedBrandColors.primary_color || '#ffffff';
 
       // Determine if we should use light or dark text based on the brand's primary color
       // (Brand primary is usually a dark accent, so we typically want white text)
@@ -490,8 +512,8 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        console.log(`Generating background: ${backgroundStyle}${brandColors ? ' with brand colors' : ''}`);
-        bgImage = await generateBackground(backgroundStyle, googleApiKey, modelConfig, brandColors);
+        console.log(`Generating background: ${backgroundStyle}${typedBrandColors ? ' with brand colors' : ''}`);
+        bgImage = await generateBackground(backgroundStyle, googleApiKey, modelConfig, typedBrandColors);
 
         if (!bgImage) {
           backgroundError = 'Background generation failed - using solid color fallback';

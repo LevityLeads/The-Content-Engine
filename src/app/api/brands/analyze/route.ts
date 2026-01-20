@@ -15,8 +15,117 @@ interface BrandAnalysis {
     accent_color: string;
     image_style: string;
     sample_images: string[];
+    fonts: {
+      heading: string;
+      body: string;
+      detected_fonts: string[];
+    };
   };
   summary: string;
+}
+
+// Common web-safe and system fonts to filter out
+const SYSTEM_FONTS = new Set([
+  'arial', 'helvetica', 'verdana', 'georgia', 'times', 'times new roman',
+  'courier', 'courier new', 'system-ui', '-apple-system', 'blinkmacsystemfont',
+  'segoe ui', 'roboto', 'oxygen', 'ubuntu', 'cantarell', 'fira sans', 'droid sans',
+  'helvetica neue', 'sans-serif', 'serif', 'monospace', 'cursive', 'fantasy', 'inherit'
+]);
+
+// Extract fonts from CSS/HTML
+function extractFonts(html: string): { heading: string; body: string; detected: string[] } {
+  const fonts = new Set<string>();
+
+  // 1. Extract from Google Fonts links (most reliable for identifying brand fonts)
+  const googleFontsMatches = html.match(/fonts\.googleapis\.com\/css2?\?family=([^"&]+)/gi) || [];
+  googleFontsMatches.forEach((match) => {
+    const familyMatch = match.match(/family=([^"&]+)/i);
+    if (familyMatch) {
+      // Decode URL encoding and extract font names
+      const decoded = decodeURIComponent(familyMatch[1]);
+      // Handle format: "Poppins:wght@400;700|Roboto:wght@300"
+      const fontFamilies = decoded.split('|').map(f => f.split(':')[0].replace(/\+/g, ' '));
+      fontFamilies.forEach(f => fonts.add(f.trim()));
+    }
+  });
+
+  // 2. Extract from Adobe Fonts/Typekit
+  const adobeFontsMatch = html.match(/use\.typekit\.net\/([a-z0-9]+)\.css/i);
+  if (adobeFontsMatch) {
+    // Can't easily get font names from Typekit ID, but note it's in use
+    fonts.add('[Adobe Fonts detected]');
+  }
+
+  // 3. Extract from CSS font-family declarations
+  const fontFamilyMatches = html.match(/font-family\s*:\s*([^;}{]+)/gi) || [];
+  fontFamilyMatches.forEach((match) => {
+    const value = match.replace(/font-family\s*:\s*/i, '').trim();
+    // Split by comma and clean up
+    const families = value.split(',').map(f =>
+      f.trim().replace(/["']/g, '').toLowerCase()
+    );
+
+    // Add non-system fonts
+    families.forEach(f => {
+      const normalized = f.toLowerCase().trim();
+      if (normalized && !SYSTEM_FONTS.has(normalized) && !normalized.startsWith('var(')) {
+        // Capitalize properly
+        const properCase = f.split(' ').map(w =>
+          w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+        ).join(' ');
+        fonts.add(properCase);
+      }
+    });
+  });
+
+  // 4. Extract from CSS variables (--font-heading, --font-body, etc.)
+  const fontVarMatches = html.match(/--font[^:]*:\s*([^;}{]+)/gi) || [];
+  fontVarMatches.forEach((match) => {
+    const value = match.split(':')[1]?.trim();
+    if (value) {
+      const families = value.split(',').map(f => f.trim().replace(/["']/g, ''));
+      families.forEach(f => {
+        const normalized = f.toLowerCase().trim();
+        if (normalized && !SYSTEM_FONTS.has(normalized) && !normalized.startsWith('var(')) {
+          const properCase = f.split(' ').map(w =>
+            w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+          ).join(' ');
+          fonts.add(properCase);
+        }
+      });
+    }
+  });
+
+  const detectedFonts = Array.from(fonts).filter(f => !f.startsWith('[')).slice(0, 5);
+
+  // Try to identify heading vs body font
+  // Usually: first font in CSS is primary/heading, or look for specific class names
+  let headingFont = detectedFonts[0] || 'Inter';
+  let bodyFont = detectedFonts[1] || detectedFonts[0] || 'Inter';
+
+  // Check for heading-specific declarations
+  const headingMatch = html.match(/(?:h1|h2|h3|\.heading|\.title)[^{]*\{[^}]*font-family\s*:\s*["']?([^;,"']+)/i);
+  if (headingMatch) {
+    const font = headingMatch[1].trim();
+    if (!SYSTEM_FONTS.has(font.toLowerCase())) {
+      headingFont = font.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    }
+  }
+
+  // Check for body-specific declarations
+  const bodyMatch = html.match(/(?:body|\.body|p)[^{]*\{[^}]*font-family\s*:\s*["']?([^;,"']+)/i);
+  if (bodyMatch) {
+    const font = bodyMatch[1].trim();
+    if (!SYSTEM_FONTS.has(font.toLowerCase())) {
+      bodyFont = font.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    }
+  }
+
+  return {
+    heading: headingFont,
+    body: bodyFont,
+    detected: detectedFonts,
+  };
 }
 
 // Extract colors from CSS/HTML
@@ -148,9 +257,12 @@ export async function POST(request: NextRequest) {
 
     // Extract elements from HTML
     const colors = extractColors(html);
+    const fonts = extractFonts(html);
     const images = extractImages(html, normalizedUrl);
     const textContent = extractTextContent(html);
     const meta = extractMeta(html);
+
+    console.log(`Brand analysis: Detected fonts - heading: ${fonts.heading}, body: ${fonts.body}, all: ${fonts.detected.join(', ')}`);
 
     // Use Claude to analyze the brand voice
     const anthropic = new Anthropic();
@@ -227,6 +339,11 @@ Respond ONLY with the JSON, no additional text.`;
         accent_color: accentColor,
         image_style: voiceAnalysis.image_style || "minimalist",
         sample_images: images,
+        fonts: {
+          heading: fonts.heading,
+          body: fonts.body,
+          detected_fonts: fonts.detected,
+        },
       },
       summary: voiceAnalysis.summary || `Brand profile extracted from ${new URL(normalizedUrl).hostname}`,
     };

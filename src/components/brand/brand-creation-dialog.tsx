@@ -40,6 +40,11 @@ interface BrandAnalysis {
     accent_color: string;
     image_style: string;
     sample_images: string[];
+    fonts?: {
+      heading: string;
+      body: string;
+      detected_fonts: string[];
+    };
   };
   summary: string;
 }
@@ -170,6 +175,11 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
       image_style: analysis.visual.image_style,
       color_palette: analysis.visual.color_palette,
       extracted_images: analysis.visual.sample_images,
+      // Include detected fonts for use in content generation
+      fonts: analysis.visual.fonts ? {
+        heading: analysis.visual.fonts.heading,
+        body: analysis.visual.fonts.body,
+      } : undefined,
     };
 
     const result = await createBrand({
