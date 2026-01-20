@@ -78,50 +78,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Get existing accounts for this brand
-    const { data: existingAccounts } = await supabase
+    const { data: existingForBrand } = await supabase
       .from("social_accounts")
-      .select("late_account_id")
+      .select("*")
       .eq("brand_id", brandId);
 
-    const existingIds = new Set(existingAccounts?.map((a) => a.late_account_id) || []);
+    const existingForBrandIds = new Set(existingForBrand?.map((a) => a.late_account_id) || []);
 
-    // Insert new accounts
+    // Insert or update accounts
     let newAccounts = 0;
     const allAccounts = [];
+    const errors: string[] = [];
 
     for (const lateAccount of lateAccounts) {
-      if (!existingIds.has(lateAccount.id)) {
-        // Insert new account
-        const { data: inserted, error: insertError } = await supabase
-          .from("social_accounts")
-          .insert({
-            brand_id: brandId,
-            platform: lateAccount.platform,
-            platform_user_id: lateAccount.id,
-            platform_username: lateAccount.username,
-            access_token_encrypted: "managed_by_late",
-            late_account_id: lateAccount.id,
-            is_active: lateAccount.isActive,
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("Error inserting account:", insertError);
-        } else {
-          newAccounts++;
-          allAccounts.push({
-            ...inserted,
-            profile_image_url: lateAccount.profileImageUrl,
-          });
-        }
-      } else {
-        // Update existing account with latest info
+      if (existingForBrandIds.has(lateAccount.id)) {
+        // Already linked to this brand - just update
         const { data: updated } = await supabase
           .from("social_accounts")
           .update({
             platform_username: lateAccount.username,
-            is_active: lateAccount.isActive,
+            is_active: lateAccount.isActive !== false,
             updated_at: new Date().toISOString(),
           })
           .eq("brand_id", brandId)
@@ -132,6 +108,33 @@ export async function POST(request: NextRequest) {
         if (updated) {
           allAccounts.push({
             ...updated,
+            profile_image_url: lateAccount.profileImageUrl,
+          });
+        }
+      } else {
+        // Not yet linked to this brand - insert new record
+        // (Each brand gets its own social_accounts record, even if same Late.dev account)
+        const { data: inserted, error: insertError } = await supabase
+          .from("social_accounts")
+          .insert({
+            brand_id: brandId,
+            platform: lateAccount.platform,
+            platform_user_id: `${lateAccount.id}_${brandId}`, // Make unique per brand
+            platform_username: lateAccount.username,
+            access_token_encrypted: "managed_by_late",
+            late_account_id: lateAccount.id,
+            is_active: lateAccount.isActive !== false,
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Error inserting account:", insertError);
+          errors.push(`Failed to link ${lateAccount.platform} (@${lateAccount.username}): ${insertError.message}`);
+        } else {
+          newAccounts++;
+          allAccounts.push({
+            ...inserted,
             profile_image_url: lateAccount.profileImageUrl,
           });
         }
@@ -158,6 +161,7 @@ export async function POST(request: NextRequest) {
       accounts: allAccounts,
       newAccounts,
       totalFromLate: lateAccounts.length,
+      errors: errors.length > 0 ? errors : undefined,
       debug: {
         lateAccountsFound: lateAccounts.map((a: { platform?: string; username?: string; id?: string }) => ({
           platform: a.platform,
@@ -165,6 +169,7 @@ export async function POST(request: NextRequest) {
           id: a.id,
         })),
         brandId,
+        existingForBrandCount: existingForBrand?.length || 0,
       },
     });
   } catch (error) {
