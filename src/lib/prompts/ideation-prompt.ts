@@ -121,7 +121,7 @@ If an idea fails ANY of these tests, improve it or discard it.
 
 ## Output Format
 
-Return a JSON array with exactly 4 ideas:
+Return a JSON array with the requested number of ideas:
 
 \`\`\`json
 {
@@ -159,13 +159,13 @@ Return a JSON array with exactly 4 ideas:
 
 ## Idea Diversity Requirements
 
-Your 4 ideas MUST include:
+Your ideas MUST include:
 1. At least 2 different angles (educational, entertaining, etc.)
 2. At least 2 different hook approaches (curiosity, controversy, etc.)
 3. At least 2 different suggested formats
 4. Ideas that work across different platforms
 
-Do NOT generate 4 variations of the same idea. Generate 4 DISTINCT ideas that approach the source material differently.
+Do NOT generate variations of the same idea. Generate DISTINCT ideas that approach the source material differently.
 
 ---
 
@@ -177,7 +177,8 @@ export const buildIdeationUserPrompt = (
   inputContent: string,
   inputType: string,
   brandVoicePrompt: string,
-  additionalContext?: string
+  additionalContext?: string,
+  ideaCount: number = 4
 ): string => {
   return `## Source Material
 
@@ -192,9 +193,9 @@ ${brandVoicePrompt}
 
 ${additionalContext ? `## Additional Context\n${additionalContext}\n\n---` : ""}
 
-Now generate 4 distinct, high-performing content ideas from this source material.
+Now generate exactly **${ideaCount}** distinct, high-performing content ideas from this source material.
 
 Focus on extracting the MOST valuable, shareable insights. Find the angles that will make people stop scrolling. Create ideas that serve the audience, not just fill a content calendar.
 
-Return ONLY valid JSON matching the specified format.`;
+Return ONLY valid JSON matching the specified format with exactly ${ideaCount} ideas.`;
 };

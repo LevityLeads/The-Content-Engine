@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Calendar } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Calendar, GripVertical, ArrowRight } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -87,6 +87,17 @@ const statusColors: Record<string, string> = {
   published: "bg-purple-500/20 text-purple-400 border-purple-500/30",
 };
 
+// Visual style options for style change
+const visualStyleOptions = [
+  { id: "typography", label: "Typography", description: "Bold text-focused" },
+  { id: "photorealistic", label: "Photo", description: "Photo-quality backgrounds" },
+  { id: "illustration", label: "Illustration", description: "Hand-drawn art" },
+  { id: "3d-render", label: "3D Render", description: "Modern 3D scenes" },
+  { id: "abstract-art", label: "Abstract", description: "Bold shapes & gradients" },
+  { id: "collage", label: "Collage", description: "Mixed media layers" },
+  { id: "experimental", label: "Experimental", description: "Wild & boundary-pushing" },
+];
+
 export default function ContentPage() {
   const { selectedBrand } = useBrand();
   const [content, setContent] = useState<Content[]>([]);
@@ -128,6 +139,9 @@ export default function ContentPage() {
   const [editingSlideText, setEditingSlideText] = useState<{ contentId: string; slideNumber: number } | null>(null);
   const [editedSlideText, setEditedSlideText] = useState<string>("");
   const [savingSlideText, setSavingSlideText] = useState(false);
+  // Visual style change state
+  const [selectedVisualStyle, setSelectedVisualStyle] = useState<Record<string, string>>({});
+  const [isChangingStyle, setIsChangingStyle] = useState<string | null>(null);
 
   // Generation job tracking
   const contentIds = content.map(c => c.id);
@@ -490,6 +504,80 @@ export default function ContentPage() {
       console.error("Error saving slide text:", err);
     } finally {
       setSavingSlideText(false);
+    }
+  };
+
+  // Regenerate carousel images with a different visual style
+  const handleRegenerateWithStyle = async (contentId: string, slides: CarouselSlide[], visualStyle: string) => {
+    setIsChangingStyle(contentId);
+    setImageMessage(`Regenerating with ${visualStyle} style...`);
+
+    try {
+      // Create a job to track the regeneration
+      let jobId: string | null = null;
+      const initialSlideStatuses = slides.map((slide) => ({
+        slideNumber: slide.slideNumber,
+        status: 'pending' as const,
+      }));
+
+      try {
+        const jobRes = await fetch("/api/images/jobs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contentId,
+            type: 'carousel',
+            totalItems: slides.length,
+            metadata: { slideStatuses: initialSlideStatuses, mode: 'style-change', newStyle: visualStyle },
+          }),
+        });
+        const jobData = await jobRes.json();
+        if (jobData.success) {
+          jobId = jobData.job.id;
+        }
+      } catch (err) {
+        console.error("Error creating job:", err);
+      }
+
+      // Call the carousel API with the new style
+      const response = await fetch("/api/images/carousel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          slides: slides.map((s) => ({
+            slideNumber: s.slideNumber,
+            text: s.text,
+            imagePrompt: s.imagePrompt,
+          })),
+          model: selectedModel,
+          textStyle: selectedTextStyle,
+          textColor: selectedTextColor,
+          backgroundStyle: selectedBackgroundStyle,
+          visualStyle, // Pass the new visual style
+          jobId,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setImageMessage(`Style changed to ${visualStyle}! Regenerating images...`);
+        // Update local selected style
+        setSelectedVisualStyle((prev) => ({ ...prev, [contentId]: visualStyle }));
+        // Refresh images after a short delay
+        setTimeout(() => {
+          fetchImagesForContent(contentId);
+          refreshJobs();
+        }, 1000);
+      } else {
+        setImageMessage(data.error || "Failed to regenerate with new style");
+      }
+    } catch (err) {
+      console.error("Error regenerating with style:", err);
+      setImageMessage("Error regenerating with new style");
+    } finally {
+      setIsChangingStyle(null);
+      setTimeout(() => setImageMessage(null), 5000);
     }
   };
 
@@ -912,6 +1000,193 @@ export default function ContentPage() {
 
   const draftCount = content.filter((c) => c.status === "draft").length;
   const approvedCount = content.filter((c) => c.status === "approved").length;
+  const scheduledCount = content.filter((c) => c.status === "scheduled").length;
+  const publishedCount = content.filter((c) => c.status === "published").length;
+
+  // Kanban board columns configuration
+  const kanbanColumns = [
+    {
+      id: "draft",
+      title: "Draft",
+      color: "bg-yellow-500",
+      bgColor: "bg-yellow-500/10",
+      borderColor: "border-yellow-500/30",
+      count: draftCount,
+      icon: <Pencil className="h-4 w-4" />
+    },
+    {
+      id: "approved",
+      title: "Approved",
+      color: "bg-emerald-500",
+      bgColor: "bg-emerald-500/10",
+      borderColor: "border-emerald-500/30",
+      count: approvedCount,
+      icon: <CheckCircle2 className="h-4 w-4" />
+    },
+    {
+      id: "scheduled",
+      title: "Scheduled",
+      color: "bg-blue-500",
+      bgColor: "bg-blue-500/10",
+      borderColor: "border-blue-500/30",
+      count: scheduledCount,
+      icon: <Calendar className="h-4 w-4" />
+    },
+    {
+      id: "published",
+      title: "Published",
+      color: "bg-purple-500",
+      bgColor: "bg-purple-500/10",
+      borderColor: "border-purple-500/30",
+      count: publishedCount,
+      icon: <Send className="h-4 w-4" />
+    },
+  ];
+
+  // Render a single Kanban card
+  const renderKanbanCard = (item: Content) => {
+    const hasCarousel = !!(item.copy_carousel_slides && item.copy_carousel_slides.length > 0);
+    const { parsed: carouselSlides } = parseCarouselSlides(item.copy_carousel_slides);
+    const totalSlides = carouselSlides?.length || 0;
+    const postType = getPostType(item);
+    const allImages = getAllContentImages(item.id);
+    const hasImages = hasGeneratedImage(item.id);
+
+    return (
+      <div
+        key={item.id}
+        className="group rounded-lg border bg-card p-3 shadow-sm hover:shadow-md transition-all cursor-pointer hover:border-primary/50"
+        onClick={() => {
+          setExpandedCards(new Set([item.id]));
+          setFilter(item.status);
+        }}
+      >
+        {/* Image Preview */}
+        {hasImages && allImages[0] && (
+          <div className="relative mb-3 aspect-[4/3] rounded-md overflow-hidden">
+            <img
+              src={allImages[0].url}
+              alt="Preview"
+              className="w-full h-full object-cover"
+            />
+            {hasCarousel && totalSlides > 1 && (
+              <Badge className="absolute top-1.5 right-1.5 bg-black/70 text-white border-0 text-xs">
+                <Images className="h-3 w-3 mr-1" />
+                {totalSlides}
+              </Badge>
+            )}
+          </div>
+        )}
+
+        {/* Platform Icon */}
+        <div className="flex items-start gap-2 mb-2">
+          <div className={cn("p-1.5 rounded", platformColors[item.platform] || "bg-gray-500")}>
+            {platformIcons[item.platform] || <FileText className="h-3 w-3 text-white" />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium line-clamp-2">
+              {item.ideas?.concept || item.copy_primary.slice(0, 60)}
+            </p>
+          </div>
+        </div>
+
+        {/* Meta info */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="text-[10px]">
+            {postType}
+          </Badge>
+          <span className="text-[10px] text-muted-foreground">
+            {formatRelativeTime(item.created_at)}
+          </span>
+        </div>
+
+        {/* Quick action on hover */}
+        <div className="mt-2 pt-2 border-t opacity-0 group-hover:opacity-100 transition-opacity">
+          {item.status === "draft" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-full text-xs text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleApprove(item.id);
+              }}
+            >
+              <Check className="h-3 w-3 mr-1" />
+              Approve
+            </Button>
+          )}
+          {item.status === "approved" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-full text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                openScheduleDialog(item.id);
+              }}
+            >
+              <Calendar className="h-3 w-3 mr-1" />
+              Schedule
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render the Kanban board
+  const renderKanbanBoard = () => {
+    return (
+      <div className="grid grid-cols-4 gap-4 min-h-[600px]">
+        {kanbanColumns.map((column) => {
+          const columnItems = content.filter((c) => c.status === column.id);
+          return (
+            <div
+              key={column.id}
+              className={cn(
+                "flex flex-col rounded-xl border-2",
+                column.borderColor,
+                column.bgColor
+              )}
+            >
+              {/* Column Header */}
+              <div className="flex items-center justify-between p-3 border-b border-inherit">
+                <div className="flex items-center gap-2">
+                  <div className={cn("p-1.5 rounded-lg text-white", column.color)}>
+                    {column.icon}
+                  </div>
+                  <span className="font-semibold">{column.title}</span>
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {column.count}
+                </Badge>
+              </div>
+
+              {/* Column Content */}
+              <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-320px)]">
+                {columnItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    <FileText className="h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-xs">No {column.id} content</p>
+                  </div>
+                ) : (
+                  columnItems.map((item) => renderKanbanCard(item))
+                )}
+              </div>
+
+              {/* Column Footer - Flow indicator */}
+              {column.id !== "published" && (
+                <div className="p-2 border-t border-inherit flex justify-center">
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   const renderModelBadge = (model: string) => {
     const modelKey = model as ImageModelKey;
@@ -977,6 +1252,44 @@ export default function ContentPage() {
                 <option key={model.key} value={model.key}>{model.name}</option>
               ))}
             </select>
+          </div>
+
+          {/* Visual Style Selector with Change Button */}
+          <div className="mb-2">
+            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Visual Style</label>
+            <div className="flex gap-1.5">
+              <select
+                className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
+                value={selectedVisualStyle[item.id] || item.metadata?.carouselStyle || "typography"}
+                onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
+              >
+                {visualStyleOptions.map((style) => (
+                  <option key={style.id} value={style.id}>{style.label}</option>
+                ))}
+              </select>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-[10px]"
+                onClick={() => handleRegenerateWithStyle(
+                  item.id,
+                  slides,
+                  selectedVisualStyle[item.id] || item.metadata?.carouselStyle || "typography"
+                )}
+                disabled={isChangingStyle === item.id || generatingCompositeCarousel === item.id}
+              >
+                {isChangingStyle === item.id ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+              </Button>
+            </div>
+            {item.metadata?.carouselStyle && (
+              <div className="text-[9px] text-muted-foreground mt-0.5">
+                Current: {visualStyleOptions.find(s => s.id === item.metadata?.carouselStyle)?.label || item.metadata.carouselStyle}
+              </div>
+            )}
           </div>
 
           {/* AI Generation / Composite Tabs */}
@@ -1371,8 +1684,8 @@ export default function ContentPage() {
         ))}
       </div>
 
-      {/* Bulk Actions Bar */}
-      {content.length > 0 && (
+      {/* Bulk Actions Bar - hidden in Kanban view */}
+      {content.length > 0 && filter !== "" && (
         <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
           <div className="flex items-center gap-3">
             <Button
@@ -1459,8 +1772,11 @@ export default function ContentPage() {
         </Card>
       )}
 
-      {/* Content List - Collapsible Cards */}
-      {!isLoading && content.length > 0 && (
+      {/* Kanban Board View - when "All" filter is selected */}
+      {!isLoading && filter === "" && content.length > 0 && renderKanbanBoard()}
+
+      {/* Content List - Collapsible Cards (when specific filter selected) */}
+      {!isLoading && filter !== "" && content.length > 0 && (
         <div className="space-y-2">
           {content.map((item) => {
             const isExpanded = expandedCards.has(item.id);

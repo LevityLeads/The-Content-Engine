@@ -11,7 +11,8 @@ export type VisualStyle =
   | 'illustration'
   | '3d-render'
   | 'abstract-art'
-  | 'collage';
+  | 'collage'
+  | 'experimental';
 
 export interface StyleDefinition {
   id: VisualStyle;
@@ -213,6 +214,44 @@ export const VISUAL_STYLES: Record<VisualStyle, StyleDefinition> = {
     `,
     examplePrompt: `Mixed media collage style on off-white textured paper background (#F5F5F0). Central cutout image of vintage camera (desaturated photo). Surrounding elements: torn coral paper shape (#FF6B6B), black ink scribble, small star stickers in gold. Text in bold black (#1a1a1a) typewriter font reading "Document everything." Additional handwritten annotation "yes, even the failures" in smaller script below. Subtle paper grain texture. 90s zine aesthetic with modern sensibility.`,
     textOverlayRules: 'Text should feel like part of the collage - can be layered, rotated slightly, or have cut-out effects. Mix font styles for visual interest. Ensure primary message remains readable.'
+  },
+
+  'experimental': {
+    id: 'experimental',
+    name: 'Experimental / Wild',
+    description: 'Boundary-pushing, avant-garde visuals that break conventions. Go wild, be unexpected, create something never seen before.',
+    bestFor: [
+      'Creative brands wanting to stand out',
+      'Disruptive messaging',
+      'Art and design content',
+      'Innovation announcements',
+      'Thought leadership wanting differentiation',
+      'Gen-Z audiences',
+      'Brand moments that need virality',
+      'Content that should feel "different"'
+    ],
+    avoidFor: [
+      'Conservative brands',
+      'Financial/legal content',
+      'Healthcare/safety messaging',
+      'Traditional audiences',
+      'Content requiring clarity over creativity'
+    ],
+    promptGuidance: `
+      - BREAK ALL RULES - this is about creating something unprecedented
+      - Mix unexpected elements: surrealism meets tech, nature meets neon, organic meets digital
+      - Use unusual compositions: extreme angles, impossible perspectives, dream logic
+      - Combine styles that shouldn't work together but somehow do
+      - Experiment with: glitch art, vaporwave, brutalist design, maximalism, acid graphics
+      - Push color boundaries: neon + pastels, unexpected combinations
+      - Include unexpected textures: chrome, liquid metal, organic materials, digital noise
+      - Create visual tension and intrigue
+      - Make people stop and say "wait, what is this?"
+      - Text can be distorted, fragmented, or integrated in surprising ways
+      - The goal is MEMORABILITY over conventionality
+    `,
+    examplePrompt: `Surreal experimental composition: a giant chrome hand emerging from a pool of liquid gold, holding a small planet Earth. Background is a gradient from hot pink (#FF1493) to electric blue (#00FFFF) with floating geometric shapes and glitch effects. Stars and digital noise particles scattered throughout. Text "THE FUTURE IS WEIRD" written in distorted, melting 3D letters that appear to be dripping chrome. Multiple light sources creating impossible shadows. Overall aesthetic: fever dream meets tech utopia. Extremely high detail, maximum visual impact.`,
+    textOverlayRules: 'Text can be anything: distorted, fragmented, 3D, melting, glitching, integrated into surreal elements. Readability is secondary to impact - but ensure the core message is still decipherable. Make it memorable.'
   }
 };
 
@@ -251,6 +290,11 @@ You must select the optimal visual style for this carousel based on the content 
 6. **collage** - Mixed media with layered elements
    BEST FOR: Pop culture, fashion, music, youth content, retrospectives, creative brands
    AVOID FOR: Minimalist brands, corporate content, clean/simple messaging
+
+7. **experimental** - Boundary-pushing, avant-garde visuals (USE SPARINGLY)
+   BEST FOR: Creative brands, disruptive messaging, virality-seeking content, Gen-Z, thought leadership
+   AVOID FOR: Conservative brands, healthcare/legal, traditional audiences
+   NOTE: This style breaks all rules - use when you want something truly unexpected and memorable
 
 ### Selection Process:
 

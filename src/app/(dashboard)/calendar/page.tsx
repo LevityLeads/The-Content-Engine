@@ -17,6 +17,11 @@ import {
   CheckCircle2,
   Images,
   AlertCircle,
+  Plus,
+  Eye,
+  MoreHorizontal,
+  ArrowUpRight,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,7 +41,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useBrand } from "@/contexts/brand-context";
 
 interface Content {
   id: string;
@@ -52,6 +64,11 @@ interface Content {
     concept: string;
     angle: string;
   };
+}
+
+interface ContentImage {
+  id: string;
+  url: string;
 }
 
 const platformIcons: Record<string, React.ReactNode> = {
@@ -74,11 +91,23 @@ const statusColors: Record<string, string> = {
   failed: "bg-red-500/20 text-red-400 border-red-500/30",
 };
 
+const statusDotColors: Record<string, string> = {
+  scheduled: "bg-blue-500",
+  published: "bg-emerald-500",
+  approved: "bg-amber-500",
+  draft: "bg-gray-400",
+};
+
+type ViewMode = "month" | "week";
+
 export default function CalendarPage() {
+  const { selectedBrand } = useBrand();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [content, setContent] = useState<Content[]>([]);
+  const [contentImages, setContentImages] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [newScheduleDate, setNewScheduleDate] = useState("");
@@ -88,20 +117,22 @@ export default function CalendarPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [hoveredContentId, setHoveredContentId] = useState<string | null>(null);
 
   // Fetch all scheduled and published content
   useEffect(() => {
     fetchContent();
-  }, []);
+  }, [selectedBrand?.id]);
 
   const fetchContent = async () => {
     setIsLoading(true);
     try {
-      // Fetch scheduled and published content
+      // Fetch scheduled, published, and approved content
+      const params = selectedBrand?.id ? `brandId=${selectedBrand.id}&` : "";
       const [scheduledRes, publishedRes, approvedRes] = await Promise.all([
-        fetch("/api/content?status=scheduled&limit=100"),
-        fetch("/api/content?status=published&limit=100"),
-        fetch("/api/content?status=approved&limit=50"),
+        fetch(`/api/content?${params}status=scheduled&limit=100`),
+        fetch(`/api/content?${params}status=published&limit=100`),
+        fetch(`/api/content?${params}status=approved&limit=50`),
       ]);
 
       const [scheduledData, publishedData, approvedData] = await Promise.all([
@@ -117,10 +148,37 @@ export default function CalendarPage() {
       ];
 
       setContent(allContent);
+
+      // Fetch images for content with images
+      for (const item of allContent) {
+        if (item.id && !contentImages[item.id]) {
+          fetchImageForContent(item.id);
+        }
+      }
     } catch (error) {
       console.error("Error fetching content:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchImageForContent = async (contentId: string) => {
+    try {
+      const res = await fetch(`/api/images/generate?contentId=${contentId}`);
+      const data = await res.json();
+      if (data.success && data.images && data.images.length > 0) {
+        const firstValidImage = data.images.find((img: ContentImage) =>
+          img.url && !img.url.startsWith("placeholder:")
+        );
+        if (firstValidImage) {
+          setContentImages(prev => ({
+            ...prev,
+            [contentId]: firstValidImage.url
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching image:", err);
     }
   };
 
@@ -171,6 +229,20 @@ export default function CalendarPage() {
     return days;
   }, [year, month, startingDayOfWeek, daysInMonth]);
 
+  // Week view days
+  const weekDays = useMemo(() => {
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+
+    const days: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startOfWeek);
+      day.setDate(startOfWeek.getDate() + i);
+      days.push(day);
+    }
+    return days;
+  }, [currentDate]);
+
   // Group content by date
   const contentByDate = useMemo(() => {
     const map: Record<string, Content[]> = {};
@@ -220,12 +292,24 @@ export default function CalendarPage() {
   }, [content]);
 
   // Navigation handlers
-  const goToPreviousMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
+  const goToPrevious = () => {
+    if (viewMode === "month") {
+      setCurrentDate(new Date(year, month - 1, 1));
+    } else {
+      const newDate = new Date(currentDate);
+      newDate.setDate(currentDate.getDate() - 7);
+      setCurrentDate(newDate);
+    }
   };
 
-  const goToNextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
+  const goToNext = () => {
+    if (viewMode === "month") {
+      setCurrentDate(new Date(year, month + 1, 1));
+    } else {
+      const newDate = new Date(currentDate);
+      newDate.setDate(currentDate.getDate() + 7);
+      setCurrentDate(newDate);
+    }
   };
 
   const goToToday = () => {
@@ -301,7 +385,6 @@ export default function CalendarPage() {
   // Open reschedule dialog
   const openRescheduleDialog = (item: Content) => {
     setSelectedContent(item);
-    // Set default to current scheduled time or tomorrow
     const defaultDate = item.scheduled_for
       ? new Date(item.scheduled_for).toISOString().slice(0, 16)
       : (() => {
@@ -325,17 +408,241 @@ export default function CalendarPage() {
 
   const selectedDateContent = selectedDate ? getContentForDate(selectedDate) : [];
 
+  // Render content card for calendar
+  const renderContentPill = (item: Content, isCompact = true) => {
+    const hasImage = contentImages[item.id];
+    const hasCarousel = item.copy_carousel_slides && item.copy_carousel_slides.length > 0;
+
+    if (isCompact) {
+      return (
+        <TooltipProvider key={item.id}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className={cn(
+                  "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] cursor-pointer transition-all hover:ring-2 hover:ring-primary/50",
+                  item.status === "published" ? "bg-emerald-500/20" : "bg-blue-500/20"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openRescheduleDialog(item);
+                }}
+                onMouseEnter={() => setHoveredContentId(item.id)}
+                onMouseLeave={() => setHoveredContentId(null)}
+              >
+                <div className={cn("w-4 h-4 rounded flex items-center justify-center text-white", platformColors[item.platform])}>
+                  {platformIcons[item.platform]}
+                </div>
+                <span className="truncate max-w-[80px]">
+                  {item.scheduled_for && new Date(item.scheduled_for).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="w-64 p-0">
+              <div className="p-3">
+                {hasImage && (
+                  <div className="mb-2 rounded-md overflow-hidden aspect-[4/3]">
+                    <img src={hasImage} alt="" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <p className="text-sm font-medium mb-1">
+                  {item.ideas?.concept || item.copy_primary.slice(0, 60)}...
+                </p>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={cn("text-[10px]", statusColors[item.status])}>
+                    {item.status}
+                  </Badge>
+                  {hasCarousel && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      <Images className="h-2.5 w-2.5 mr-1" />
+                      {item.copy_carousel_slides?.length}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return (
+      <div
+        key={item.id}
+        className="flex items-start gap-3 rounded-lg border p-3 bg-card hover:bg-muted/50 transition-colors cursor-pointer group"
+        onClick={() => openRescheduleDialog(item)}
+      >
+        {hasImage && (
+          <div className="w-14 h-14 rounded-md overflow-hidden flex-shrink-0">
+            <img src={hasImage} alt="" className="w-full h-full object-cover" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-2">
+            <div
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded text-white flex-shrink-0",
+                platformColors[item.platform] || "bg-gray-500"
+              )}
+            >
+              {platformIcons[item.platform] || <FileText className="h-3 w-3" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">
+                {item.ideas?.concept || item.copy_primary.slice(0, 40)}...
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="outline" className={cn("text-[10px]", statusColors[item.status])}>
+                  {item.status}
+                </Badge>
+                {item.scheduled_for && (
+                  <span className="text-[10px] text-muted-foreground">
+                    {new Date(item.scheduled_for).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                )}
+                {hasCarousel && (
+                  <Badge variant="secondary" className="text-[10px] h-4">
+                    <Images className="mr-1 h-2.5 w-2.5" />
+                    {item.copy_carousel_slides?.length}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {item.status === "scheduled" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-red-500"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleUnschedule(item.id);
+              }}
+              disabled={isUnscheduling === item.id}
+            >
+              {isUnscheduling === item.id ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <X className="h-3 w-3" />
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render week view
+  const renderWeekView = () => {
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+
+    return (
+      <div className="border rounded-xl overflow-hidden bg-card">
+        {/* Week header */}
+        <div className="grid grid-cols-8 border-b">
+          <div className="p-3 border-r bg-muted/30">
+            <span className="text-xs text-muted-foreground">Time</span>
+          </div>
+          {weekDays.map((day, idx) => (
+            <div
+              key={idx}
+              className={cn(
+                "p-3 text-center cursor-pointer transition-colors",
+                isToday(day) && "bg-primary/10",
+                isSelected(day) && "bg-primary/20",
+                idx < 6 && "border-r"
+              )}
+              onClick={() => setSelectedDate(day)}
+            >
+              <p className="text-xs text-muted-foreground">
+                {day.toLocaleDateString("en-US", { weekday: "short" })}
+              </p>
+              <p className={cn(
+                "text-lg font-semibold",
+                isToday(day) && "text-primary"
+              )}>
+                {day.getDate()}
+              </p>
+              {getContentForDate(day).length > 0 && (
+                <div className="flex justify-center gap-0.5 mt-1">
+                  {getContentForDate(day).slice(0, 3).map((item, i) => (
+                    <div key={i} className={cn("h-1.5 w-1.5 rounded-full", statusDotColors[item.status])} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Time grid */}
+        <div className="max-h-[500px] overflow-y-auto">
+          {hours.slice(6, 22).map((hour) => (
+            <div key={hour} className="grid grid-cols-8 border-b last:border-b-0">
+              <div className="p-2 border-r bg-muted/10 text-xs text-muted-foreground text-right pr-3">
+                {hour.toString().padStart(2, '0')}:00
+              </div>
+              {weekDays.map((day, idx) => {
+                const dayContent = getContentForDate(day).filter((item) => {
+                  if (!item.scheduled_for) return false;
+                  const scheduledHour = new Date(item.scheduled_for).getHours();
+                  return scheduledHour === hour;
+                });
+
+                return (
+                  <div
+                    key={idx}
+                    className={cn(
+                      "p-1 min-h-[50px]",
+                      idx < 6 && "border-r",
+                      isToday(day) && "bg-primary/5"
+                    )}
+                  >
+                    {dayContent.map((item) => renderContentPill(item, true))}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Content Calendar</h1>
           <p className="text-muted-foreground">
-            View and manage your scheduled content
+            Plan and schedule your content publishing
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex items-center rounded-lg border p-1">
+            <Button
+              variant={viewMode === "month" ? "default" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setViewMode("month")}
+            >
+              Month
+            </Button>
+            <Button
+              variant={viewMode === "week" ? "default" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setViewMode("week")}
+            >
+              Week
+            </Button>
+          </div>
           <Button variant="outline" size="sm" onClick={goToToday}>
             Today
           </Button>
@@ -365,16 +672,21 @@ export default function CalendarPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 xl:grid-cols-4 lg:grid-cols-3">
         {/* Calendar */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
+        <Card className={cn(viewMode === "week" ? "xl:col-span-4 lg:col-span-3" : "xl:col-span-3 lg:col-span-2")}>
+          <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
+              <Button variant="outline" size="icon" onClick={goToPrevious}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <CardTitle className="text-xl">{monthName}</CardTitle>
-              <Button variant="outline" size="icon" onClick={goToNextMonth}>
+              <CardTitle className="text-xl">
+                {viewMode === "month"
+                  ? monthName
+                  : `${weekDays[0].toLocaleDateString("default", { month: "short", day: "numeric" })} - ${weekDays[6].toLocaleDateString("default", { month: "short", day: "numeric", year: "numeric" })}`
+                }
+              </CardTitle>
+              <Button variant="outline" size="icon" onClick={goToNext}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -384,6 +696,8 @@ export default function CalendarPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
+            ) : viewMode === "week" ? (
+              renderWeekView()
             ) : (
               <>
                 {/* Day Headers */}
@@ -417,35 +731,31 @@ export default function CalendarPage() {
                         key={index}
                         onClick={() => setSelectedDate(date)}
                         className={cn(
-                          "relative aspect-square rounded-lg p-1 text-sm transition-all hover:bg-muted",
-                          !isCurrentMonth && "text-muted-foreground/30",
-                          isToday(date) &&
-                            isCurrentMonth &&
-                            "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                          isSelected(date) && "bg-primary text-primary-foreground",
-                          hasContent && isCurrentMonth && !isSelected(date) && "bg-muted"
+                          "relative min-h-[100px] rounded-lg p-2 text-left transition-all hover:bg-muted/80 border",
+                          !isCurrentMonth && "text-muted-foreground/30 bg-muted/20",
+                          isCurrentMonth && "bg-card",
+                          isToday(date) && isCurrentMonth && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                          isSelected(date) && "bg-primary/10 border-primary"
                         )}
                       >
+                        {/* Date number */}
                         <span
                           className={cn(
-                            "flex h-6 w-6 items-center justify-center rounded-full text-xs",
-                            isToday(date) &&
-                              isCurrentMonth &&
-                              !isSelected(date) &&
-                              "bg-primary text-primary-foreground"
+                            "flex h-7 w-7 items-center justify-center rounded-full text-sm font-medium",
+                            isToday(date) && isCurrentMonth && "bg-primary text-primary-foreground"
                           )}
                         >
                           {date.getDate()}
                         </span>
 
-                        {/* Content indicators */}
+                        {/* Content previews */}
                         {hasContent && isCurrentMonth && (
-                          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-                            {scheduledCount > 0 && (
-                              <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                            )}
-                            {publishedCount > 0 && (
-                              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          <div className="mt-1 space-y-1">
+                            {dayContent.slice(0, 2).map((item) => renderContentPill(item, true))}
+                            {dayContent.length > 2 && (
+                              <p className="text-[10px] text-muted-foreground text-center">
+                                +{dayContent.length - 2} more
+                              </p>
                             )}
                           </div>
                         )}
@@ -464,283 +774,130 @@ export default function CalendarPage() {
                     <div className="h-2 w-2 rounded-full bg-emerald-500" />
                     <span>Published</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-amber-500" />
+                    <span>Approved</span>
+                  </div>
                 </div>
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* Selected Date / Upcoming Posts */}
-        <div className="space-y-6">
-          {/* Selected Date Content */}
-          {selectedDate && (
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">
-                    {selectedDate.toLocaleDateString("default", {
-                      weekday: "long",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => setSelectedDate(null)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <CardDescription>
-                  {selectedDateContent.length} post
-                  {selectedDateContent.length !== 1 ? "s" : ""}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {selectedDateContent.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    No posts on this date
-                  </p>
-                ) : (
-                  selectedDateContent.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-start gap-3 rounded-lg border p-3"
+        {/* Sidebar - only show in month view */}
+        {viewMode === "month" && (
+          <div className="space-y-6">
+            {/* Selected Date Content */}
+            {selectedDate && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">
+                      {selectedDate.toLocaleDateString("default", {
+                        weekday: "long",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setSelectedDate(null)}
                     >
-                      <div
-                        className={cn(
-                          "flex h-8 w-8 items-center justify-center rounded-lg text-white",
-                          platformColors[item.platform] || "bg-gray-500"
-                        )}
-                      >
-                        {platformIcons[item.platform] || (
-                          <FileText className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {item.ideas?.concept ||
-                            item.copy_primary.slice(0, 40) + "..."}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "text-[10px]",
-                              statusColors[item.status]
-                            )}
-                          >
-                            {item.status}
-                          </Badge>
-                          {item.scheduled_for && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {new Date(item.scheduled_for).toLocaleTimeString(
-                                [],
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }
-                              )}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {item.status === "scheduled" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => openRescheduleDialog(item)}
-                        >
-                          <Clock className="h-3 w-3" />
-                        </Button>
-                      )}
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <CardDescription>
+                    {selectedDateContent.length} post
+                    {selectedDateContent.length !== 1 ? "s" : ""}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {selectedDateContent.length === 0 ? (
+                    <div className="text-center py-6">
+                      <CalendarIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                      <p className="text-sm text-muted-foreground">
+                        No posts on this date
+                      </p>
+                      <Button variant="outline" size="sm" className="mt-3">
+                        <Plus className="h-3 w-3 mr-1" />
+                        Schedule content
+                      </Button>
                     </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Upcoming Posts */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Upcoming Posts
-              </CardTitle>
-              <CardDescription>Next 7 days</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-6">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : upcomingContent.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-6">
-                  <CalendarIcon className="mb-3 h-8 w-8 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground text-center">
-                    No posts scheduled for the next 7 days
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {upcomingContent.slice(0, 5).map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-start gap-3 rounded-lg border p-3 hover:bg-muted/50 transition-colors"
-                    >
-                      <div
-                        className={cn(
-                          "flex h-8 w-8 items-center justify-center rounded-lg text-white flex-shrink-0",
-                          platformColors[item.platform] || "bg-gray-500"
-                        )}
-                      >
-                        {platformIcons[item.platform] || (
-                          <FileText className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {item.ideas?.concept ||
-                            item.copy_primary.slice(0, 40) + "..."}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {item.copy_carousel_slides &&
-                            item.copy_carousel_slides.length > 0 && (
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px] h-4"
-                              >
-                                <Images className="mr-1 h-2.5 w-2.5" />
-                                {item.copy_carousel_slides.length}
-                              </Badge>
-                            )}
-                          <span className="text-[10px] text-muted-foreground">
-                            {item.scheduled_for &&
-                              new Date(item.scheduled_for).toLocaleDateString(
-                                [],
-                                {
-                                  weekday: "short",
-                                  month: "short",
-                                  day: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }
-                              )}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          title="Reschedule"
-                          onClick={() => openRescheduleDialog(item)}
-                        >
-                          <Clock className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-red-500"
-                          title="Unschedule"
-                          onClick={() => handleUnschedule(item.id)}
-                          disabled={isUnscheduling === item.id}
-                        >
-                          {isUnscheduling === item.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <X className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {upcomingContent.length > 5 && (
-                    <p className="text-xs text-muted-foreground text-center pt-2">
-                      +{upcomingContent.length - 5} more scheduled
-                    </p>
+                  ) : (
+                    selectedDateContent.map((item) => renderContentPill(item, false))
                   )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Ready to Schedule */}
-          {readyToSchedule.length > 0 && (
+            {/* Upcoming Posts */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Send className="h-4 w-4" />
-                  Ready to Schedule
+                  <Clock className="h-4 w-4" />
+                  Upcoming
                 </CardTitle>
-                <CardDescription>Approved content awaiting schedule</CardDescription>
+                <CardDescription>Next 7 days</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {readyToSchedule.slice(0, 3).map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-start gap-3 rounded-lg border p-3 hover:bg-muted/50 transition-colors"
-                    >
-                      <div
-                        className={cn(
-                          "flex h-8 w-8 items-center justify-center rounded-lg text-white flex-shrink-0",
-                          platformColors[item.platform] || "bg-gray-500"
-                        )}
-                      >
-                        {platformIcons[item.platform] || (
-                          <FileText className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {item.ideas?.concept ||
-                            item.copy_primary.slice(0, 40) + "..."}
-                        </p>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[10px] mt-1",
-                            statusColors[item.status]
-                          )}
-                        >
-                          Approved
-                        </Badge>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => openRescheduleDialog(item)}
-                      >
-                        <Clock className="mr-1 h-3 w-3" />
-                        Schedule
-                      </Button>
-                    </div>
-                  ))}
-                  {readyToSchedule.length > 3 && (
-                    <a
-                      href="/content?status=approved"
-                      className="block text-xs text-primary text-center pt-2 hover:underline"
-                    >
-                      View all {readyToSchedule.length} approved posts
-                    </a>
-                  )}
-                </div>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : upcomingContent.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-6">
+                    <CalendarIcon className="mb-3 h-8 w-8 text-muted-foreground opacity-50" />
+                    <p className="text-sm text-muted-foreground text-center">
+                      No posts scheduled
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {upcomingContent.slice(0, 5).map((item) => renderContentPill(item, false))}
+                    {upcomingContent.length > 5 && (
+                      <p className="text-xs text-muted-foreground text-center pt-2">
+                        +{upcomingContent.length - 5} more scheduled
+                      </p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
-          )}
-        </div>
+
+            {/* Ready to Schedule */}
+            {readyToSchedule.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Send className="h-4 w-4" />
+                    Ready to Schedule
+                  </CardTitle>
+                  <CardDescription>Approved & waiting</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {readyToSchedule.slice(0, 3).map((item) => renderContentPill(item, false))}
+                    {readyToSchedule.length > 3 && (
+                      <a
+                        href="/content?status=approved"
+                        className="block text-xs text-primary text-center pt-2 hover:underline"
+                      >
+                        View all {readyToSchedule.length} approved posts
+                      </a>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Reschedule Dialog */}
       <Dialog open={rescheduleDialogOpen} onOpenChange={setRescheduleDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
               {selectedContent?.status === "approved" ? "Schedule" : "Reschedule"} Post
@@ -755,23 +912,31 @@ export default function CalendarPage() {
             <div className="py-4 space-y-4">
               {/* Content Preview */}
               <div className="flex items-start gap-3 rounded-lg border p-3 bg-muted/30">
-                <div
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-lg text-white flex-shrink-0",
-                    platformColors[selectedContent.platform] || "bg-gray-500"
-                  )}
-                >
-                  {platformIcons[selectedContent.platform] || (
-                    <FileText className="h-4 w-4" />
-                  )}
-                </div>
+                {contentImages[selectedContent.id] && (
+                  <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
+                    <img
+                      src={contentImages[selectedContent.id]}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">
-                    {selectedContent.ideas?.concept ||
-                      selectedContent.copy_primary.slice(0, 60) + "..."}
-                  </p>
-                  <p className="text-xs text-muted-foreground capitalize mt-1">
-                    {selectedContent.platform}
+                  <div className="flex items-center gap-2 mb-1">
+                    <div
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded text-white flex-shrink-0",
+                        platformColors[selectedContent.platform] || "bg-gray-500"
+                      )}
+                    >
+                      {platformIcons[selectedContent.platform] || <FileText className="h-3 w-3" />}
+                    </div>
+                    <p className="text-sm font-medium truncate">
+                      {selectedContent.ideas?.concept || selectedContent.copy_primary.slice(0, 40)}...
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {selectedContent.platform} • {selectedContent.copy_carousel_slides?.length || 0} slides
                   </p>
                 </div>
               </div>

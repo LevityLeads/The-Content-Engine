@@ -151,7 +151,7 @@ Best for: Single posts, quick tips
 [HASHTAGS - 5-10 targeted tags]
 \`\`\`
 
-**Carousel Architecture** (4-6 slides):
+**Carousel Architecture** (DYNAMIC - use optimal number of slides):
 \`\`\`
 Slide 1: HOOK ONLY
 - Bold statement or question
@@ -164,11 +164,13 @@ Slide 2: THE PROBLEM/CONTEXT
 - Make them feel understood
 - Transition to the solution
 
-Slides 3-5: THE VALUE
+Slides 3 to N-1: THE VALUE
 - One key point per slide
 - Clear, scannable text
 - Each slide should be valuable standalone
 - Build momentum toward conclusion
+- IMPORTANT: Use as many slides as the content requires
+- Don't compress multiple points into one slide
 
 Final Slide: THE CTA
 - Summary or key takeaway
@@ -178,7 +180,11 @@ Final Slide: THE CTA
 \`\`\`
 
 **Carousel Design Rules**:
-- Maximum 6 slides (swipe fatigue is real)
+- DYNAMIC SLIDE COUNT: Use the optimal number for your content:
+  - Quick tips/frameworks: 4-6 slides
+  - Comprehensive guides: 7-10 slides
+  - Deep dives/step-by-step: 8-12 slides
+  - List posts: 1 slide per item + hook + CTA
 - Each slide must earn the next swipe
 - Text must be readable without zooming
 - Never reference "slide 1" or "previous slide" in prompts
@@ -539,7 +545,7 @@ ${sourceContent.substring(0, 3000)}${sourceContent.length > 3000 ? "\n\n[Content
 
 Generate content for: ${platforms.map((p) => p.toUpperCase()).join(", ")}
 
-${platforms.includes("instagram") ? `For Instagram: Create a carousel with 4-6 slides. Remember slide 1 is HOOK ONLY.
+${platforms.includes("instagram") ? `For Instagram: Create a carousel with the OPTIMAL number of slides for this content. Remember slide 1 is HOOK ONLY.
 
 ${visualStyleInstruction}
 
