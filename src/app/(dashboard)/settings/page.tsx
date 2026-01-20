@@ -541,14 +541,15 @@ export default function SettingsPage() {
       </Card>
 
       {/* Connected Accounts */}
-      <Card>
+      <Card className="opacity-75">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
             Connected Accounts
+            <Badge variant="outline" className="ml-2 text-xs">Coming Soon</Badge>
           </CardTitle>
           <CardDescription>
-            Social media accounts for publishing
+            Social media accounts for publishing (Late.dev integration)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -571,8 +572,8 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-                <Button variant={account.connected ? "outline" : "default"}>
-                  {account.connected ? "Disconnect" : "Connect"}
+                <Button variant="outline" disabled>
+                  Coming Soon
                 </Button>
               </div>
             ))}
