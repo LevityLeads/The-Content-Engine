@@ -669,8 +669,9 @@ export default function ContentPage() {
     };
 
     // Calculate card positions for fanned/overlapping effect
-    const cardWidth = 200;
-    const cardOverlap = 50;
+    // Larger cards to fill vertical space, with more overlap so side cards go behind
+    const cardWidth = 320;
+    const cardOverlap = 220; // Heavy overlap so side cards peek out less
     const visibleCardWidth = cardWidth - cardOverlap;
 
     return (
