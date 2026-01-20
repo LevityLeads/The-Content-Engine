@@ -14,7 +14,7 @@ import {
   LateApiError,
 } from './types';
 
-const LATE_API_BASE_URL = 'https://api.getlate.dev/v1';
+const LATE_API_BASE_URL = 'https://getlate.dev/api/v1';
 
 /**
  * Custom error class for Late.dev API errors
