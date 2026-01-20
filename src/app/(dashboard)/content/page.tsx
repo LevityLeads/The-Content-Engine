@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Calendar, GripVertical, ArrowRight } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Calendar, GripVertical, ArrowRight, Video, Play } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +23,9 @@ interface ContentImage {
   prompt: string;
   is_primary: boolean;
   model?: ImageModelKey;
+  media_type?: "image" | "video";
+  duration_seconds?: number;
+  has_audio?: boolean;
 }
 
 interface CarouselSlide {

@@ -24,6 +24,8 @@ import {
   type SlideContent,
 } from '@/lib/slide-templates';
 import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from '@/lib/image-models';
+import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL, type VideoModelKey, platformSupportsMixedCarousel } from '@/lib/video-models';
+import { BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from '@/types/database';
 
 // Helper to update job status
 async function updateJobStatus(
@@ -352,15 +354,87 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'slides array is required' }, { status: 400 });
     }
 
-    // Verify content exists
+    // Verify content exists and get brand info for video config
     const { data: content, error: contentError } = await supabase
       .from('content')
-      .select('id, platform')
+      .select('id, platform, brand_id, brands(video_config)')
       .eq('id', contentId)
       .single();
 
     if (contentError || !content) {
       return NextResponse.json({ error: 'Content not found' }, { status: 404 });
+    }
+
+    // Check if this is a mixed carousel request (video slide 1 + images)
+    const isMixedCarousel = visualStyle === 'mixed-carousel' || visualStyle === 'video-carousel';
+    let videoGeneratedForSlide1 = false;
+    let videoSlide1Result: { id: string; url: string; media_type: string } | null = null;
+
+    if (isMixedCarousel) {
+      // Check if platform supports mixed carousels
+      const platform = content.platform?.toLowerCase() || '';
+      if (!platformSupportsMixedCarousel(platform)) {
+        return NextResponse.json(
+          { error: `Platform '${platform}' does not support mixed video+image carousels. Use single video or image carousel instead.` },
+          { status: 400 }
+        );
+      }
+
+      // Get brand video config
+      const brandsResult = content.brands;
+      const brandData = Array.isArray(brandsResult) ? brandsResult[0] : brandsResult;
+      const videoConfig = (brandData?.video_config as BrandVideoConfig) || DEFAULT_VIDEO_CONFIG;
+
+      if (!videoConfig.enabled) {
+        return NextResponse.json(
+          { error: 'Video generation is not enabled for this brand. Enable it in Settings to use mixed carousel.' },
+          { status: 400 }
+        );
+      }
+
+      // Generate video for slide 1
+      const slide1 = slides.find((s: { slideNumber: number }) => s.slideNumber === 1);
+      if (slide1) {
+        const videoModel = videoConfig.default_model || DEFAULT_VIDEO_MODEL;
+        const duration = videoConfig.default_duration || 5;
+        const includeAudio = videoConfig.include_audio || false;
+
+        try {
+          // Build video prompt from slide 1 text
+          const videoPrompt = `Create a short engaging video for social media. Main message: "${slide1.text}". Style: Dynamic, attention-grabbing, suitable for ${platform}. Keep it simple and impactful.`;
+
+          // Call video generation endpoint
+          const videoResponse = await fetch(new URL('/api/videos/generate', request.url).toString(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contentId,
+              prompt: videoPrompt,
+              model: videoModel,
+              duration,
+              includeAudio,
+              slideNumber: 1,
+            }),
+          });
+
+          const videoResult = await videoResponse.json();
+
+          if (videoResponse.ok && videoResult.video) {
+            videoSlide1Result = {
+              id: videoResult.video.id,
+              url: videoResult.video.url,
+              media_type: 'video',
+            };
+            videoGeneratedForSlide1 = true;
+            console.log('Video generated for slide 1 in mixed carousel');
+          } else {
+            console.warn('Video generation for slide 1 failed, falling back to image:', videoResult.error);
+          }
+        } catch (videoError) {
+          console.error('Error generating video for mixed carousel slide 1:', videoError);
+          // Continue with image fallback
+        }
+      }
     }
 
     const totalSlides = slides.length;
@@ -568,6 +642,22 @@ export async function POST(request: NextRequest) {
       const slideIndex = slide.slideNumber - 1;
       const templateType = getTemplateTypeForSlide(slideIndex, totalSlides, useNumberedSlides);
 
+      // Skip slide 1 if video was already generated for mixed carousel
+      if (slide.slideNumber === 1 && videoGeneratedForSlide1 && videoSlide1Result) {
+        await updateSlideStatus(slide.slideNumber, 'completed');
+        generatedImages.push({
+          slideNumber: 1,
+          imageUrl: videoSlide1Result.url,
+          savedImage: {
+            id: videoSlide1Result.id,
+            url: videoSlide1Result.url,
+            prompt: `[Slide 1] Video: ${slide.text.substring(0, 100)}`,
+          },
+        });
+        console.log('Skipping slide 1 image generation - video already created');
+        continue;
+      }
+
       // Mark this slide as generating
       await updateSlideStatus(slide.slideNumber, 'generating');
 
@@ -681,7 +771,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Generated ${generatedImages.length} carousel slides with consistent styling`,
+      message: videoGeneratedForSlide1
+        ? `Generated mixed carousel: 1 video + ${generatedImages.length - 1} image slides`
+        : `Generated ${generatedImages.length} carousel slides with consistent styling`,
       images: generatedImages,
       design: {
         preset: typeof designPreset === 'string' ? designPreset : 'custom',
@@ -692,6 +784,10 @@ export async function POST(request: NextRequest) {
       slideErrors: slideErrors.length > 0 ? slideErrors : undefined,
       dimensions: { width, height },
       jobId,
+      mixedCarousel: videoGeneratedForSlide1 ? {
+        videoSlide: 1,
+        videoId: videoSlide1Result?.id,
+      } : undefined,
     });
   } catch (error) {
     console.error('Error in POST /api/images/carousel:', error);

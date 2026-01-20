@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles, ExternalLink, Unlink, X } from "lucide-react";
+import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles, ExternalLink, Unlink, X, Video, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useBrand, VoiceConfig, VisualConfig } from "@/contexts/brand-context";
 import { StrictnessSlider } from "@/components/brand/strictness-slider";
+import { type BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
+import { VIDEO_MODELS, type VideoModelKey } from "@/lib/video-models";
+import { formatCost } from "@/lib/video-utils";
 
 // Platform configuration
 const PLATFORMS = [
@@ -74,6 +77,11 @@ function SettingsPageContent() {
   const [availableLateAccounts, setAvailableLateAccounts] = useState<LateAccount[]>([]);
   const [showAccountPicker, setShowAccountPicker] = useState<string | null>(null); // platform id
 
+  // Video config state
+  const [videoConfig, setVideoConfig] = useState<BrandVideoConfig>(DEFAULT_VIDEO_CONFIG);
+  const [videoUsage, setVideoUsage] = useState<{ monthly: { spent: number; budget: number | null } } | null>(null);
+  const [isSavingVideo, setIsSavingVideo] = useState(false);
+
   // UI state
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -113,6 +121,21 @@ function SettingsPageContent() {
     }
   }, [selectedBrand?.id]);
 
+  // Fetch video usage and config
+  const fetchVideoUsage = useCallback(async () => {
+    if (!selectedBrand?.id) return;
+    try {
+      const res = await fetch(`/api/videos/usage?brandId=${selectedBrand.id}`);
+      const data = await res.json();
+      if (data.success) {
+        setVideoConfig(data.config || DEFAULT_VIDEO_CONFIG);
+        setVideoUsage(data.usage || null);
+      }
+    } catch (err) {
+      console.error("Error fetching video usage:", err);
+    }
+  }, [selectedBrand?.id]);
+
   // Load brand data when selected brand changes
   useEffect(() => {
     if (selectedBrand) {
@@ -124,8 +147,37 @@ function SettingsPageContent() {
       setAnalyzeUrl(selectedBrand.voice_config?.source_url || "");
       // Fetch social accounts for this brand
       fetchSocialAccounts();
+      // Fetch video usage and config
+      fetchVideoUsage();
     }
-  }, [selectedBrand, fetchSocialAccounts]);
+  }, [selectedBrand, fetchSocialAccounts, fetchVideoUsage]);
+
+  // Save video config
+  const handleSaveVideoConfig = async () => {
+    if (!selectedBrand?.id) return;
+    setIsSavingVideo(true);
+    setSaveMessage(null);
+    try {
+      const res = await fetch("/api/videos/usage", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandId: selectedBrand.id, videoConfig }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSaveMessage({ type: "success", text: "Video settings saved!" });
+        setVideoConfig(data.videoConfig);
+      } else {
+        setSaveMessage({ type: "error", text: data.error || "Failed to save video settings" });
+      }
+    } catch (err) {
+      console.error("Error saving video config:", err);
+      setSaveMessage({ type: "error", text: "Failed to save video settings" });
+    } finally {
+      setIsSavingVideo(false);
+      setTimeout(() => setSaveMessage(null), 5000);
+    }
+  };
 
   const handleSave = async (section: "brand" | "voice" | "visual") => {
     if (!selectedBrand) return;
@@ -927,6 +979,194 @@ function SettingsPageContent() {
                 <RefreshCw className="mr-2 h-4 w-4" />
               )}
               Sync Accounts
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Video Generation Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Video className="h-5 w-5" />
+            Video Generation
+          </CardTitle>
+          <CardDescription>
+            Configure AI video generation settings and budget limits
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Enable/Disable Toggle */}
+          <div className="flex items-center justify-between p-4 rounded-lg border">
+            <div>
+              <p className="font-medium">Enable Video Generation</p>
+              <p className="text-sm text-muted-foreground">
+                Allow generating AI videos using Veo 3
+              </p>
+            </div>
+            <button
+              onClick={() => setVideoConfig((prev) => ({ ...prev, enabled: !prev.enabled }))}
+              className={`relative h-6 w-11 rounded-full transition-colors ${
+                videoConfig.enabled ? "bg-violet-500" : "bg-muted"
+              }`}
+            >
+              <span
+                className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${
+                  videoConfig.enabled ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {videoConfig.enabled && (
+            <>
+              {/* Budget Settings */}
+              <div className="space-y-4 pt-2">
+                <div>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Monthly Budget (USD)
+                  </label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={10}
+                      value={videoConfig.monthly_budget_usd || ""}
+                      onChange={(e) => setVideoConfig((prev) => ({
+                        ...prev,
+                        monthly_budget_usd: e.target.value ? parseFloat(e.target.value) : null,
+                      }))}
+                      placeholder="No limit"
+                      className="w-32"
+                    />
+                    <span className="flex items-center text-sm text-muted-foreground">
+                      Leave empty for no limit
+                    </span>
+                  </div>
+                  {videoUsage?.monthly && videoConfig.monthly_budget_usd && (
+                    <div className="mt-2">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-muted-foreground">Current usage</span>
+                        <span>{formatCost(videoUsage.monthly.spent)} / {formatCost(videoConfig.monthly_budget_usd)}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${
+                            (videoUsage.monthly.spent / videoConfig.monthly_budget_usd) >= 0.9
+                              ? "bg-red-500"
+                              : (videoUsage.monthly.spent / videoConfig.monthly_budget_usd) >= 0.7
+                                ? "bg-yellow-500"
+                                : "bg-violet-500"
+                          }`}
+                          style={{ width: `${Math.min((videoUsage.monthly.spent / videoConfig.monthly_budget_usd) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Daily Video Limit</label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={videoConfig.daily_limit || ""}
+                      onChange={(e) => setVideoConfig((prev) => ({
+                        ...prev,
+                        daily_limit: e.target.value ? parseInt(e.target.value) : null,
+                      }))}
+                      placeholder="No limit"
+                      className="w-32"
+                    />
+                    <span className="flex items-center text-sm text-muted-foreground">
+                      videos per day
+                    </span>
+                  </div>
+                </div>
+
+                {/* Default Model */}
+                <div>
+                  <label className="text-sm font-medium">Default Model</label>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    {(Object.keys(VIDEO_MODELS) as VideoModelKey[]).map((modelKey) => {
+                      const model = VIDEO_MODELS[modelKey];
+                      return (
+                        <button
+                          key={modelKey}
+                          onClick={() => setVideoConfig((prev) => ({ ...prev, default_model: modelKey }))}
+                          className={`flex flex-col items-start p-3 rounded-lg border-2 transition-all text-left ${
+                            videoConfig.default_model === modelKey
+                              ? "border-violet-500 bg-violet-500/10"
+                              : "border-muted hover:border-muted-foreground/50"
+                          }`}
+                        >
+                          <span className="font-medium text-sm">{model.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ${model.costPerSecond.toFixed(2)}/sec
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Default Duration */}
+                <div>
+                  <label className="text-sm font-medium">Default Duration: {videoConfig.default_duration}s</label>
+                  <div className="flex gap-2 mt-1">
+                    {[3, 4, 5, 6, 7, 8].map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setVideoConfig((prev) => ({ ...prev, default_duration: d }))}
+                        className={`flex-1 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                          videoConfig.default_duration === d
+                            ? "border-violet-500 bg-violet-500/10 text-violet-400"
+                            : "border-muted hover:border-muted-foreground/50"
+                        }`}
+                      >
+                        {d}s
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Include Audio by Default */}
+                <div className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <p className="text-sm font-medium">Include Audio by Default</p>
+                    <p className="text-xs text-muted-foreground">
+                      Adds background audio to generated videos (extra cost)
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setVideoConfig((prev) => ({ ...prev, include_audio: !prev.include_audio }))}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${
+                      videoConfig.include_audio ? "bg-violet-500" : "bg-muted"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${
+                        videoConfig.include_audio ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Save Button */}
+          <div className="flex justify-end pt-2 border-t">
+            <Button onClick={handleSaveVideoConfig} disabled={isSavingVideo}>
+              {isSavingVideo ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Save Video Settings
             </Button>
           </div>
         </CardContent>

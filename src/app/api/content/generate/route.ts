@@ -161,6 +161,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         imagePrompt: post.imagePrompt || null,
         carouselStyle: post.carouselStyle || null,
+        visualStyle: visualStyle || null,
       },
     }));
 
