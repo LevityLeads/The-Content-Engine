@@ -4,8 +4,8 @@ import {
   LateClient,
   LateApiException,
   CreatePostRequest,
-  InstagramContentType,
-  LateMedia,
+  LateMediaItem,
+  LatePlatform,
 } from "@/lib/late";
 
 /**
@@ -35,6 +35,13 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Map platform to account ID environment variable
+    const platformAccountIds: Record<string, string | undefined> = {
+      instagram: process.env.LATE_INSTAGRAM_ACCOUNT_ID,
+      twitter: process.env.LATE_TWITTER_ACCOUNT_ID,
+      linkedin: process.env.LATE_LINKEDIN_ACCOUNT_ID,
+    };
 
     const supabase = await createClient();
     const body = await request.json();
@@ -107,21 +114,15 @@ export async function POST(request: NextRequest) {
       caption = `${caption}\n\n${content.copy_cta}`;
     }
 
-    // Determine Instagram content type based on images
-    let instagramContentType: InstagramContentType = "feed";
-    if (validImages.length > 1) {
-      instagramContentType = "carousel";
-    }
-
     // Build media array for Late.dev
-    const media: LateMedia[] = validImages.map((img) => ({
+    const mediaItems: LateMediaItem[] = validImages.map((img) => ({
       url: img.url,
       type: "image" as const,
-      altText: img.prompt || undefined, // Use prompt as alt text
+      altText: img.prompt || undefined,
     }));
 
     // Only require images for Instagram feed/carousel posts
-    if (content.platform === "instagram" && media.length === 0) {
+    if (content.platform === "instagram" && mediaItems.length === 0) {
       return NextResponse.json(
         {
           success: false,
@@ -131,28 +132,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build the Late.dev request
+    // Get account ID for this platform
+    const accountId = platformAccountIds[content.platform];
+    if (!accountId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Late.dev account ID not configured for ${content.platform}. Please set LATE_${content.platform.toUpperCase()}_ACCOUNT_ID in your environment variables.`,
+        },
+        { status: 500 }
+      );
+    }
+
+    // Build the Late.dev request with correct format
     const lateRequest: CreatePostRequest = {
-      platforms: [content.platform as "instagram" | "twitter" | "linkedin"],
+      platforms: [
+        {
+          platform: content.platform as LatePlatform,
+          accountId: accountId,
+        },
+      ],
       content: {
         text: caption.trim(),
-        media: media.length > 0 ? media : undefined,
       },
+      mediaItems: mediaItems.length > 0 ? mediaItems : undefined,
       externalId: contentId,
     };
 
     // Add scheduling if specified
     if (scheduledFor) {
       lateRequest.scheduledFor = scheduledFor;
-    }
-
-    // Add Instagram-specific data
-    if (content.platform === "instagram") {
-      lateRequest.platformSpecificData = {
-        instagram: {
-          contentType: instagramContentType,
-        },
-      };
     }
 
     // Initialize Late.dev client and publish
