@@ -53,14 +53,33 @@ src/app/api/               # All API routes
 │   └── generate/route.ts
 ├── content/
 │   ├── route.ts
-│   └── generate/route.ts
-└── images/
-    └── generate/route.ts
+│   ├── generate/route.ts
+│   └── publish/route.ts
+├── images/
+│   ├── generate/route.ts
+│   └── carousel/route.ts
+├── videos/
+│   ├── generate/route.ts
+│   ├── estimate/route.ts
+│   └── usage/route.ts
+├── social-accounts/       # Late.dev OAuth & linking
+│   ├── route.ts
+│   ├── connect/route.ts
+│   ├── callback/route.ts
+│   ├── link/route.ts
+│   ├── available/route.ts
+│   └── sync/route.ts
+└── schedule/
+    └── suggest/route.ts
 
 src/lib/supabase/          # Database clients
 ├── client.ts
 ├── server.ts
 └── middleware.ts
+
+src/lib/late/              # Late.dev API client
+├── client.ts
+└── types.ts
 
 supabase/
 └── migrations/            # Database migrations
@@ -76,15 +95,16 @@ src/types/
 - **Page layouts** - hand off to Frontend
 - **CI/CD configuration** - hand off to DevOps
 
-## KEY PRIORITY: Late.dev Integration
+## Late.dev Integration (Implemented)
 
-Current status: Structure defined, **NOT implemented**
+Current status: **Fully implemented**
 
-Needs to be built:
-- OAuth flow for connecting accounts
-- Publishing endpoint (`/api/publish`)
-- Webhook handling for status updates
-- Analytics sync
+Available features:
+- OAuth flow for connecting accounts (`/api/social-accounts/connect`)
+- Publishing endpoint (`/api/content/publish`)
+- Account linking to brands (`/api/social-accounts/link`)
+- Account sync (`/api/social-accounts/sync`)
+- Republishing support for evergreen content
 
 ## Git Workflow
 
@@ -142,11 +162,13 @@ Always use consistent format:
 |-------|---------|
 | `organizations` | Multi-tenant |
 | `brands` | Brand config |
-| `social_accounts` | Connected platforms |
+| `social_accounts` | Connected platforms via Late.dev |
 | `inputs` | Raw content |
 | `ideas` | Generated ideas |
 | `content` | Generated posts |
 | `images` | Generated images |
+| `generation_jobs` | Async job tracking |
+| `video_generation` | Video tracking & budget |
 | `analytics` | Post metrics |
 
 ## Verification Before Handoff
