@@ -24,10 +24,12 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
     const body = await request.json();
+    // Use string type for visualStyle to accept "video", "mixed-carousel", etc.
+    // which are special modes, not just carousel image styles
     const { ideaId, platforms: selectedPlatforms, visualStyle } = body as {
       ideaId: string;
       platforms?: string[];
-      visualStyle?: VisualStyle;
+      visualStyle?: string;
     };
 
     if (!ideaId) {
@@ -84,6 +86,12 @@ export async function POST(request: NextRequest) {
     } | null;
     const brandVoicePrompt = buildVoicePrompt(voiceConfig, visualConfig);
 
+    // For AI prompt, only pass valid IMAGE styles, not "video" or "mixed-carousel"
+    // which are special modes for video generation. The AI doesn't know these styles.
+    // We'll store the original visualStyle in metadata for the carousel API to use.
+    const isVideoMode = visualStyle === "video" || visualStyle === "mixed-carousel";
+    const imageStyleForPrompt = isVideoMode ? undefined : visualStyle as VisualStyle | undefined;
+
     // Build the enhanced user prompt using the new prompt system
     const userPrompt = buildContentUserPrompt(
       {
@@ -96,7 +104,7 @@ export async function POST(request: NextRequest) {
       platformsToGenerate || [],
       brandVoicePrompt,
       undefined, // additionalInstructions
-      visualStyle // visual style override (optional)
+      imageStyleForPrompt // Only pass valid image styles to AI prompt
     );
 
     // Call Claude Opus 4.5
