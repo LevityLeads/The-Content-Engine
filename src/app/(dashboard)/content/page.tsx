@@ -219,6 +219,14 @@ export default function ContentPage() {
     }
   }, [swrContent]);
 
+  // Fetch images when content loads from SWR
+  useEffect(() => {
+    if (swrContent && swrContent.length > 0) {
+      // Fetch images for all content items in parallel
+      Promise.all(swrContent.map((item) => fetchImagesForContent(item.id)));
+    }
+  }, [swrContent]);
+
   // Update loading state based on SWR
   useEffect(() => {
     setIsLoading(isContentLoading);
