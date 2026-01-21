@@ -490,6 +490,8 @@ Use `/role:handoff` to document session state when passing work to another role 
 | Schedule suggestions | `src/app/api/schedule/suggest/route.ts` |
 | Best practices | `src/lib/scheduling/best-practices.ts` |
 | Generation jobs hook | `src/hooks/use-generation-jobs.ts` |
+| SWR data hooks | `src/hooks/use-swr-hooks.ts` |
+| Content card component | `src/components/content/content-card.tsx` |
 | Database types | `src/types/database.ts` |
 | PRD | `docs/PRD.md` |
 | Rules | `RULES.md` |
