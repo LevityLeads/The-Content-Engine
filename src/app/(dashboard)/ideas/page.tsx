@@ -450,8 +450,9 @@ export default function IdeasPage() {
             body: JSON.stringify({
               ideaId: id,
               platforms,
-              // Only pass visualStyle if not "auto" or "video" - undefined lets AI choose
-              visualStyle: visualStyle !== "auto" && visualStyle !== "video" ? visualStyle : undefined,
+              // Only pass visualStyle if not "auto" - undefined lets AI choose
+              // "video" must be passed through so carousel API knows to generate video for slide 1
+              visualStyle: visualStyle !== "auto" ? visualStyle : undefined,
               // Pass video options if generating video
               videoOptions: isVideo ? videoOptions : undefined,
             }),
