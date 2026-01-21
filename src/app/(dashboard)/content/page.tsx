@@ -270,6 +270,7 @@ export default function ContentPage() {
               url: img.url,
               model: img.model,
               createdAt: img.created_at,
+              prompt: img.prompt,
             };
 
             const patterns = [
@@ -338,6 +339,7 @@ export default function ContentPage() {
             url: data.image.url,
             model: data.image.model || selectedModel,
             createdAt: new Date().toISOString(),
+            prompt: data.image.prompt || prompt,
           };
           setSlideImages((prev) => ({
             ...prev,
@@ -1249,6 +1251,7 @@ export default function ContentPage() {
         url: img.url,
         model: img.model,
         mediaType: img.media_type,
+        prompt: img.prompt,
       }));
   };
 

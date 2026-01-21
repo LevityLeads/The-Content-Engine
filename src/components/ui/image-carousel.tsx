@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Download, Zap, Brain, Video, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Zap, Brain, Video, Play, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ export interface CarouselImage {
   createdAt?: string;
   mediaType?: "image" | "video";
   durationSeconds?: number;
+  prompt?: string;
 }
 
 interface ImageCarouselProps {
@@ -45,6 +46,7 @@ export function ImageCarousel({
   onIndexChange,
 }: ImageCarouselProps) {
   const [internalIndex, setInternalIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
 
   // Support controlled mode
   const isControlled = controlledIndex !== undefined;
@@ -94,7 +96,11 @@ export function ImageCarousel({
   return (
     <div className={cn("space-y-2", className)}>
       {/* Main image/video container */}
-      <div className="relative rounded-lg overflow-hidden border bg-black/5">
+      <div
+        className="relative rounded-lg overflow-hidden border bg-black/5"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
         <div className={cn("relative", aspectRatio)}>
           {currentImage.mediaType === "video" ? (
             <video
@@ -154,7 +160,7 @@ export function ImageCarousel({
 
           {/* Download button - bottom right */}
           {onDownload && (
-            <div className="absolute bottom-2 right-2">
+            <div className="absolute bottom-2 right-2 z-10">
               <Button
                 size="sm"
                 variant="secondary"
@@ -164,6 +170,24 @@ export function ImageCarousel({
               >
                 <Download className="h-4 w-4" />
               </Button>
+            </div>
+          )}
+
+          {/* Prompt overlay on hover */}
+          {currentImage.prompt && (
+            <div
+              className={cn(
+                "absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent",
+                "px-3 pt-8 pb-3 transition-all duration-200 ease-out",
+                isHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
+              )}
+            >
+              <div className="flex items-start gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-white/70 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-white/90 leading-relaxed line-clamp-3">
+                  {currentImage.prompt}
+                </p>
+              </div>
             </div>
           )}
         </div>
