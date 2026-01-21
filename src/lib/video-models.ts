@@ -2,7 +2,7 @@
 
 export const VIDEO_MODELS = {
   "veo-3.1-fast": {
-    id: "veo-3.1-generate-preview",
+    id: "veo-3.1-fast-generate-preview",
     name: "Veo 3.1 Fast",
     description: "Cost-effective video generation",
     speed: "fast" as const,
@@ -12,8 +12,8 @@ export const VIDEO_MODELS = {
     minDuration: 3,
   },
   "veo-3.0": {
-    id: "veo-3.0-generate-preview",
-    name: "Veo 3.0 Standard",
+    id: "veo-3.1-generate-preview",
+    name: "Veo 3.1 Standard",
     description: "Highest quality video generation",
     speed: "slow" as const,
     costPerSecond: 0.50,
