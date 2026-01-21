@@ -36,7 +36,7 @@ async function pollVideoGeneration(
   apiKey: string,
   maxAttempts: number = 60,
   pollInterval: number = 5000
-): Promise<{ success: boolean; videoData?: string; error?: string }> {
+): Promise<{ success: boolean; videoData?: string; isUrl?: boolean; error?: string }> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const response = await fetch(
@@ -62,13 +62,26 @@ async function pollVideoGeneration(
           return { success: false, error: data.error.message || "Video generation failed" };
         }
 
-        // Extract video from response
-        const video = data.response?.generatedVideos?.[0]?.video;
-        if (video) {
-          return { success: true, videoData: video };
+        // Path 1: Gemini API format - generateVideoResponse.generatedSamples[].video.uri
+        const generatedSample = data.response?.generateVideoResponse?.generatedSamples?.[0];
+        const videoUri = generatedSample?.video?.uri;
+        if (videoUri) {
+          console.log("Found video URI:", videoUri);
+          return { success: true, videoData: videoUri, isUrl: true };
         }
 
-        return { success: false, error: "No video in response" };
+        // Path 2: Legacy format - generatedVideos[].video.videoBytes
+        const generatedVideo = data.response?.generatedVideos?.[0];
+        const videoBytes = generatedVideo?.video?.videoBytes;
+        if (videoBytes) {
+          return { success: true, videoData: videoBytes };
+        }
+
+        // Include response structure in error for debugging
+        const responseKeys = data.response ? Object.keys(data.response).join(', ') : 'none';
+        const fullStructure = JSON.stringify(data, null, 2).substring(0, 500);
+        console.error("Unknown response structure:", fullStructure);
+        return { success: false, error: `No video in response. Keys: [${responseKeys}]. Structure: ${fullStructure}` };
       }
 
       // Not done yet, wait and try again
@@ -80,6 +93,23 @@ async function pollVideoGeneration(
   }
 
   return { success: false, error: "Video generation timed out" };
+}
+
+// Download video from URL and convert to base64
+async function downloadVideoAsBase64(url: string, apiKey: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: {
+      "x-goog-api-key": apiKey,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download video: ${response.status}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString("base64");
+  return base64;
 }
 
 export async function POST(request: NextRequest) {
@@ -258,7 +288,6 @@ CRITICAL RULES:
             parameters: {
               aspectRatio,
               sampleCount: 1,
-              personGeneration: "allow_adult",
             },
           }),
         }
@@ -327,14 +356,44 @@ CRITICAL RULES:
 
       // Update job progress
       if (jobId) {
-        await updateJobStatus(supabase, jobId, { progress: 80, currentStep: "Saving video" });
+        await updateJobStatus(supabase, jobId, { progress: 80, currentStep: "Downloading video" });
+      }
+
+      // If the result is a URL, download the video and convert to base64
+      let videoBase64: string;
+      if (pollResult.isUrl) {
+        try {
+          console.log("Downloading video from URL:", pollResult.videoData);
+          videoBase64 = await downloadVideoAsBase64(pollResult.videoData, googleApiKey);
+          console.log("Video downloaded, size:", videoBase64.length, "chars");
+        } catch (downloadError) {
+          console.error("Failed to download video:", downloadError);
+          if (jobId) {
+            await updateJobStatus(supabase, jobId, {
+              status: "failed",
+              errorMessage: `Failed to download video: ${downloadError instanceof Error ? downloadError.message : String(downloadError)}`,
+              errorCode: "DOWNLOAD_FAILED",
+            });
+          }
+          return NextResponse.json(
+            { error: "Failed to download generated video", jobId },
+            { status: 500 }
+          );
+        }
+      } else {
+        videoBase64 = pollResult.videoData;
+      }
+
+      // Update job progress
+      if (jobId) {
+        await updateJobStatus(supabase, jobId, { progress: 90, currentStep: "Saving video" });
       }
 
       // Calculate actual cost
       const actualCost = calculateActualCost(modelKey, duration, includeAudio);
 
       // Save video to images table (with media_type = 'video')
-      const videoUrl = `data:video/mp4;base64,${pollResult.videoData}`;
+      const videoUrl = `data:video/mp4;base64,${videoBase64}`;
 
       const { data: savedMedia, error: saveError } = await supabase
         .from("images")
