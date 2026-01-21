@@ -146,7 +146,7 @@ Return format for video posts:
 
     let posts;
     try {
-      const jsonMatch = responseText.match(/{[sS]*}/);
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         posts = parsed.posts || [];
