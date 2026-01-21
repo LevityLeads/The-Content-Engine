@@ -46,6 +46,7 @@ interface Content {
   scheduled_for: string | null;
   metadata: {
     imagePrompt?: string;
+    visualStyle?: string; // "video" | "mixed-carousel" | other visual styles
     carouselStyle?: string | {
       visualStyle?: string;
       font?: string;
@@ -446,9 +447,13 @@ export default function ContentPage() {
   };
 
   // Generate carousel with composite system (consistent text rendering)
-  const handleGenerateCompositeCarousel = async (contentId: string, slides: CarouselSlide[]) => {
+  // If visualStyle is "video" or "mixed-carousel", will generate video for slide 1
+  const handleGenerateCompositeCarousel = async (contentId: string, slides: CarouselSlide[], visualStyle?: string) => {
     setGeneratingCompositeCarousel(contentId);
-    setImageMessage("Generating carousel with consistent styling...");
+    const isVideoCarousel = visualStyle === "video" || visualStyle === "mixed-carousel";
+    setImageMessage(isVideoCarousel
+      ? "Generating mixed carousel (video + images)..."
+      : "Generating carousel with consistent styling...");
     try {
       const response = await fetch("/api/images/carousel", {
         method: "POST",
@@ -462,6 +467,7 @@ export default function ContentPage() {
           textStyle: selectedTextStyle,
           textColor: selectedTextColor,
           backgroundStyle: selectedBackgroundStyle,
+          visualStyle: visualStyle, // Pass visualStyle to trigger video generation
           // Pass brand colors and fonts for visual consistency
           brandColors: selectedBrand?.visual_config ? {
             primary_color: selectedBrand.visual_config.primary_color,
@@ -1626,7 +1632,7 @@ export default function ContentPage() {
               className="w-full h-8 mb-3 bg-emerald-600 hover:bg-emerald-700"
               onClick={() => {
                 if (generationMode === "composite") {
-                  handleGenerateCompositeCarousel(item.id, slides);
+                  handleGenerateCompositeCarousel(item.id, slides, item.metadata?.visualStyle);
                 } else {
                   handleGenerateAllSlides(item.id, slides);
                 }
@@ -1783,7 +1789,7 @@ export default function ContentPage() {
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] text-muted-foreground">Style Variants</span>
-                  <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleGenerateCompositeCarousel(item.id, slides)} disabled={generatingCompositeCarousel === item.id}>
+                  <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleGenerateCompositeCarousel(item.id, slides, item.metadata?.visualStyle)} disabled={generatingCompositeCarousel === item.id}>
                     {generatingCompositeCarousel === item.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ImageIcon className="mr-1 h-3 w-3" />}
                     Generate Another
                   </Button>
@@ -2206,7 +2212,7 @@ export default function ContentPage() {
                         clearJob(job.id);
                         // Re-trigger generation based on type
                         if (job.type === 'composite') {
-                          handleGenerateCompositeCarousel(item.id, carouselSlides || []);
+                          handleGenerateCompositeCarousel(item.id, carouselSlides || [], item.metadata?.visualStyle);
                         } else if (item.metadata?.imagePrompt) {
                           handleGenerateImage(item.id, item.metadata?.imagePrompt || "");
                         }
@@ -2224,6 +2230,14 @@ export default function ContentPage() {
                   {item.ideas?.angle && typeof item.ideas.angle === 'string' && (
                     <Badge variant="secondary" className="text-xs capitalize shrink-0">
                       {item.ideas?.angle}
+                    </Badge>
+                  )}
+
+                  {/* Video Style Badge */}
+                  {(item.metadata?.visualStyle === "video" || item.metadata?.visualStyle === "mixed-carousel") && (
+                    <Badge variant="outline" className="text-xs shrink-0 border-violet-500/50 text-violet-400 bg-violet-500/10">
+                      <Video className="h-3 w-3 mr-1" />
+                      {item.metadata.visualStyle === "mixed-carousel" ? "Video+Images" : "Video"}
                     </Badge>
                   )}
 
@@ -2315,7 +2329,7 @@ export default function ContentPage() {
                               clearJob(job.id);
                               // Re-trigger generation based on type
                               if (job.type === 'composite') {
-                                handleGenerateCompositeCarousel(item.id, carouselSlides || []);
+                                handleGenerateCompositeCarousel(item.id, carouselSlides || [], item.metadata?.visualStyle);
                               } else if (item.metadata?.imagePrompt) {
                                 handleGenerateImage(item.id, item.metadata?.imagePrompt || "");
                               }
