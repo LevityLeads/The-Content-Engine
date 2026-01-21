@@ -167,11 +167,22 @@ export function useGenerationJobs(options: UseGenerationJobsOptions = {}): UseGe
   }, [getLatestJob]);
 
   const clearJob = useCallback(async (jobId: string) => {
+    // Optimistically remove the job from local state immediately for instant UI feedback
+    setJobsByContent(prev => {
+      const updated: Record<string, GenerationJob[]> = {};
+      for (const contentId in prev) {
+        updated[contentId] = prev[contentId].filter(job => job.id !== jobId);
+      }
+      return updated;
+    });
+
+    // Then delete from server in background
     try {
       await fetch(`/api/images/jobs?jobId=${jobId}`, { method: "DELETE" });
-      await fetchJobs();
     } catch (error) {
       console.error("Error clearing job:", error);
+      // Refetch to restore correct state if delete failed
+      await fetchJobs();
     }
   }, [fetchJobs]);
 
