@@ -237,19 +237,20 @@ CRITICAL RULES:
 - Do NOT include social media interfaces`;
 
     try {
-      // Call Veo 3 API to start video generation
+      // Call Veo API using predictLongRunning endpoint (correct method for video generation)
       const generateResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:generateVideos?key=${googleApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:predictLongRunning?key=${googleApiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: { text: fullPrompt },
-            config: {
+            instances: [{ prompt: fullPrompt }],
+            parameters: {
               aspectRatio,
               durationSeconds: duration,
-              numberOfVideos: 1,
-              includeAudio,
+              sampleCount: 1,
+              includeRaiReason: true,
+              personGeneration: "allow_adult",
             },
           }),
         }
