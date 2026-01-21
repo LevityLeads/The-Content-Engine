@@ -13,6 +13,65 @@ const VISUAL_STYLE_DESCRIPTIONS: Record<string, string> = {
   experimental: "Wild, boundary-pushing visuals, unconventional compositions",
 };
 
+// Style-specific video guidance for each visual style
+const VIDEO_STYLE_GUIDANCE: Record<string, string> = {
+  typography: `STYLE GUIDANCE FOR TYPOGRAPHY VIDEO:
+- Animated text elements as the focus (kinetic typography)
+- Clean, solid color backgrounds with subtle motion (gradient shifts, particles)
+- Text reveals, transitions, and emphasis animations
+- Minimal to no real-world imagery - focus on graphic elements
+- Bold contrasts, modern fonts animated in/out
+- Example: Text zooming in, letters assembling, words sliding across clean backgrounds`,
+
+  photorealistic: `STYLE GUIDANCE FOR PHOTOREALISTIC VIDEO:
+- Real-world cinematic footage style (nature, cityscapes, people, objects)
+- Professional cinematography: depth of field, natural lighting, golden hour
+- Camera movements: slow pans, dolly shots, gentle zooms
+- Atmospheric elements: lens flares, bokeh, natural motion blur
+- Focus on authentic, believable scenes that evoke emotion
+- Example: Drone shot over mountains, close-up of hands working, sunrise timelapse`,
+
+  illustration: `STYLE GUIDANCE FOR ILLUSTRATION VIDEO:
+- Animated illustration/cartoon style
+- Hand-drawn or digital art aesthetic with movement
+- Characters, objects, or scenes that feel illustrated, not photographed
+- Playful, creative animations: bouncing, morphing, drawing-on effects
+- Limited color palettes, stylized shapes, artistic interpretations
+- Example: Illustrated character walking, hand-drawn elements appearing, watercolor washes`,
+
+  "3d-render": `STYLE GUIDANCE FOR 3D RENDER VIDEO:
+- Modern 3D rendered environments and objects
+- Futuristic, tech-forward aesthetics: glass, metal, neon
+- Smooth camera movements through 3D space
+- Reflections, refractions, volumetric lighting
+- Abstract 3D shapes, product visualizations, architectural renders
+- Example: Camera flying through abstract 3D tunnels, rotating product, morphing geometric shapes`,
+
+  "abstract-art": `STYLE GUIDANCE FOR ABSTRACT ART VIDEO:
+- Bold abstract shapes in motion
+- Vibrant gradients flowing and morphing
+- Geometric patterns, fluid simulations, particle effects
+- Non-representational visuals that evoke mood through color and movement
+- Psychedelic, artistic, experimental motion graphics
+- Example: Colorful liquid flows, geometric shapes transforming, gradient waves`,
+
+  collage: `STYLE GUIDANCE FOR COLLAGE VIDEO:
+- Mixed media layers with vintage/retro elements
+- Cut-out animations, paper textures, layered compositions
+- Nostalgic aesthetic: film grain, old photographs, texture overlays
+- Elements appearing, layering, peeling away
+- Eclectic mix of visual elements animated together
+- Example: Vintage photos sliding in, paper cutouts animating, textured backgrounds`,
+
+  experimental: `STYLE GUIDANCE FOR EXPERIMENTAL VIDEO:
+- Wild, boundary-pushing visuals
+- Unconventional compositions and unexpected transitions
+- Glitch effects, distortion, surreal imagery
+- Breaking visual conventions - anything goes
+- Provocative, attention-grabbing, avant-garde
+- Example: Glitchy transitions, surreal morphing, unexpected visual juxtapositions`,
+};
+
 // Generate image prompt for a slide
 function generateImagePromptGuidelines(visualStyle: string, slideText: string, platform: string): string {
   const styleDesc = VISUAL_STYLE_DESCRIPTIONS[visualStyle] || VISUAL_STYLE_DESCRIPTIONS.photorealistic;
@@ -43,6 +102,7 @@ OUTPUT: Return ONLY the image generation prompt, nothing else.`;
 // Generate video prompt for a slide
 function generateVideoPromptGuidelines(visualStyle: string, slideText: string, platform: string): string {
   const styleDesc = VISUAL_STYLE_DESCRIPTIONS[visualStyle] || VISUAL_STYLE_DESCRIPTIONS.photorealistic;
+  const styleGuidance = VIDEO_STYLE_GUIDANCE[visualStyle] || VIDEO_STYLE_GUIDANCE.photorealistic;
 
   return `Generate a detailed video generation prompt for this social media content.
 
@@ -50,21 +110,24 @@ CONTENT TEXT: "${slideText}"
 
 VISUAL STYLE: ${visualStyle} - ${styleDesc}
 
+${styleGuidance}
+
 PLATFORM: ${platform}
 
 REQUIREMENTS:
 1. The prompt must describe a 5-8 second video scene
-2. Include specific details about:
-   - Opening scene and visual setup
+2. CRITICAL: The video MUST match the "${visualStyle}" style described above
+3. Include specific details about:
+   - Opening scene and visual setup (matching the style)
    - Camera movement (pan, zoom, static, etc.)
    - Visual transitions or motion
    - Key visual elements and their movement
    - Overall mood and atmosphere
    - Color palette and lighting
-3. The video should be visually engaging for ${platform}
-4. DO NOT include text overlays in the video description (text will be added separately)
-5. Focus on cinematic, professional quality visuals
-6. Keep the prompt under 600 characters
+4. The video should be visually engaging for ${platform}
+5. DO NOT include text overlays in the video description (text will be added separately)
+6. Focus on ${visualStyle === "photorealistic" ? "cinematic, professional quality footage" : `${visualStyle} aesthetic and motion`}
+7. Keep the prompt under 600 characters
 
 OUTPUT: Return ONLY the video generation prompt, nothing else.`;
 }
