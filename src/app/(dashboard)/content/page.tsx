@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Calendar, ArrowRight, Video, Play } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
-import { VIDEO_MODEL_OPTIONS, DEFAULT_VIDEO_MODEL, type VideoModelKey } from "@/lib/video-models";
+import { VIDEO_MODEL_OPTIONS, DEFAULT_VIDEO_MODEL, VIDEO_MODELS, type VideoModelKey } from "@/lib/video-models";
+import { estimateVideoCost } from "@/lib/video-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -150,6 +151,8 @@ export default function ContentPage() {
   const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
   const [generatingAllVideos, setGeneratingAllVideos] = useState<string | null>(null);
   const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModelKey>(DEFAULT_VIDEO_MODEL);
+  const [includeAudio, setIncludeAudio] = useState<boolean>(false);
+  const [videoDuration, setVideoDuration] = useState<number>(5);
   const [mediaMode, setMediaMode] = useState<"image" | "video">("image");
   const [generatingPrompt, setGeneratingPrompt] = useState<string | null>(null);
   const [videoPrompts, setVideoPrompts] = useState<Record<string, string>>({});
@@ -483,8 +486,8 @@ export default function ContentPage() {
           contentId,
           prompt: videoPrompt,
           model: selectedVideoModel,
-          duration: 5,
-          includeAudio: false,
+          duration: videoDuration,
+          includeAudio: includeAudio,
           slideNumber,
         }),
       });
@@ -1897,6 +1900,80 @@ export default function ContentPage() {
                   ))}
                 </select>
               </div>
+
+              {/* Duration and Audio Settings */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Duration</label>
+                  <select
+                    className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs"
+                    value={videoDuration}
+                    onChange={(e) => setVideoDuration(parseInt(e.target.value))}
+                  >
+                    <option value={3}>3 sec</option>
+                    <option value={4}>4 sec</option>
+                    <option value={5}>5 sec</option>
+                    <option value={6}>6 sec</option>
+                    <option value={7}>7 sec</option>
+                    <option value={8}>8 sec</option>
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Audio</label>
+                  <button
+                    className={cn(
+                      "w-full h-7 rounded-md border px-2 text-xs flex items-center justify-center gap-1.5 transition-colors",
+                      includeAudio
+                        ? "bg-purple-600 border-purple-600 text-white"
+                        : "bg-background border-input text-muted-foreground hover:border-purple-500/50"
+                    )}
+                    onClick={() => setIncludeAudio(!includeAudio)}
+                  >
+                    {includeAudio ? (
+                      <>
+                        <Check className="h-3 w-3" />
+                        On
+                      </>
+                    ) : (
+                      "Off"
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Cost Estimate */}
+              {(() => {
+                const estimate = estimateVideoCost(selectedVideoModel, videoDuration, includeAudio);
+                const totalForAllSlides = estimate.totalCost * slides.length;
+                return (
+                  <div className="rounded-lg bg-muted/40 border border-muted p-2.5">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-medium text-muted-foreground">Estimated Cost</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        ${totalForAllSlides.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="text-[9px] text-muted-foreground space-y-0.5">
+                      <div className="flex justify-between">
+                        <span>Video ({videoDuration}s × ${VIDEO_MODELS[selectedVideoModel].costPerSecond}/s)</span>
+                        <span>${(videoDuration * VIDEO_MODELS[selectedVideoModel].costPerSecond * slides.length).toFixed(2)}</span>
+                      </div>
+                      {includeAudio && (
+                        <div className="flex justify-between">
+                          <span>Audio ({videoDuration}s × ${VIDEO_MODELS[selectedVideoModel].audioCostPerSecond}/s)</span>
+                          <span>${(videoDuration * VIDEO_MODELS[selectedVideoModel].audioCostPerSecond * slides.length).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {slides.length > 1 && (
+                        <div className="flex justify-between pt-0.5 border-t border-muted mt-1">
+                          <span>× {slides.length} videos</span>
+                          <span className="font-medium">${totalForAllSlides.toFixed(2)} total</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Generate All Videos Button */}
               <Button
