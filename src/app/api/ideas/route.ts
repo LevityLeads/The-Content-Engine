@@ -33,10 +33,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      ideas,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        ideas,
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+        },
+      }
+    );
   } catch (error) {
     console.error("Error in GET /api/ideas:", error);
     return NextResponse.json(
