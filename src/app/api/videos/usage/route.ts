@@ -116,15 +116,8 @@ export async function GET(request: NextRequest) {
           spentFormatted: formatCost(dailySpend),
         },
       },
-      config: {
-        enabled: videoConfig.enabled,
-        monthlyBudget: videoConfig.monthly_budget_usd,
-        dailyLimit: videoConfig.daily_limit,
-        defaultModel: videoConfig.default_model,
-        defaultDuration: videoConfig.default_duration,
-        maxDuration: videoConfig.max_duration,
-        includeAudio: videoConfig.include_audio,
-      },
+      // Return the raw config with snake_case keys to match BrandVideoConfig type
+      config: videoConfig,
       recentVideos: recentVideos?.map((v) => ({
         id: v.id,
         cost: v.cost_usd,
