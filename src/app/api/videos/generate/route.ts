@@ -96,8 +96,11 @@ async function pollVideoGeneration(
           return { success: true, videoData: prediction.bytesBase64Encoded };
         }
 
-        console.error("Unknown response structure:", JSON.stringify(data.response, null, 2).substring(0, 1000));
-        return { success: false, error: "No video in response - unknown format" };
+        // Include response structure in error for debugging
+        const responseKeys = data.response ? Object.keys(data.response).join(', ') : 'none';
+        const fullStructure = JSON.stringify(data, null, 2).substring(0, 500);
+        console.error("Unknown response structure:", fullStructure);
+        return { success: false, error: `No video in response. Keys: [${responseKeys}]. Structure: ${fullStructure}` };
       }
 
       // Not done yet, wait and try again
