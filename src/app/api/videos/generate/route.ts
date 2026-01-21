@@ -57,18 +57,47 @@ async function pollVideoGeneration(
 
       const data = await response.json();
 
+      // Log the response structure for debugging
+      console.log("Veo poll response:", JSON.stringify(data, null, 2).substring(0, 2000));
+
       if (data.done) {
         if (data.error) {
           return { success: false, error: data.error.message || "Video generation failed" };
         }
 
-        // Extract video from response
-        const video = data.response?.generatedVideos?.[0]?.video;
-        if (video) {
-          return { success: true, videoData: video };
+        // Try multiple possible response paths (Gemini API vs Vertex AI formats)
+        const generatedVideo = data.response?.generatedVideos?.[0];
+
+        // Path 1: videoBytes directly on video object
+        const videoBytes = generatedVideo?.video?.videoBytes;
+        if (videoBytes) {
+          console.log("Found video at: response.generatedVideos[0].video.videoBytes");
+          return { success: true, videoData: videoBytes };
         }
 
-        return { success: false, error: "No video in response" };
+        // Path 2: video as base64 string directly
+        const videoData = generatedVideo?.video;
+        if (typeof videoData === 'string') {
+          console.log("Found video at: response.generatedVideos[0].video (string)");
+          return { success: true, videoData: videoData };
+        }
+
+        // Path 3: Check for gcsUri (Cloud Storage URL)
+        const gcsUri = generatedVideo?.video?.gcsUri || generatedVideo?.gcsUri;
+        if (gcsUri) {
+          console.log("Video stored at GCS:", gcsUri);
+          return { success: false, error: `Video stored at GCS (not supported): ${gcsUri}` };
+        }
+
+        // Path 4: Check predictions array (Vertex AI format)
+        const prediction = data.response?.predictions?.[0];
+        if (prediction?.bytesBase64Encoded) {
+          console.log("Found video at: response.predictions[0].bytesBase64Encoded");
+          return { success: true, videoData: prediction.bytesBase64Encoded };
+        }
+
+        console.error("Unknown response structure:", JSON.stringify(data.response, null, 2).substring(0, 1000));
+        return { success: false, error: "No video in response - unknown format" };
       }
 
       // Not done yet, wait and try again
