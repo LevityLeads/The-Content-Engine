@@ -455,10 +455,17 @@ export async function POST(request: NextRequest): Promise<NextResponse<ScheduleS
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      suggestions,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        suggestions,
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=300, stale-while-revalidate=600',
+        },
+      }
+    );
   } catch (error) {
     console.error("Error in POST /api/schedule/suggest:", error);
     return NextResponse.json(

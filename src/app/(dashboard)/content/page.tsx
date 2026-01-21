@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GenerationStatus } from "@/components/ui/generation-status";
 import { ContentGridSkeleton } from "@/components/ui/skeleton";
 import { useGenerationJobs } from "@/hooks/use-generation-jobs";
+import { useContent } from '@/hooks/use-swr-hooks';
 import { cn } from "@/lib/utils";
 import { useBrand } from "@/contexts/brand-context";
 
@@ -117,11 +118,19 @@ const visualStyleOptions = [
 export default function ContentPage() {
   const { selectedBrand } = useBrand();
   const fetchingImagesRef = useRef<Set<string>>(new Set());
+  const [filter, setFilter] = useState<string>("draft");
+  
+  // Use SWR for content fetching with automatic caching
+  const { content: swrContent, isLoading: isContentLoading, mutate: mutateContent } = useContent({
+    status: filter || undefined,
+    limit: 50,
+  });
+
+  // Local state for backwards compatibility during transition
   const [content, setContent] = useState<Content[]>([]);
   const [images, setImages] = useState<Record<string, ContentImage[]>>({});
   const [slideImages, setSlideImages] = useState<Record<string, Record<number, CarouselImage[]>>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<string>("draft");
   const [generatingImage, setGeneratingImage] = useState<string | null>(null);
   const [generatingSlides, setGeneratingSlides] = useState<Record<string, number[]>>({});
   const [imageMessage, setImageMessage] = useState<string | null>(null);
@@ -199,8 +208,23 @@ export default function ContentPage() {
     autoPoll: true,
   });
 
+  // Sync SWR data to local state
   useEffect(() => {
-    fetchContent();
+    if (swrContent && swrContent.length > 0) {
+      // Cast SWR content to local Content type (SWR type is a subset)
+      setContent(swrContent as unknown as Content[]);
+    }
+  }, [swrContent]);
+
+  // Update loading state based on SWR
+  useEffect(() => {
+    setIsLoading(isContentLoading);
+  }, [isContentLoading]);
+
+  useEffect(() => {
+    if (selectedBrand?.id) {
+      mutateContent();
+    }
     setSelectedItems(new Set());
   }, [filter, selectedBrand?.id]);
 
@@ -230,25 +254,9 @@ export default function ContentPage() {
   }, [isDraggingDivider]);
 
   const fetchContent = async () => {
-    try {
-      setIsLoading(true);
-      const params = new URLSearchParams();
-      if (filter) params.set("status", filter);
-      if (selectedBrand?.id) params.set("brandId", selectedBrand.id);
-      const url = `/api/content?${params.toString()}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.success) {
-        setContent(data.content || []);
-        const contentItems = data.content || [];
-        // Fetch all images in parallel for better performance
-        await Promise.all(contentItems.map((item: Content) => fetchImagesForContent(item.id)));
-      }
-    } catch (err) {
-      console.error("Error fetching content:", err);
-    } finally {
-      setIsLoading(false);
-    }
+    // SWR handles the main content fetching
+    // Just trigger a revalidation
+    mutateContent();
   };
 
   const fetchImagesForContent = async (contentId: string) => {

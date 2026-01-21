@@ -20,10 +20,17 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      brands: brands || [],
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        brands: brands || [],
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
+        },
+      }
+    );
   } catch (error) {
     console.error("Error in GET /api/brands:", error);
     return NextResponse.json(
