@@ -241,22 +241,19 @@ Then EVERY slide prompt MUST follow the chosen style's guidelines exactly. No mi
 
 ---
 
-## Image Prompt Requirements
+## Carousel Slides (Text Only)
 
-### CRITICAL: Self-Contained Prompts
-Each imagePrompt MUST be 100% self-contained. The image generator has NO context about other slides, brand, or content. Include EVERYTHING needed.
+For Instagram carousels, generate slide TEXT only. Image prompts will be generated separately based on the user's visual style selection in the UI.
 
-### FORBIDDEN in Image Prompts (Will Cause Failures):
-- Platform names: "Instagram", "LinkedIn", "Twitter", "Facebook"
-- Social media terms: "post", "carousel", "story", "feed", "reel"
-- UI elements: "like button", "heart icon", "comment section", "profile picture"
-- Format references: "for social media", "social graphic", "Instagram carousel"
-- Cross-references: "same style as slide 1", "matching previous slide"
-- App mockups: "phone screen showing", "app interface"
+Each slide should have:
+- slideNumber: The slide position (1, 2, 3, etc.)
+- text: The text content for the slide
+
+Do NOT include imagePrompt in slides - this will be generated on-demand.
 
 ---
 
-## Style-Specific Image Prompt Guidelines
+## Visual Style Guidelines (For Reference)
 
 ### TYPOGRAPHY Style Prompts:
 Focus on bold text as the hero element. No background imagery.
@@ -412,40 +409,35 @@ Return a JSON array with content for each requested platform:
         "Tweet 3: Point 1",
         "Tweet 4: Point 2",
         "Tweet 5: CTA"
-      ],
-      "imagePrompt": "Full self-contained image prompt if single image needed"
+      ]
     },
     {
       "platform": "linkedin",
       "primaryCopy": "Full LinkedIn post with formatting and line breaks",
       "hashtags": ["#hashtag1", "#hashtag2", "#hashtag3"],
-      "cta": "Comment your thoughts below!",
-      "imagePrompt": "Full self-contained image prompt"
+      "cta": "Comment your thoughts below!"
     },
     {
       "platform": "instagram",
       "primaryCopy": "Instagram caption text",
       "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],
       "cta": "Save this for later!",
-      "carouselStyle": {
-        "visualStyle": "photorealistic",
-        "styleRationale": "Travel content benefits from photo-quality imagery that evokes emotion and wanderlust",
-        "primaryColor": "#ffffff",
-        "accentColor": "#ff6b6b",
-        "font": "Inter",
-        "aesthetic": "cinematic, aspirational, premium",
-        "textOverlayMethod": "semi-transparent dark box in lower third"
-      },
       "carouselSlides": [
         {
           "slideNumber": 1,
-          "text": "Hook text for slide 1",
-          "imagePrompt": "Full self-contained prompt following the chosen visualStyle guidelines. For photorealistic: include scene, lighting, camera effects, text overlay treatment, quality keywords. For typography: include background color, text hierarchy, accent elements."
+          "text": "Hook text for slide 1 (attention-grabbing, creates curiosity)"
         },
         {
           "slideNumber": 2,
-          "text": "Content for slide 2",
-          "imagePrompt": "Full self-contained prompt matching the same visualStyle, color palette, and text treatment as slide 1. Maintain visual consistency across all slides."
+          "text": "Content for slide 2 (first key point)"
+        },
+        {
+          "slideNumber": 3,
+          "text": "Content for slide 3 (second key point)"
+        },
+        {
+          "slideNumber": 4,
+          "text": "Final slide with CTA"
         }
       ]
     }
@@ -511,13 +503,8 @@ export const buildContentUserPrompt = (
   platforms: string[],
   brandVoicePrompt: string,
   additionalInstructions?: string,
-  visualStyleOverride?: VisualStyle
+  _visualStyleOverride?: VisualStyle // Kept for backwards compatibility but no longer used
 ): string => {
-  // Build visual style instruction
-  const visualStyleInstruction = visualStyleOverride
-    ? `**REQUIRED Visual Style**: Use "${visualStyleOverride}" style for all carousel images. Follow the style-specific guidelines in the prompt system.`
-    : `**Visual Style Selection**: Analyze the content topic and choose the optimal visual style (typography, photorealistic, illustration, 3d-render, abstract-art, or collage). Include your styleRationale explaining why this style fits the content.`;
-
   return `## The Idea to Transform
 
 **Concept**: ${idea.concept}
@@ -547,15 +534,9 @@ Generate content for: ${platforms.map((p) => p.toUpperCase()).join(", ")}
 
 ${platforms.includes("instagram") ? `For Instagram: Create a carousel with the OPTIMAL number of slides for this content. Remember slide 1 is HOOK ONLY.
 
-${visualStyleInstruction}
+Generate ONLY the slide TEXT content - do NOT include imagePrompt fields. Image prompts will be generated separately based on the user's visual style selection.
 
-CRITICAL: Define carouselStyle FIRST with:
-- visualStyle (the chosen style)
-- styleRationale (why this style fits)
-- Color palette (primaryColor, accentColor)
-- textOverlayMethod (how text remains readable)
-
-Then ensure EVERY slide imagePrompt follows the chosen style's guidelines with IDENTICAL treatment across all slides.` : ""}
+Each slide should be compelling text that would work with any visual style.` : ""}
 ${platforms.includes("twitter") ? "For Twitter: If the idea warrants depth, create a thread. Otherwise, a powerful single tweet." : ""}
 
 ---

@@ -35,7 +35,7 @@ interface ContentImage {
 interface CarouselSlide {
   slideNumber: number;
   text: string;
-  imagePrompt: string;
+  imagePrompt?: string; // Optional - generated on-demand when user clicks Generate
 }
 
 interface Content {
@@ -472,11 +472,12 @@ export default function ContentPage() {
       }
     };
 
-    // Generate all slides with status tracking
-    const promises = slides.map(async (slide) => {
+    // Generate all slides with status tracking (only slides with prompts)
+    const slidesWithPrompts = slides.filter(slide => slide.imagePrompt);
+    const promises = slidesWithPrompts.map(async (slide) => {
       await updateSlideStatus(slide.slideNumber, 'generating');
       try {
-        await handleGenerateImage(contentId, slide.imagePrompt, slide.slideNumber);
+        await handleGenerateImage(contentId, slide.imagePrompt!, slide.slideNumber);
         await updateSlideStatus(slide.slideNumber, 'completed');
       } catch (err) {
         await updateSlideStatus(slide.slideNumber, 'failed');
@@ -1420,11 +1421,12 @@ export default function ContentPage() {
       }
     }
 
-    if (obj && "text" in obj && "imagePrompt" in obj) {
+    // Allow slides with just text (imagePrompt is now generated on-demand)
+    if (obj && "text" in obj) {
       return {
         slideNumber: typeof obj.slideNumber === "number" ? obj.slideNumber : 1,
         text: String(obj.text || ""),
-        imagePrompt: String(obj.imagePrompt || ""),
+        imagePrompt: obj.imagePrompt ? String(obj.imagePrompt) : undefined,
       };
     }
 
