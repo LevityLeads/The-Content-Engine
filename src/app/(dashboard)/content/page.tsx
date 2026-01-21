@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Calendar, ArrowRight, Video, Play } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { VIDEO_MODEL_OPTIONS, DEFAULT_VIDEO_MODEL, type VideoModelKey } from "@/lib/video-models";
@@ -14,6 +14,7 @@ import { ImageCarousel, type CarouselImage } from "@/components/ui/image-carouse
 import { PlatformPostMockup } from "@/components/ui/platform-mockups";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GenerationStatus } from "@/components/ui/generation-status";
+import { ContentGridSkeleton } from "@/components/ui/skeleton";
 import { useGenerationJobs } from "@/hooks/use-generation-jobs";
 import { cn } from "@/lib/utils";
 import { useBrand } from "@/contexts/brand-context";
@@ -115,6 +116,7 @@ const visualStyleOptions = [
 
 export default function ContentPage() {
   const { selectedBrand } = useBrand();
+  const fetchingImagesRef = useRef<Set<string>>(new Set());
   const [content, setContent] = useState<Content[]>([]);
   const [images, setImages] = useState<Record<string, ContentImage[]>>({});
   const [slideImages, setSlideImages] = useState<Record<string, Record<number, CarouselImage[]>>>({});
@@ -239,9 +241,8 @@ export default function ContentPage() {
       if (data.success) {
         setContent(data.content || []);
         const contentItems = data.content || [];
-        for (const item of contentItems) {
-          fetchImagesForContent(item.id);
-        }
+        // Fetch all images in parallel for better performance
+        await Promise.all(contentItems.map((item: Content) => fetchImagesForContent(item.id)));
       }
     } catch (err) {
       console.error("Error fetching content:", err);
@@ -251,6 +252,11 @@ export default function ContentPage() {
   };
 
   const fetchImagesForContent = async (contentId: string) => {
+    // Prevent duplicate fetches for the same content
+    if (fetchingImagesRef.current.has(contentId)) {
+      return;
+    }
+    fetchingImagesRef.current.add(contentId);
     try {
       const res = await fetch(`/api/images/generate?contentId=${contentId}`);
       const data = await res.json();
@@ -308,6 +314,8 @@ export default function ContentPage() {
       }
     } catch (err) {
       console.error("Error fetching images:", err);
+    } finally {
+      fetchingImagesRef.current.delete(contentId);
     }
   };
 
@@ -1457,10 +1465,12 @@ export default function ContentPage() {
     return text.slice(0, maxLength) + "...";
   };
 
-  const draftCount = content.filter((c) => c.status === "draft").length;
-  const approvedCount = content.filter((c) => c.status === "approved").length;
-  const scheduledCount = content.filter((c) => c.status === "scheduled").length;
-  const publishedCount = content.filter((c) => c.status === "published").length;
+  const { draftCount, approvedCount, scheduledCount, publishedCount } = useMemo(() => ({
+    draftCount: content.filter((c) => c.status === "draft").length,
+    approvedCount: content.filter((c) => c.status === "approved").length,
+    scheduledCount: content.filter((c) => c.status === "scheduled").length,
+    publishedCount: content.filter((c) => c.status === "published").length,
+  }), [content]);
 
   // Kanban board columns configuration
   const kanbanColumns = [
@@ -2314,15 +2324,7 @@ export default function ContentPage() {
       )}
 
       {/* Loading State */}
-      {isLoading && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="mb-4 h-12 w-12 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Loading content...</p>
-          </CardContent>
-        </Card>
-      )}
-
+      {isLoading && <ContentGridSkeleton count={6} />}
       {/* Kanban Board View - when "All" filter is selected */}
       {!isLoading && filter === "" && content.length > 0 && renderKanbanBoard()}
 
