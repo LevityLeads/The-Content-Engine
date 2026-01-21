@@ -146,6 +146,16 @@ export default function ContentPage() {
   const [scheduledDateTime, setScheduledDateTime] = useState<string>("");
   const [isScheduling, setIsScheduling] = useState(false);
   const [publishMessage, setPublishMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // Magic Schedule state
+  const [magicScheduleDialogOpen, setMagicScheduleDialogOpen] = useState(false);
+  const [magicScheduleContentId, setMagicScheduleContentId] = useState<string | null>(null);
+  const [magicSuggestion, setMagicSuggestion] = useState<{
+    suggestedTime: string;
+    reasoning: string;
+    alternatives: Array<{ time: string; label: string }>;
+  } | null>(null);
+  const [isLoadingMagicSuggestion, setIsLoadingMagicSuggestion] = useState(false);
+  const [selectedMagicTime, setSelectedMagicTime] = useState<string | null>(null);
   // Slide text editing state
   const [editingSlideText, setEditingSlideText] = useState<{ contentId: string; slideNumber: number } | null>(null);
   const [editedSlideText, setEditedSlideText] = useState<string>("");
@@ -153,6 +163,20 @@ export default function ContentPage() {
   // Visual style change state
   const [selectedVisualStyle, setSelectedVisualStyle] = useState<Record<string, string>>({});
   const [isChangingStyle, setIsChangingStyle] = useState<string | null>(null);
+  // Bulk Magic Schedule state
+  const [bulkMagicDialogOpen, setBulkMagicDialogOpen] = useState(false);
+  const [bulkSuggestions, setBulkSuggestions] = useState<Array<{
+    contentId: string;
+    suggestedTime: string;
+    reasoning: string;
+    score: number;
+    platform?: string;
+    concept?: string;
+  }>>([]);
+  const [isLoadingBulkSuggestions, setIsLoadingBulkSuggestions] = useState(false);
+  const [isSchedulingBulk, setIsSchedulingBulk] = useState(false);
+  const [bulkScheduleProgress, setBulkScheduleProgress] = useState<{ current: number; total: number } | null>(null);
+  const [bulkScheduleResults, setBulkScheduleResults] = useState<{ successes: string[]; failures: string[] } | null>(null);
 
   // Generation job tracking
   const contentIds = content.map(c => c.id);
@@ -744,6 +768,246 @@ export default function ContentPage() {
     }
   };
 
+  const openMagicScheduleDialog = async (contentId: string) => {
+    const contentItem = content.find(c => c.id === contentId);
+    if (!contentItem) return;
+
+    setMagicScheduleContentId(contentId);
+    setMagicSuggestion(null);
+    setSelectedMagicTime(null);
+    setIsLoadingMagicSuggestion(true);
+    setMagicScheduleDialogOpen(true);
+
+    try {
+      const res = await fetch("/api/schedule/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          brandId: selectedBrand?.id,
+          platform: contentItem.platform,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.suggestion) {
+        setMagicSuggestion(data.suggestion);
+        setSelectedMagicTime(data.suggestion.suggestedTime);
+      } else {
+        // Fallback to a reasonable default if API fails
+        const fallbackTime = new Date();
+        fallbackTime.setDate(fallbackTime.getDate() + 1);
+        fallbackTime.setHours(9, 0, 0, 0);
+        setMagicSuggestion({
+          suggestedTime: fallbackTime.toISOString(),
+          reasoning: "We suggest posting tomorrow morning for optimal engagement.",
+          alternatives: [
+            {
+              time: (() => {
+                const t = new Date();
+                t.setDate(t.getDate() + 1);
+                t.setHours(12, 0, 0, 0);
+                return t.toISOString();
+              })(),
+              label: "Tomorrow at 12:00 PM",
+            },
+            {
+              time: (() => {
+                const t = new Date();
+                t.setDate(t.getDate() + 1);
+                t.setHours(17, 0, 0, 0);
+                return t.toISOString();
+              })(),
+              label: "Tomorrow at 5:00 PM",
+            },
+          ],
+        });
+        setSelectedMagicTime(fallbackTime.toISOString());
+      }
+    } catch (err) {
+      console.error("Error fetching magic schedule suggestion:", err);
+      // Fallback to a reasonable default
+      const fallbackTime = new Date();
+      fallbackTime.setDate(fallbackTime.getDate() + 1);
+      fallbackTime.setHours(9, 0, 0, 0);
+      setMagicSuggestion({
+        suggestedTime: fallbackTime.toISOString(),
+        reasoning: "We suggest posting tomorrow morning for optimal engagement.",
+        alternatives: [],
+      });
+      setSelectedMagicTime(fallbackTime.toISOString());
+    } finally {
+      setIsLoadingMagicSuggestion(false);
+    }
+  };
+
+  const handleMagicSchedule = async () => {
+    if (!magicScheduleContentId || !selectedMagicTime) return;
+
+    setIsScheduling(true);
+    setPublishMessage(null);
+    try {
+      const res = await fetch("/api/content/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId: magicScheduleContentId,
+          scheduledFor: selectedMagicTime,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPublishMessage({ type: "success", text: `Scheduled for ${new Date(selectedMagicTime).toLocaleString()}` });
+        // Update local state
+        setContent((prev) =>
+          prev.map((c) =>
+            c.id === magicScheduleContentId
+              ? { ...c, status: "scheduled", scheduled_for: selectedMagicTime }
+              : c
+          )
+        );
+        setMagicScheduleDialogOpen(false);
+        setTimeout(() => setPublishMessage(null), 3000);
+      } else {
+        setPublishMessage({ type: "error", text: data.error || "Failed to schedule" });
+        setTimeout(() => setPublishMessage(null), 5000);
+      }
+    } catch (err) {
+      console.error("Error scheduling:", err);
+      setPublishMessage({ type: "error", text: "Network error - please try again" });
+      setTimeout(() => setPublishMessage(null), 5000);
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  const formatMagicTime = (isoString: string) => {
+    const date = new Date(isoString);
+    return date.toLocaleString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  // Open bulk magic schedule dialog and fetch suggestions for all approved content
+  const openBulkMagicDialog = async () => {
+    // Get all approved content
+    const approvedContent = content.filter(c => c.status === "approved");
+    if (approvedContent.length === 0) return;
+
+    setBulkSuggestions([]);
+    setBulkScheduleResults(null);
+    setBulkScheduleProgress(null);
+    setIsLoadingBulkSuggestions(true);
+    setBulkMagicDialogOpen(true);
+
+    try {
+      const res = await fetch("/api/schedule/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentIds: approvedContent.map(c => c.id),
+          brandId: selectedBrand?.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.suggestions) {
+        // Enrich suggestions with content info
+        const enrichedSuggestions = data.suggestions.map((suggestion: { contentId: string; suggestedTime: string; reasoning: string; score: number }) => {
+          const contentItem = approvedContent.find(c => c.id === suggestion.contentId);
+          return {
+            ...suggestion,
+            platform: contentItem?.platform,
+            concept: contentItem?.ideas?.concept || contentItem?.copy_primary?.slice(0, 50),
+          };
+        });
+        setBulkSuggestions(enrichedSuggestions);
+      } else {
+        console.error("Failed to get bulk suggestions:", data.error);
+      }
+    } catch (err) {
+      console.error("Error fetching bulk magic suggestions:", err);
+    } finally {
+      setIsLoadingBulkSuggestions(false);
+    }
+  };
+
+  // Schedule all content items with their suggested times
+  const handleBulkMagicSchedule = async () => {
+    if (bulkSuggestions.length === 0) return;
+
+    setIsSchedulingBulk(true);
+    setBulkScheduleProgress({ current: 0, total: bulkSuggestions.length });
+    const successes: string[] = [];
+    const failures: string[] = [];
+
+    for (let i = 0; i < bulkSuggestions.length; i++) {
+      const suggestion = bulkSuggestions[i];
+      setBulkScheduleProgress({ current: i + 1, total: bulkSuggestions.length });
+
+      try {
+        const res = await fetch("/api/content/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contentId: suggestion.contentId,
+            scheduledFor: suggestion.suggestedTime,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          successes.push(suggestion.contentId);
+          // Update local state for this content item
+          setContent((prev) =>
+            prev.map((c) =>
+              c.id === suggestion.contentId
+                ? { ...c, status: "scheduled", scheduled_for: suggestion.suggestedTime }
+                : c
+            )
+          );
+        } else {
+          failures.push(suggestion.contentId);
+        }
+      } catch (err) {
+        console.error(`Error scheduling content ${suggestion.contentId}:`, err);
+        failures.push(suggestion.contentId);
+      }
+    }
+
+    setBulkScheduleResults({ successes, failures });
+    setIsSchedulingBulk(false);
+    setBulkScheduleProgress(null);
+
+    // Show success message if all succeeded
+    if (failures.length === 0) {
+      setPublishMessage({ type: "success", text: `Successfully scheduled ${successes.length} posts!` });
+      setTimeout(() => {
+        setBulkMagicDialogOpen(false);
+        setPublishMessage(null);
+      }, 2000);
+    }
+  };
+
+  // Calculate date range for bulk suggestions
+  const getBulkScheduleSummary = () => {
+    if (bulkSuggestions.length === 0) return null;
+
+    const times = bulkSuggestions.map(s => new Date(s.suggestedTime).getTime());
+    const earliest = new Date(Math.min(...times));
+    const latest = new Date(Math.max(...times));
+    const daysDiff = Math.ceil((latest.getTime() - earliest.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    return {
+      count: bulkSuggestions.length,
+      days: daysDiff,
+      startDate: earliest.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      endDate: latest.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    };
+  };
+
   const handleDownloadImage = (url: string, platform: string, slideNumber?: number) => {
     const link = document.createElement("a");
     link.href = url;
@@ -1155,18 +1419,32 @@ export default function ContentPage() {
             </Button>
           )}
           {item.status === "approved" && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 w-full text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
-              onClick={(e) => {
-                e.stopPropagation();
-                openScheduleDialog(item.id);
-              }}
-            >
-              <Calendar className="h-3 w-3 mr-1" />
-              Schedule
-            </Button>
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 flex-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openScheduleDialog(item.id);
+                }}
+              >
+                <Calendar className="h-3 w-3 mr-1" />
+                Schedule
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 flex-1 text-xs bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 text-purple-300 hover:text-purple-200"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openMagicScheduleDialog(item.id);
+                }}
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                Magic
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -1709,7 +1987,7 @@ export default function ContentPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         {["draft", "approved", "scheduled", "published", ""].map((f) => (
           <Button
             key={f || "all"}
@@ -1720,6 +1998,18 @@ export default function ContentPage() {
             {f || "All"}
           </Button>
         ))}
+
+        {/* Magic Schedule All - only show on approved tab with approved items */}
+        {filter === "approved" && approvedCount > 0 && (
+          <Button
+            size="sm"
+            className="ml-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0"
+            onClick={openBulkMagicDialog}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Magic Schedule All ({approvedCount})
+          </Button>
+        )}
       </div>
 
       {/* Bulk Actions Bar - hidden in Kanban view */}
@@ -2346,6 +2636,15 @@ export default function ContentPage() {
                             </Button>
                             <Button
                               size="sm"
+                              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0"
+                              onClick={() => openMagicScheduleDialog(item.id)}
+                              disabled={publishingId === item.id}
+                            >
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              Magic Schedule
+                            </Button>
+                            <Button
+                              size="sm"
                               onClick={() => handlePublish(item.id)}
                               disabled={publishingId === item.id}
                             >
@@ -2483,6 +2782,303 @@ export default function ContentPage() {
                 </>
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Magic Schedule Dialog */}
+      <Dialog open={magicScheduleDialogOpen} onOpenChange={setMagicScheduleDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              Magic Schedule
+            </DialogTitle>
+            <DialogDescription>
+              AI-powered scheduling recommendation based on your audience and content type.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingMagicSuggestion ? (
+            <div className="py-8 flex flex-col items-center justify-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 blur-md opacity-50 animate-pulse" />
+                <div className="relative p-3 rounded-full bg-gradient-to-r from-purple-600 to-blue-600">
+                  <Sparkles className="h-6 w-6 text-white animate-pulse" />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">Finding the optimal time...</p>
+            </div>
+          ) : magicSuggestion ? (
+            <div className="py-4 space-y-4">
+              {/* Recommended Time */}
+              <div
+                className={cn(
+                  "p-4 rounded-lg border-2 cursor-pointer transition-all",
+                  selectedMagicTime === magicSuggestion.suggestedTime
+                    ? "border-purple-500 bg-purple-500/10"
+                    : "border-border hover:border-purple-500/50"
+                )}
+                onClick={() => setSelectedMagicTime(magicSuggestion.suggestedTime)}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-gradient-to-r from-purple-500 to-blue-500">
+                      <Sparkles className="h-3 w-3 text-white" />
+                    </div>
+                    <span className="text-xs font-medium text-purple-400">RECOMMENDED</span>
+                  </div>
+                  {selectedMagicTime === magicSuggestion.suggestedTime && (
+                    <CheckCircle2 className="h-4 w-4 text-purple-400" />
+                  )}
+                </div>
+                <p className="font-semibold text-lg">
+                  {formatMagicTime(magicSuggestion.suggestedTime)}
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {magicSuggestion.reasoning}
+                </p>
+              </div>
+
+              {/* Alternative Times */}
+              {magicSuggestion.alternatives && magicSuggestion.alternatives.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Alternative times
+                  </p>
+                  {magicSuggestion.alternatives.map((alt, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "p-3 rounded-lg border cursor-pointer transition-all",
+                        selectedMagicTime === alt.time
+                          ? "border-purple-500 bg-purple-500/10"
+                          : "border-border hover:border-purple-500/50"
+                      )}
+                      onClick={() => setSelectedMagicTime(alt.time)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{alt.label}</span>
+                        {selectedMagicTime === alt.time && (
+                          <CheckCircle2 className="h-4 w-4 text-purple-400" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setMagicScheduleDialogOpen(false)}
+              disabled={isScheduling}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleMagicSchedule}
+              disabled={isScheduling || !selectedMagicTime || isLoadingMagicSuggestion}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0"
+            >
+              {isScheduling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scheduling...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Schedule
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Magic Schedule Dialog */}
+      <Dialog open={bulkMagicDialogOpen} onOpenChange={setBulkMagicDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              Magic Schedule All
+            </DialogTitle>
+            <DialogDescription>
+              AI-powered bulk scheduling for all your approved content.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingBulkSuggestions ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 blur-md opacity-50 animate-pulse" />
+                <div className="relative p-4 rounded-full bg-gradient-to-r from-purple-600 to-blue-600">
+                  <Sparkles className="h-8 w-8 text-white animate-pulse" />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Finding optimal times for {content.filter(c => c.status === "approved").length} posts...
+              </p>
+            </div>
+          ) : bulkScheduleResults ? (
+            // Results view after scheduling
+            <div className="py-6 space-y-4">
+              {bulkScheduleResults.failures.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <div className="p-3 rounded-full bg-emerald-500/20">
+                    <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-semibold text-emerald-400">All posts scheduled!</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {bulkScheduleResults.successes.length} posts are now queued for publishing.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {bulkScheduleResults.successes.length > 0 && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                      <span className="text-sm text-emerald-400">
+                        {bulkScheduleResults.successes.length} posts scheduled successfully
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                    <XCircle className="h-5 w-5 text-red-400" />
+                    <span className="text-sm text-red-400">
+                      {bulkScheduleResults.failures.length} posts failed to schedule
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : bulkSuggestions.length > 0 ? (
+            // Suggestions list view
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {/* Summary */}
+              {(() => {
+                const summary = getBulkScheduleSummary();
+                return summary ? (
+                  <div className="p-3 mb-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4 text-purple-400" />
+                      <span>
+                        <strong className="text-purple-400">{summary.count} posts</strong>{" "}
+                        will be scheduled across{" "}
+                        <strong className="text-purple-400">{summary.days} days</strong>
+                        {summary.days > 1 && (
+                          <span className="text-muted-foreground">
+                            {" "}({summary.startDate} - {summary.endDate})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+
+              {/* Scrollable list of suggestions */}
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                {bulkSuggestions.map((suggestion, idx) => (
+                  <div
+                    key={suggestion.contentId}
+                    className="p-3 rounded-lg border border-border bg-card/50 hover:bg-card/80 transition-colors"
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Platform icon */}
+                      <div className={cn(
+                        "p-1.5 rounded flex-shrink-0",
+                        platformColors[suggestion.platform || "twitter"] || "bg-gray-500"
+                      )}>
+                        {platformIcons[suggestion.platform || "twitter"] || <FileText className="h-3 w-3 text-white" />}
+                      </div>
+
+                      {/* Content info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {suggestion.concept || "Untitled post"}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-purple-400 font-medium">
+                            {formatMagicTime(suggestion.suggestedTime)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Order number */}
+                      <Badge variant="secondary" className="text-xs">
+                        #{idx + 1}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">
+              <p>No approved content to schedule.</p>
+            </div>
+          )}
+
+          {/* Progress bar during scheduling */}
+          {isSchedulingBulk && bulkScheduleProgress && (
+            <div className="py-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Scheduling posts...</span>
+                <span className="font-medium">
+                  {bulkScheduleProgress.current} of {bulkScheduleProgress.total}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-300"
+                  style={{ width: `${(bulkScheduleProgress.current / bulkScheduleProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setBulkMagicDialogOpen(false);
+                setBulkScheduleResults(null);
+              }}
+              disabled={isSchedulingBulk}
+            >
+              {bulkScheduleResults ? "Close" : "Cancel"}
+            </Button>
+            {!bulkScheduleResults && bulkSuggestions.length > 0 && (
+              <Button
+                onClick={handleBulkMagicSchedule}
+                disabled={isSchedulingBulk || isLoadingBulkSuggestions || bulkSuggestions.length === 0}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0"
+              >
+                {isSchedulingBulk ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Scheduling...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Schedule All ({bulkSuggestions.length})
+                  </>
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
