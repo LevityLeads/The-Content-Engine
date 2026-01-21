@@ -40,7 +40,13 @@ async function pollVideoGeneration(
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/${operationName}?key=${apiKey}`
+        `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+        {
+          method: "GET",
+          headers: {
+            "x-goog-api-key": apiKey,
+          },
+        }
       );
 
       if (!response.ok) {
@@ -238,18 +244,20 @@ CRITICAL RULES:
 
     try {
       // Call Veo API using predictLongRunning endpoint (correct method for video generation)
+      // Note: Gemini API requires API key in header, not query parameter
       const generateResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:predictLongRunning?key=${googleApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:predictLongRunning`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": googleApiKey,
+          },
           body: JSON.stringify({
             instances: [{ prompt: fullPrompt }],
             parameters: {
               aspectRatio,
-              durationSeconds: duration,
               sampleCount: 1,
-              includeRaiReason: true,
               personGeneration: "allow_adult",
             },
           }),
