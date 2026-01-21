@@ -18,10 +18,7 @@ import {
   Images,
   AlertCircle,
   Plus,
-  Eye,
-  MoreHorizontal,
-  ArrowUpRight,
-  Layers,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,8 +44,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useBrand } from "@/contexts/brand-context";
+import { getOptimalTimeSlotsForPlatform } from "@/lib/scheduling/best-practices";
 
 interface Content {
   id: string;
@@ -69,6 +72,17 @@ interface Content {
 interface ContentImage {
   id: string;
   url: string;
+}
+
+interface MagicSuggestion {
+  contentId: string;
+  suggestedTime: string;
+  reasoning: string;
+  score: number;
+  alternatives: Array<{
+    time: string;
+    score: number;
+  }>;
 }
 
 const platformIcons: Record<string, React.ReactNode> = {
@@ -118,6 +132,16 @@ export default function CalendarPage() {
     text: string;
   } | null>(null);
   const [hoveredContentId, setHoveredContentId] = useState<string | null>(null);
+
+  // Magic scheduling states
+  const [magicSuggestionOpen, setMagicSuggestionOpen] = useState<string | null>(null);
+  const [magicSuggestion, setMagicSuggestion] = useState<MagicSuggestion | null>(null);
+  const [isLoadingMagicSuggestion, setIsLoadingMagicSuggestion] = useState(false);
+  const [isMagicScheduling, setIsMagicScheduling] = useState(false);
+  const [bulkMagicDialogOpen, setBulkMagicDialogOpen] = useState(false);
+  const [bulkMagicSuggestions, setBulkMagicSuggestions] = useState<MagicSuggestion[]>([]);
+  const [isLoadingBulkMagic, setIsLoadingBulkMagic] = useState(false);
+  const [isBulkMagicScheduling, setIsBulkMagicScheduling] = useState(false);
 
   // Fetch all scheduled and published content
   useEffect(() => {
@@ -382,6 +406,161 @@ export default function CalendarPage() {
     }
   };
 
+  // Fetch magic suggestion for a single item
+  const fetchMagicSuggestion = async (contentId: string) => {
+    const item = content.find((c) => c.id === contentId);
+    if (!item || !selectedBrand?.id) return;
+
+    setMagicSuggestionOpen(contentId);
+    setIsLoadingMagicSuggestion(true);
+    setMagicSuggestion(null);
+
+    try {
+      const res = await fetch("/api/schedule/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          brandId: selectedBrand.id,
+          platform: item.platform,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.suggestions && data.suggestions.length > 0) {
+        setMagicSuggestion(data.suggestions[0]);
+      } else {
+        // Fallback suggestion
+        const fallbackTime = new Date();
+        fallbackTime.setDate(fallbackTime.getDate() + 1);
+        fallbackTime.setHours(9, 0, 0, 0);
+        setMagicSuggestion({
+          contentId,
+          suggestedTime: fallbackTime.toISOString(),
+          reasoning: "Suggested posting tomorrow morning for optimal engagement.",
+          score: 70,
+          alternatives: [],
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching magic suggestion:", error);
+      setMessage({ type: "error", text: "Failed to get magic suggestion" });
+      setMagicSuggestionOpen(null);
+    } finally {
+      setIsLoadingMagicSuggestion(false);
+    }
+  };
+
+  // Schedule content with a magic suggestion
+  const handleMagicSchedule = async (contentId: string, scheduledTime: string) => {
+    setIsMagicScheduling(true);
+    try {
+      const res = await fetch("/api/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: contentId,
+          scheduled_for: scheduledTime,
+          status: "scheduled",
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setMessage({ type: "success", text: "Content scheduled with magic timing!" });
+        setMagicSuggestionOpen(null);
+        setMagicSuggestion(null);
+        fetchContent();
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to schedule" });
+      }
+    } catch (error) {
+      console.error("Error magic scheduling:", error);
+      setMessage({ type: "error", text: "Network error - please try again" });
+    } finally {
+      setIsMagicScheduling(false);
+      setTimeout(() => setMessage(null), 3000);
+    }
+  };
+
+  // Fetch bulk magic suggestions for all ready-to-schedule items
+  const fetchBulkMagicSuggestions = async () => {
+    if (!selectedBrand?.id || readyToSchedule.length === 0) return;
+
+    setBulkMagicDialogOpen(true);
+    setIsLoadingBulkMagic(true);
+    setBulkMagicSuggestions([]);
+
+    try {
+      const contentIds = readyToSchedule.map((item) => item.id);
+      const platforms = readyToSchedule.map((item) => item.platform);
+
+      const res = await fetch("/api/schedule/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentIds,
+          brandId: selectedBrand.id,
+          platforms,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.suggestions) {
+        setBulkMagicSuggestions(data.suggestions);
+      } else {
+        setMessage({ type: "error", text: "Failed to get bulk suggestions" });
+        setBulkMagicDialogOpen(false);
+      }
+    } catch (error) {
+      console.error("Error fetching bulk magic suggestions:", error);
+      setMessage({ type: "error", text: "Network error - please try again" });
+      setBulkMagicDialogOpen(false);
+    } finally {
+      setIsLoadingBulkMagic(false);
+    }
+  };
+
+  // Schedule all with magic suggestions
+  const handleBulkMagicSchedule = async () => {
+    if (bulkMagicSuggestions.length === 0) return;
+
+    setIsBulkMagicScheduling(true);
+    try {
+      const promises = bulkMagicSuggestions.map((suggestion) =>
+        fetch("/api/content", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: suggestion.contentId,
+            scheduled_for: suggestion.suggestedTime,
+            status: "scheduled",
+          }),
+        })
+      );
+
+      const results = await Promise.all(promises);
+      const successCount = results.filter((r) => r.ok).length;
+
+      if (successCount === bulkMagicSuggestions.length) {
+        setMessage({ type: "success", text: `All ${successCount} posts scheduled!` });
+      } else {
+        setMessage({
+          type: "success",
+          text: `${successCount}/${bulkMagicSuggestions.length} posts scheduled`,
+        });
+      }
+
+      setBulkMagicDialogOpen(false);
+      setBulkMagicSuggestions([]);
+      fetchContent();
+    } catch (error) {
+      console.error("Error bulk scheduling:", error);
+      setMessage({ type: "error", text: "Some posts failed to schedule" });
+    } finally {
+      setIsBulkMagicScheduling(false);
+      setTimeout(() => setMessage(null), 3000);
+    }
+  };
+
   // Open reschedule dialog
   const openRescheduleDialog = (item: Content) => {
     setSelectedContent(item);
@@ -400,6 +579,24 @@ export default function CalendarPage() {
   const isToday = (date: Date) => {
     const today = new Date();
     return date.toDateString() === today.toDateString();
+  };
+
+  // Check if a specific hour on a day is optimal for any platform
+  const isOptimalSlot = (date: Date, hour: number): { isOptimal: boolean; platforms: string[] } => {
+    const platforms = ['twitter', 'linkedin', 'instagram'] as const;
+    const optimalFor: string[] = [];
+
+    for (const platform of platforms) {
+      const slots = getOptimalTimeSlotsForPlatform(platform, date);
+      if (slots.some(slot => slot.hour === hour && slot.priority <= 3)) {
+        optimalFor.push(platform);
+      }
+    }
+
+    return {
+      isOptimal: optimalFor.length > 0,
+      platforms: optimalFor,
+    };
   };
 
   const isSelected = (date: Date) => {
@@ -593,17 +790,46 @@ export default function CalendarPage() {
                   return scheduledHour === hour;
                 });
 
+                const optimalInfo = isOptimalSlot(day, hour);
+                const isEmpty = dayContent.length === 0;
+                const isPastSlot = (() => {
+                  const slotTime = new Date(day);
+                  slotTime.setHours(hour, 0, 0, 0);
+                  return slotTime < new Date();
+                })();
+
                 return (
-                  <div
-                    key={idx}
-                    className={cn(
-                      "p-1 min-h-[50px]",
-                      idx < 6 && "border-r",
-                      isToday(day) && "bg-primary/5"
-                    )}
-                  >
-                    {dayContent.map((item) => renderContentPill(item, true))}
-                  </div>
+                  <TooltipProvider key={idx}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={cn(
+                            "p-1 min-h-[50px] transition-colors",
+                            idx < 6 && "border-r",
+                            isToday(day) && "bg-primary/5",
+                            // Subtle highlight for optimal empty slots (only future)
+                            optimalInfo.isOptimal && isEmpty && !isPastSlot && "bg-gradient-to-br from-purple-500/5 to-blue-500/5 hover:from-purple-500/10 hover:to-blue-500/10"
+                          )}
+                        >
+                          {dayContent.map((item) => renderContentPill(item, true))}
+                          {/* Show sparkle icon for optimal empty slots */}
+                          {optimalInfo.isOptimal && isEmpty && !isPastSlot && (
+                            <div className="flex items-center justify-center h-full opacity-30 hover:opacity-60 transition-opacity">
+                              <Sparkles className="h-3 w-3 text-purple-400" />
+                            </div>
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      {optimalInfo.isOptimal && isEmpty && !isPastSlot && (
+                        <TooltipContent side="top" className="text-xs">
+                          <div className="flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 text-purple-400" />
+                            <span>Optimal for: {optimalInfo.platforms.join(", ")}</span>
+                          </div>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 );
               })}
             </div>
@@ -870,15 +1096,202 @@ export default function CalendarPage() {
             {readyToSchedule.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Send className="h-4 w-4" />
-                    Ready to Schedule
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Send className="h-4 w-4" />
+                      Ready to Schedule
+                    </CardTitle>
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                      onClick={fetchBulkMagicSuggestions}
+                      disabled={isLoadingBulkMagic}
+                    >
+                      {isLoadingBulkMagic ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1 h-3 w-3" />
+                      )}
+                      Magic All
+                    </Button>
+                  </div>
                   <CardDescription>Approved & waiting</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {readyToSchedule.slice(0, 3).map((item) => renderContentPill(item, false))}
+                    {readyToSchedule.slice(0, 3).map((item) => {
+                      const hasImage = contentImages[item.id];
+                      const hasCarousel = item.copy_carousel_slides && item.copy_carousel_slides.length > 0;
+                      const isThisItemLoading = magicSuggestionOpen === item.id && isLoadingMagicSuggestion;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-start gap-3 rounded-lg border p-3 bg-card hover:bg-muted/50 transition-colors group"
+                        >
+                          {hasImage && (
+                            <div
+                              className="w-14 h-14 rounded-md overflow-hidden flex-shrink-0 cursor-pointer"
+                              onClick={() => openRescheduleDialog(item)}
+                            >
+                              <img src={hasImage} alt="" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0" onClick={() => openRescheduleDialog(item)}>
+                            <div className="flex items-start gap-2 cursor-pointer">
+                              <div
+                                className={cn(
+                                  "flex h-6 w-6 items-center justify-center rounded text-white flex-shrink-0",
+                                  platformColors[item.platform] || "bg-gray-500"
+                                )}
+                              >
+                                {platformIcons[item.platform] || <FileText className="h-3 w-3" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">
+                                  {item.ideas?.concept || item.copy_primary.slice(0, 40)}...
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge variant="outline" className={cn("text-[10px]", statusColors[item.status])}>
+                                    {item.status}
+                                  </Badge>
+                                  {hasCarousel && (
+                                    <Badge variant="secondary" className="text-[10px] h-4">
+                                      <Images className="mr-1 h-2.5 w-2.5" />
+                                      {item.copy_carousel_slides?.length}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Popover
+                              open={magicSuggestionOpen === item.id}
+                              onOpenChange={(open) => {
+                                if (!open) {
+                                  setMagicSuggestionOpen(null);
+                                  setMagicSuggestion(null);
+                                }
+                              }}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground hover:text-purple-500 hover:bg-purple-500/10"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    fetchMagicSuggestion(item.id);
+                                  }}
+                                  disabled={isThisItemLoading}
+                                >
+                                  {isThisItemLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent side="left" className="w-80 p-0" align="start">
+                                {magicSuggestion && magicSuggestionOpen === item.id && (
+                                  <div className="p-4 space-y-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-8 w-8 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center">
+                                        <Sparkles className="h-4 w-4 text-white" />
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-semibold">Magic Suggestion</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Score: {magicSuggestion.score}/100
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="rounded-lg bg-muted/50 p-3">
+                                      <p className="text-sm font-medium">
+                                        {new Date(magicSuggestion.suggestedTime).toLocaleDateString("en-US", {
+                                          weekday: "long",
+                                          month: "short",
+                                          day: "numeric",
+                                        })}
+                                      </p>
+                                      <p className="text-lg font-bold">
+                                        {new Date(magicSuggestion.suggestedTime).toLocaleTimeString("en-US", {
+                                          hour: "numeric",
+                                          minute: "2-digit",
+                                        })}
+                                      </p>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                      {magicSuggestion.reasoning}
+                                    </p>
+                                    {magicSuggestion.alternatives.length > 0 && (
+                                      <div>
+                                        <p className="text-xs font-medium mb-2">Alternatives:</p>
+                                        <div className="space-y-1">
+                                          {magicSuggestion.alternatives.slice(0, 2).map((alt, idx) => (
+                                            <button
+                                              key={idx}
+                                              className="w-full text-left text-xs p-2 rounded hover:bg-muted/80 transition-colors"
+                                              onClick={() =>
+                                                handleMagicSchedule(item.id, alt.time)
+                                              }
+                                              disabled={isMagicScheduling}
+                                            >
+                                              {new Date(alt.time).toLocaleDateString("en-US", {
+                                                weekday: "short",
+                                                month: "short",
+                                                day: "numeric",
+                                              })}{" "}
+                                              at{" "}
+                                              {new Date(alt.time).toLocaleTimeString("en-US", {
+                                                hour: "numeric",
+                                                minute: "2-digit",
+                                              })}{" "}
+                                              <span className="text-muted-foreground">
+                                                (score: {alt.score})
+                                              </span>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    <div className="flex gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="flex-1"
+                                        onClick={() => {
+                                          setMagicSuggestionOpen(null);
+                                          openRescheduleDialog(item);
+                                        }}
+                                      >
+                                        Custom Time
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                                        onClick={() =>
+                                          handleMagicSchedule(item.id, magicSuggestion.suggestedTime)
+                                        }
+                                        disabled={isMagicScheduling}
+                                      >
+                                        {isMagicScheduling ? (
+                                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                        ) : (
+                                          <CheckCircle2 className="mr-1 h-3 w-3" />
+                                        )}
+                                        Schedule
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+                      );
+                    })}
                     {readyToSchedule.length > 3 && (
                       <a
                         href="/content?status=approved"
@@ -981,6 +1394,121 @@ export default function CalendarPage() {
                   {selectedContent?.status === "approved"
                     ? "Schedule"
                     : "Reschedule"}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Magic Schedule Dialog */}
+      <Dialog open={bulkMagicDialogOpen} onOpenChange={setBulkMagicDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              Magic Schedule All
+            </DialogTitle>
+            <DialogDescription>
+              Automatically schedule all approved posts at optimal times
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {isLoadingBulkMagic ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-purple-500 mb-4" />
+                <p className="text-sm text-muted-foreground">
+                  Calculating optimal times for {readyToSchedule.length} posts...
+                </p>
+              </div>
+            ) : bulkMagicSuggestions.length > 0 ? (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {bulkMagicSuggestions.map((suggestion) => {
+                  const item = content.find((c) => c.id === suggestion.contentId);
+                  if (!item) return null;
+
+                  return (
+                    <div
+                      key={suggestion.contentId}
+                      className="flex items-center gap-3 p-3 rounded-lg border bg-card"
+                    >
+                      <div
+                        className={cn(
+                          "flex h-8 w-8 items-center justify-center rounded text-white flex-shrink-0",
+                          platformColors[item.platform] || "bg-gray-500"
+                        )}
+                      >
+                        {platformIcons[item.platform] || <FileText className="h-4 w-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {item.ideas?.concept || item.copy_primary.slice(0, 35)}...
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(suggestion.suggestedTime).toLocaleDateString("en-US", {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                          })}{" "}
+                          at{" "}
+                          {new Date(suggestion.suggestedTime).toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "text-xs",
+                            suggestion.score >= 80
+                              ? "bg-emerald-500/20 text-emerald-400"
+                              : suggestion.score >= 60
+                              ? "bg-amber-500/20 text-amber-400"
+                              : "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {suggestion.score}%
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8">
+                <AlertCircle className="h-8 w-8 text-muted-foreground mb-4" />
+                <p className="text-sm text-muted-foreground">
+                  No suggestions available
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkMagicDialogOpen(false)}
+              disabled={isBulkMagicScheduling}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+              onClick={handleBulkMagicSchedule}
+              disabled={isBulkMagicScheduling || bulkMagicSuggestions.length === 0}
+            >
+              {isBulkMagicScheduling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scheduling...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Schedule All ({bulkMagicSuggestions.length})
                 </>
               )}
             </Button>
