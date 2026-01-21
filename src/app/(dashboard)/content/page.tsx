@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Calendar, ArrowRight, Video, Play } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Calendar, ArrowRight, Video, Play, Save, FolderOpen, MoreVertical } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { VIDEO_MODEL_OPTIONS, DEFAULT_VIDEO_MODEL, VIDEO_MODELS, type VideoModelKey } from "@/lib/video-models";
 import { estimateVideoCost } from "@/lib/video-utils";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ImageCarousel, type CarouselImage } from "@/components/ui/image-carousel";
 import { PlatformPostMockup } from "@/components/ui/platform-mockups";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -19,7 +20,7 @@ import { ContentGridSkeleton } from "@/components/ui/skeleton";
 import { useGenerationJobs } from "@/hooks/use-generation-jobs";
 import { useContent } from '@/hooks/use-swr-hooks';
 import { cn } from "@/lib/utils";
-import { useBrand } from "@/contexts/brand-context";
+import { useBrand, type SavedDesignSystemPreset } from "@/contexts/brand-context";
 
 interface ContentImage {
   id: string;
@@ -36,6 +37,17 @@ interface CarouselSlide {
   slideNumber: number;
   text: string;
   imagePrompt?: string; // Optional - generated on-demand when user clicks Generate
+}
+
+// Design system structure stored in content metadata
+interface DesignSystem {
+  background: string;
+  primaryColor: string;
+  accentColor: string;
+  typography: string;
+  layout: string;
+  mood: string;
+  textOverlay?: string;
 }
 
 interface Content {
@@ -62,6 +74,7 @@ interface Content {
       textOverlayMethod?: string;
       styleRationale?: string;
     };
+    designSystems?: Record<string, DesignSystem>; // Stored design systems by visual style
   } | null;
   created_at: string;
   ideas?: {
@@ -117,7 +130,7 @@ const visualStyleOptions = [
 ];
 
 export default function ContentPage() {
-  const { selectedBrand } = useBrand();
+  const { selectedBrand, updateBrand } = useBrand();
   const fetchingImagesRef = useRef<Set<string>>(new Set());
   const [filter, setFilter] = useState<string>("draft");
   
@@ -180,6 +193,12 @@ export default function ContentPage() {
   const [savingSlideText, setSavingSlideText] = useState(false);
   // Visual style state
   const [selectedVisualStyle, setSelectedVisualStyle] = useState<Record<string, string>>({});
+  // Design system preset state
+  const [savePresetDialogOpen, setSavePresetDialogOpen] = useState(false);
+  const [savePresetContentId, setSavePresetContentId] = useState<string | null>(null);
+  const [presetName, setPresetName] = useState("");
+  const [savingPreset, setSavingPreset] = useState(false);
+  const [loadingPreset, setLoadingPreset] = useState<string | null>(null);
   // Bulk Magic Schedule state
   const [bulkMagicDialogOpen, setBulkMagicDialogOpen] = useState(false);
   const [bulkSuggestions, setBulkSuggestions] = useState<Array<{
@@ -724,6 +743,205 @@ export default function ContentPage() {
       setImageMessage("Error generating images");
     } finally {
       setGeneratingPrompt(null);
+      setTimeout(() => setImageMessage(null), 5000);
+    }
+  };
+
+  // Regenerate design system for a style (force new generation)
+  const [regeneratingStyle, setRegeneratingStyle] = useState<string | null>(null);
+
+  const handleRegenerateStyle = async (contentId: string, slides: CarouselSlide[], andGenerateImages: boolean = false) => {
+    const contentItem = content.find((c) => c.id === contentId);
+    const currentStyle = selectedVisualStyle[contentId] || contentItem?.metadata?.carouselStyle || "photorealistic";
+
+    setRegeneratingStyle(contentId);
+    setImageMessage(`Regenerating ${currentStyle} style design system...`);
+
+    try {
+      const promptResponse = await fetch("/api/prompts/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          slides: slides.map((s) => ({ slideNumber: s.slideNumber, text: s.text })),
+          visualStyle: currentStyle,
+          mediaType: "image",
+          brandId: selectedBrand?.id,
+          forceRegenerate: true, // Force regenerate the design system
+        }),
+      });
+
+      const promptData = await promptResponse.json();
+
+      if (!promptData.success) {
+        setImageMessage(`Error: ${promptData.error || "Failed to regenerate style"}`);
+        return;
+      }
+
+      setImageMessage(`✓ New ${currentStyle} design system created!`);
+
+      // If requested, also generate the images with the new design system
+      if (andGenerateImages) {
+        const generatedPrompts = promptData.prompts as Array<{ slideNumber: number; prompt: string }>;
+
+        // Update slides with new prompts
+        setContent((prev) =>
+          prev.map((c) => {
+            if (c.id !== contentId) return c;
+            if (!c.copy_carousel_slides) return c;
+            const updatedSlides = c.copy_carousel_slides.map((slideData) => {
+              const s = typeof slideData === 'string' ? JSON.parse(slideData) : slideData;
+              const newPrompt = generatedPrompts.find((p) => p.slideNumber === s.slideNumber);
+              if (newPrompt) {
+                return JSON.stringify({ ...s, imagePrompt: newPrompt.prompt });
+              }
+              return typeof slideData === 'string' ? slideData : JSON.stringify(slideData);
+            });
+            return { ...c, copy_carousel_slides: updatedSlides };
+          })
+        );
+
+        // Generate images using new prompts
+        const slidesWithPrompts = slides.map((s) => ({
+          ...s,
+          imagePrompt: generatedPrompts.find((p) => p.slideNumber === s.slideNumber)?.prompt || s.imagePrompt,
+        }));
+
+        setImageMessage("Generating images with new design system...");
+        await handleGenerateAllSlides(contentId, slidesWithPrompts);
+      }
+    } catch (error) {
+      console.error("Error regenerating style:", error);
+      setImageMessage("Error regenerating style");
+    } finally {
+      setRegeneratingStyle(null);
+      setTimeout(() => setImageMessage(null), 5000);
+    }
+  };
+
+  // Open save preset dialog
+  const openSavePresetDialog = (contentId: string) => {
+    setSavePresetContentId(contentId);
+    setPresetName("");
+    setSavePresetDialogOpen(true);
+  };
+
+  // Save current design system as preset
+  const handleSavePreset = async () => {
+    if (!savePresetContentId || !selectedBrand || !presetName.trim()) return;
+
+    setSavingPreset(true);
+    try {
+      const contentItem = content.find((c) => c.id === savePresetContentId);
+      const currentStyle = selectedVisualStyle[savePresetContentId] || contentItem?.metadata?.carouselStyle || "photorealistic";
+      const effectiveStyle = typeof currentStyle === "string" ? currentStyle : (currentStyle as { visualStyle?: string }).visualStyle || "photorealistic";
+
+      // Get the design system from content metadata
+      const designSystem = contentItem?.metadata?.designSystems?.[effectiveStyle];
+
+      if (!designSystem) {
+        setImageMessage("No design system found for this style. Generate images first to create a design system.");
+        return;
+      }
+
+      // Create new preset
+      const newPreset: SavedDesignSystemPreset = {
+        id: crypto.randomUUID(),
+        name: presetName.trim(),
+        visualStyle: effectiveStyle,
+        designSystem,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Get existing presets or empty array
+      const existingPresets = selectedBrand.visual_config?.savedDesignSystems || [];
+
+      // Update brand with new preset
+      await updateBrand(selectedBrand.id, {
+        visual_config: {
+          ...selectedBrand.visual_config,
+          savedDesignSystems: [...existingPresets, newPreset],
+        },
+      });
+
+      setImageMessage(`✓ Saved "${presetName}" preset for ${effectiveStyle} style`);
+      setSavePresetDialogOpen(false);
+    } catch (error) {
+      console.error("Error saving preset:", error);
+      setImageMessage("Error saving preset");
+    } finally {
+      setSavingPreset(false);
+      setTimeout(() => setImageMessage(null), 5000);
+    }
+  };
+
+  // Load a saved preset into content metadata
+  const handleLoadPreset = async (contentId: string, preset: SavedDesignSystemPreset) => {
+    setLoadingPreset(contentId);
+    try {
+      const contentItem = content.find((c) => c.id === contentId);
+      if (!contentItem) return;
+
+      // Update content metadata with the preset's design system
+      const existingDesignSystems = contentItem.metadata?.designSystems || {};
+      const updatedMetadata = {
+        ...contentItem.metadata,
+        designSystems: {
+          ...existingDesignSystems,
+          [preset.visualStyle]: preset.designSystem,
+        },
+      };
+
+      // Update content via API
+      const res = await fetch("/api/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: contentId, metadata: updatedMetadata }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        // Update local state
+        setContent((prev) =>
+          prev.map((c) =>
+            c.id === contentId ? { ...c, metadata: updatedMetadata } : c
+          )
+        );
+        // Set the visual style to match the preset
+        setSelectedVisualStyle((prev) => ({ ...prev, [contentId]: preset.visualStyle }));
+        setImageMessage(`✓ Loaded "${preset.name}" preset`);
+      } else {
+        setImageMessage("Error loading preset");
+      }
+    } catch (error) {
+      console.error("Error loading preset:", error);
+      setImageMessage("Error loading preset");
+    } finally {
+      setLoadingPreset(null);
+      setTimeout(() => setImageMessage(null), 5000);
+    }
+  };
+
+  // Delete a saved preset
+  const handleDeletePreset = async (presetId: string) => {
+    if (!selectedBrand) return;
+
+    try {
+      const existingPresets = selectedBrand.visual_config?.savedDesignSystems || [];
+      const updatedPresets = existingPresets.filter((p) => p.id !== presetId);
+
+      await updateBrand(selectedBrand.id, {
+        visual_config: {
+          ...selectedBrand.visual_config,
+          savedDesignSystems: updatedPresets,
+        },
+      });
+
+      setImageMessage("✓ Preset deleted");
+    } catch (error) {
+      console.error("Error deleting preset:", error);
+      setImageMessage("Error deleting preset");
+    } finally {
       setTimeout(() => setImageMessage(null), 5000);
     }
   };
@@ -1788,15 +2006,95 @@ export default function ContentPage() {
               {/* Visual Style Selector */}
               <div>
                 <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Visual Style</label>
-                <select
-                  className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs"
-                  value={selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)}
-                  onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                >
-                  {visualStyleOptions.map((style) => (
-                    <option key={style.id} value={style.id}>{style.label}</option>
-                  ))}
-                </select>
+                <div className="flex gap-1">
+                  <select
+                    className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
+                    value={selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)}
+                    onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                  >
+                    {visualStyleOptions.map((style) => (
+                      <option key={style.id} value={style.id}>{style.label}</option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={() => handleRegenerateStyle(item.id, slides, false)}
+                    disabled={regeneratingStyle === item.id}
+                    title="Regenerate style design system"
+                  >
+                    {regeneratingStyle === item.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                  </Button>
+                  {/* Presets Menu */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        title="Style presets"
+                      >
+                        <MoreVertical className="h-3 w-3" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2" align="end">
+                      <div className="space-y-2">
+                        <div className="text-xs font-medium text-muted-foreground px-1">Style Presets</div>
+                        {/* Save current design system */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start h-7 text-xs"
+                          onClick={() => openSavePresetDialog(item.id)}
+                          disabled={!item.metadata?.designSystems?.[selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle) || "photorealistic"]}
+                        >
+                          <Save className="h-3 w-3 mr-2" />
+                          Save current style
+                        </Button>
+                        {/* Load saved presets */}
+                        {selectedBrand?.visual_config?.savedDesignSystems && selectedBrand.visual_config.savedDesignSystems.length > 0 ? (
+                          <>
+                            <div className="border-t border-muted my-1" />
+                            <div className="text-[10px] text-muted-foreground px-1 py-1">Saved Presets</div>
+                            {selectedBrand.visual_config.savedDesignSystems.map((preset) => (
+                              <div key={preset.id} className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="flex-1 justify-start h-7 text-xs"
+                                  onClick={() => handleLoadPreset(item.id, preset)}
+                                  disabled={loadingPreset === item.id}
+                                >
+                                  <FolderOpen className="h-3 w-3 mr-2" />
+                                  <span className="truncate">{preset.name}</span>
+                                  <span className="ml-auto text-[10px] text-muted-foreground">{preset.visualStyle}</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                                  onClick={() => handleDeletePreset(preset.id)}
+                                  title="Delete preset"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="text-[10px] text-muted-foreground px-1 py-2">
+                            No saved presets yet. Generate images, then save the style to reuse it.
+                          </div>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
 
               {/* Generate All Images Button */}
@@ -1912,15 +2210,95 @@ export default function ContentPage() {
               {/* Visual Style Selector */}
               <div>
                 <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Visual Style</label>
-                <select
-                  className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs"
-                  value={selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)}
-                  onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                >
-                  {visualStyleOptions.map((style) => (
-                    <option key={style.id} value={style.id}>{style.label}</option>
-                  ))}
-                </select>
+                <div className="flex gap-1">
+                  <select
+                    className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
+                    value={selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)}
+                    onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                  >
+                    {visualStyleOptions.map((style) => (
+                      <option key={style.id} value={style.id}>{style.label}</option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={() => handleRegenerateStyle(item.id, slides, false)}
+                    disabled={regeneratingStyle === item.id}
+                    title="Regenerate style design system"
+                  >
+                    {regeneratingStyle === item.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                  </Button>
+                  {/* Presets Menu (Video Tab) */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        title="Style presets"
+                      >
+                        <MoreVertical className="h-3 w-3" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2" align="end">
+                      <div className="space-y-2">
+                        <div className="text-xs font-medium text-muted-foreground px-1">Style Presets</div>
+                        {/* Save current design system */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start h-7 text-xs"
+                          onClick={() => openSavePresetDialog(item.id)}
+                          disabled={!item.metadata?.designSystems?.[selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle) || "photorealistic"]}
+                        >
+                          <Save className="h-3 w-3 mr-2" />
+                          Save current style
+                        </Button>
+                        {/* Load saved presets */}
+                        {selectedBrand?.visual_config?.savedDesignSystems && selectedBrand.visual_config.savedDesignSystems.length > 0 ? (
+                          <>
+                            <div className="border-t border-muted my-1" />
+                            <div className="text-[10px] text-muted-foreground px-1 py-1">Saved Presets</div>
+                            {selectedBrand.visual_config.savedDesignSystems.map((preset) => (
+                              <div key={preset.id} className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="flex-1 justify-start h-7 text-xs"
+                                  onClick={() => handleLoadPreset(item.id, preset)}
+                                  disabled={loadingPreset === item.id}
+                                >
+                                  <FolderOpen className="h-3 w-3 mr-2" />
+                                  <span className="truncate">{preset.name}</span>
+                                  <span className="ml-auto text-[10px] text-muted-foreground">{preset.visualStyle}</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                                  onClick={() => handleDeletePreset(preset.id)}
+                                  title="Delete preset"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="text-[10px] text-muted-foreground px-1 py-2">
+                            No saved presets yet. Generate images, then save the style to reuse it.
+                          </div>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
 
               {/* Duration and Audio Settings */}
@@ -3228,6 +3606,62 @@ export default function ContentPage() {
           <span>{publishMessage.text}</span>
         </div>
       )}
+
+      {/* Save Preset Dialog */}
+      <Dialog open={savePresetDialogOpen} onOpenChange={setSavePresetDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Save Style Preset</DialogTitle>
+            <DialogDescription>
+              Save this design system as a reusable preset for future content.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <label className="block text-sm font-medium mb-2">
+              Preset Name
+            </label>
+            <Input
+              placeholder="e.g., Bold Blue, Warm Sunset"
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && presetName.trim()) {
+                  handleSavePreset();
+                }
+              }}
+            />
+            {savePresetContentId && content.find((c) => c.id === savePresetContentId)?.metadata?.designSystems && (
+              <div className="mt-3 p-3 bg-muted/50 rounded-md">
+                <div className="text-xs font-medium text-muted-foreground mb-2">Design System Preview</div>
+                {(() => {
+                  const contentItem = content.find((c) => c.id === savePresetContentId);
+                  const currentStyle = selectedVisualStyle[savePresetContentId!] || contentItem?.metadata?.carouselStyle || "photorealistic";
+                  const effectiveStyle = typeof currentStyle === "string" ? currentStyle : "photorealistic";
+                  const ds = contentItem?.metadata?.designSystems?.[effectiveStyle];
+                  if (!ds) return <div className="text-xs text-muted-foreground">No design system found</div>;
+                  return (
+                    <div className="space-y-1 text-xs">
+                      <div><span className="text-muted-foreground">Style:</span> {effectiveStyle}</div>
+                      <div><span className="text-muted-foreground">Background:</span> {ds.background}</div>
+                      <div><span className="text-muted-foreground">Colors:</span> {ds.primaryColor}, {ds.accentColor}</div>
+                      <div><span className="text-muted-foreground">Mood:</span> {ds.mood}</div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSavePresetDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSavePreset} disabled={savingPreset || !presetName.trim()}>
+              {savingPreset ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Save Preset
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Schedule Dialog */}
       <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
