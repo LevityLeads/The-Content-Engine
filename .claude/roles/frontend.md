@@ -50,12 +50,19 @@ src/app/(dashboard)/       # All dashboard pages
 ├── inputs/page.tsx
 ├── ideas/page.tsx
 ├── content/page.tsx
-├── calendar/page.tsx      # STUB - needs implementation
+├── calendar/page.tsx      # With magic scheduling
 ├── analytics/page.tsx     # STUB - needs implementation
+├── experiments/page.tsx
 ├── settings/page.tsx
 └── layout.tsx
 
 src/components/
+├── brand/                 # Brand management dialogs
+│   ├── brand-switcher.tsx
+│   ├── brand-creation-dialog.tsx
+│   └── brand-deletion-dialog.tsx
+├── video/                 # Video components
+│   └── video-cost-dialog.tsx
 ├── ui/                    # Base UI components
 └── layout/                # Layout components
 
@@ -126,7 +133,8 @@ Test by:
 | `/ideas` | Complete | - |
 | `/content` | Complete | - |
 | `/settings` | Complete | - |
-| `/calendar` | **STUB** | High |
+| `/calendar` | Complete (with magic scheduling) | - |
+| `/experiments` | Complete | - |
 | `/analytics` | **STUB** | High |
 
 ## Component Patterns

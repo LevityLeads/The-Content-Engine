@@ -50,7 +50,8 @@ You read code carefully and ensure documentation accurately reflects what exists
 CLAUDE.md                  # Main project documentation
 RULES.md                   # Project rules and conventions
 docs/
-└── PRD.md                 # Product requirements document
+├── PRD.md                 # Product requirements document
+└── AUDIT_REPORT.md        # Codebase audit report
 
 .claude/
 ├── roles/                 # Role definitions
@@ -60,7 +61,9 @@ docs/
 │   ├── backend.md
 │   ├── fullstack.md
 │   ├── qa.md
+│   ├── debug.md
 │   ├── devops.md
+│   ├── researcher.md
 │   └── docs.md            # This file
 └── commands/              # Slash commands
 ```

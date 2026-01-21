@@ -51,12 +51,19 @@ src/lib/prompts/           # Your primary domain
 ├── voice-system.ts        # Brand voice configuration
 ├── hook-library.ts        # Hook patterns library
 ├── content-pillars.ts     # Content angles and pillars
+├── visual-styles.ts       # Visual style descriptions
+├── marketer-persona.ts    # Marketer persona guidelines
 └── index.ts               # Exports
 
 src/app/api/ideas/generate/     # Ideation API
 src/app/api/content/generate/   # Content generation API
-src/app/api/images/generate/    # Image generation API (prompt aspects)
+src/app/api/images/generate/    # Image generation API
+src/app/api/images/carousel/    # Carousel image generation
+src/app/api/videos/generate/    # Video generation API
 src/lib/image-models.ts         # Image model configuration
+src/lib/video-models.ts         # Veo 3 video configuration
+src/lib/video-utils.ts          # Video cost estimation
+src/lib/slide-templates/        # Carousel design system
 ```
 
 ## What You Should NOT Touch
@@ -127,6 +134,11 @@ Suggested test:
 ### Gemini Integration
 - Model: `gemini-2.5-flash-image`
 - **Critical**: Carousel slide prompts must be self-contained
+
+### Veo 3 Video Integration
+- Models: `veo-3.1-fast` (cost-effective), `veo-3.0` (premium)
+- Max duration: 8 seconds
+- Supports mixed carousels (video + images)
 
 ## Common Tasks
 
