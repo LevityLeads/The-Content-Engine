@@ -2400,74 +2400,212 @@ export default function ContentPage() {
                             <Eye className="h-4 w-4 mr-2" />
                             Preview
                           </TabsTrigger>
-                          <TabsTrigger value="caption">
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Caption
-                          </TabsTrigger>
                           {hasCarousel && carouselSlides && (
-                            <TabsTrigger value="slides">
-                              <Images className="h-4 w-4 mr-2" />
-                              Slides ({totalSlides})
-                            </TabsTrigger>
+                            <>
+                              <TabsTrigger value="caption">
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Caption
+                              </TabsTrigger>
+                              <TabsTrigger value="slides">
+                                <Images className="h-4 w-4 mr-2" />
+                                Slides ({totalSlides})
+                              </TabsTrigger>
+                            </>
                           )}
                         </TabsList>
                       </div>
 
                       {/* Preview Tab - Platform Mockup */}
                       <TabsContent value="preview" className="m-0 p-4">
-                        <div className="max-w-md mx-auto">
-                          {/* Single Video Content */}
-                          {isSingleVideo ? (
-                            <PlatformPostMockup platform={item.platform}>
-                              <div className="relative aspect-[4/5] bg-black/10">
-                                {hasVideo ? (
-                                  <>
-                                    <video
-                                      src={allImages.find((img) => img.mediaType === "video")?.url}
-                                      controls
-                                      className="w-full h-full object-cover"
-                                    />
-                                    <Badge className="absolute top-2 left-2 bg-violet-600 text-white border-0 z-10">
-                                      <Video className="h-3 w-3 mr-1" />
-                                      Video
-                                    </Badge>
-                                  </>
-                                ) : (
-                                  <div className="w-full h-full flex flex-col items-center justify-center p-6">
-                                    <Video className="h-16 w-16 mb-4 text-violet-400" />
-                                    <p className="text-sm text-muted-foreground mb-4 text-center">No video generated yet</p>
-                                    <Button
-                                      onClick={() => handleGenerateSingleVideo(item.id, item.metadata?.videoPrompt)}
-                                      disabled={generatingSingleVideo === item.id}
-                                      className="bg-violet-600 hover:bg-violet-700"
-                                    >
-                                      {generatingSingleVideo === item.id ? (
-                                        <>
-                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                          Generating Video...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Video className="mr-2 h-4 w-4" />
-                                          Generate Video
-                                        </>
-                                      )}
-                                    </Button>
-                                    {item.metadata?.videoPrompt && (
-                                      <p className="text-xs text-muted-foreground mt-3 text-center max-w-xs">
-                                        Prompt: {item.metadata.videoPrompt.substring(0, 100)}...
-                                      </p>
+                        {/* Single Media (Video or Image) - Side by side layout with caption */}
+                        {!hasCarousel ? (
+                          <div className="flex gap-6 max-w-4xl mx-auto">
+                            {/* Left: Media Preview */}
+                            <div className="flex-1 min-w-0">
+                              {isSingleVideo ? (
+                                <PlatformPostMockup platform={item.platform}>
+                                  <div className="relative aspect-[4/5] bg-black/10">
+                                    {hasVideo ? (
+                                      <>
+                                        <video
+                                          src={allImages.find((img) => img.mediaType === "video")?.url}
+                                          controls
+                                          className="w-full h-full object-cover"
+                                        />
+                                        <Badge className="absolute top-2 left-2 bg-violet-600 text-white border-0 z-10">
+                                          <Video className="h-3 w-3 mr-1" />
+                                          Video
+                                        </Badge>
+                                      </>
+                                    ) : (
+                                      <div className="w-full h-full flex flex-col items-center justify-center p-6">
+                                        <Video className="h-16 w-16 mb-4 text-violet-400" />
+                                        <p className="text-sm text-muted-foreground mb-4 text-center">No video generated yet</p>
+                                        <Button
+                                          onClick={() => handleGenerateSingleVideo(item.id, item.metadata?.videoPrompt)}
+                                          disabled={generatingSingleVideo === item.id}
+                                          className="bg-violet-600 hover:bg-violet-700"
+                                        >
+                                          {generatingSingleVideo === item.id ? (
+                                            <>
+                                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                              Generating Video...
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Video className="mr-2 h-4 w-4" />
+                                              Generate Video
+                                            </>
+                                          )}
+                                        </Button>
+                                        {item.metadata?.videoPrompt && (
+                                          <p className="text-xs text-muted-foreground mt-3 text-center max-w-xs">
+                                            Prompt: {item.metadata.videoPrompt.substring(0, 100)}...
+                                          </p>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
-                                )}
+                                </PlatformPostMockup>
+                              ) : (
+                                <PlatformPostMockup platform={item.platform}>
+                                  {allImages.length > 0 ? (
+                                    <ImageCarousel
+                                      images={allImages}
+                                      aspectRatio={item.platform === "instagram" ? "aspect-[4/5]" : "aspect-video"}
+                                      onDownload={(url) => handleDownloadImage(url, item.platform)}
+                                      modelBadge={renderModelBadge}
+                                    />
+                                  ) : (
+                                    <div className={cn(
+                                      "flex items-center justify-center bg-muted/10",
+                                      item.platform === "instagram" ? "aspect-[4/5]" : "aspect-video"
+                                    )}>
+                                      <div className="text-center p-4">
+                                        <ImageIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                                        <p className="text-sm text-muted-foreground">No image generated</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </PlatformPostMockup>
+                              )}
+
+                              {/* Single post image generation */}
+                              {!isSingleVideo && item.metadata?.imagePrompt && (
+                                <div className="mt-4 space-y-2">
+                                  <button
+                                    onClick={() => togglePrompt(`single-${item.id}`)}
+                                    className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+                                  >
+                                    {expandedPrompts.has(`single-${item.id}`) ? (
+                                      <ChevronUp className="h-3 w-3" />
+                                    ) : (
+                                      <ChevronDown className="h-3 w-3" />
+                                    )}
+                                    Image Prompt
+                                    {!expandedPrompts.has(`single-${item.id}`) && (
+                                      <span className="text-muted-foreground/60 truncate flex-1">
+                                        — {truncateText(item.metadata?.imagePrompt || "", 50)}
+                                      </span>
+                                    )}
+                                  </button>
+                                  {expandedPrompts.has(`single-${item.id}`) && (
+                                    <p className="text-xs text-muted-foreground leading-relaxed pl-5">
+                                      {item.metadata?.imagePrompt}
+                                    </p>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => handleGenerateImage(item.id, item.metadata?.imagePrompt || "")}
+                                    disabled={generatingImage === item.id}
+                                  >
+                                    {generatingImage === item.id ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Generating...
+                                      </>
+                                    ) : allImages.length > 0 ? (
+                                      <>
+                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                        Generate Another
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ImageIcon className="mr-2 h-4 w-4" />
+                                        Generate Image
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Right: Caption Panel */}
+                            <div className="w-[320px] flex-shrink-0 flex flex-col">
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="text-xs font-medium text-muted-foreground">Caption</label>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => {
+                                    if (editingId === item.id) {
+                                      setEditingId(null);
+                                    } else {
+                                      setEditingId(item.id);
+                                      setEditedCopy(item.copy_primary);
+                                    }
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
                               </div>
-                            </PlatformPostMockup>
-                          ) : hasCarousel && carouselSlides ? (
+                              {editingId === item.id ? (
+                                <div className="flex-1 flex flex-col gap-2">
+                                  <Textarea
+                                    value={editedCopy}
+                                    onChange={(e) => setEditedCopy(e.target.value)}
+                                    className="flex-1 min-h-[200px] font-mono text-sm resize-none"
+                                  />
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleUpdateContent(item.id, { copy_primary: editedCopy })}
+                                    >
+                                      <Check className="mr-2 h-4 w-4" />
+                                      Save
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setEditingId(null)}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex-1 rounded-lg bg-muted/20 p-4 overflow-y-auto">
+                                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{item.copy_primary}</p>
+                                  {item.copy_hashtags && item.copy_hashtags.length > 0 && (
+                                    <p className="text-sm text-primary mt-4">
+                                      {item.copy_hashtags.map((h) => `#${h}`).join(" ")}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          /* Carousel Content - Centered layout (uses Slides tab for detailed view) */
+                          <div className="max-w-md mx-auto">
                             <PlatformPostMockup platform={item.platform}>
                               <div className="relative">
                                 <div className="relative aspect-[4/5] bg-black/10">
                                   {(() => {
-                                    const slideNum = carouselSlides[currentSlide]?.slideNumber || 1;
+                                    const slideNum = carouselSlides![currentSlide]?.slideNumber || 1;
                                     const slideImgs = getSlideImages(item.id, slideNum);
                                     const versionIdx = getVersionIndex(item.id, slideNum);
                                     const safeVersionIdx = slideImgs.length > 0 ? Math.min(versionIdx, slideImgs.length - 1) : 0;
@@ -2524,35 +2662,12 @@ export default function ContentPage() {
                                 )}
                               </div>
                             </PlatformPostMockup>
-                          ) : (
-                            <PlatformPostMockup platform={item.platform}>
-                              {allImages.length > 0 ? (
-                                <ImageCarousel
-                                  images={allImages}
-                                  aspectRatio={item.platform === "instagram" ? "aspect-[4/5]" : "aspect-video"}
-                                  onDownload={(url) => handleDownloadImage(url, item.platform)}
-                                  modelBadge={renderModelBadge}
-                                />
-                              ) : (
-                                <div className={cn(
-                                  "flex items-center justify-center bg-muted/10",
-                                  item.platform === "instagram" ? "aspect-[4/5]" : "aspect-video"
-                                )}>
-                                  <div className="text-center p-4">
-                                    <ImageIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                                    <p className="text-sm text-muted-foreground">No image generated</p>
-                                  </div>
-                                </div>
-                              )}
-                            </PlatformPostMockup>
-                          )}
 
-                          {/* Slide Thumbnails for Preview */}
-                          {hasCarousel && carouselSlides && (
+                            {/* Slide Thumbnails for Preview */}
                             <div className="mt-4">
                               <p className="text-xs font-medium text-muted-foreground mb-2">Slides</p>
                               <div className="flex gap-2 overflow-x-auto pb-2">
-                                {carouselSlides.map((slide, idx) => {
+                                {carouselSlides!.map((slide, idx) => {
                                   const slideImgs = getSlideImages(item.id, slide.slideNumber);
                                   const versionIdx = getVersionIndex(item.id, slide.slideNumber);
                                   const safeIdx = slideImgs.length > 0 ? Math.min(versionIdx, slideImgs.length - 1) : -1;
@@ -2592,59 +2707,8 @@ export default function ContentPage() {
                                 })}
                               </div>
                             </div>
-                          )}
-
-                          {/* Single post image generation */}
-                          {!hasCarousel && item.metadata?.imagePrompt && (
-                            <div className="mt-4 space-y-2">
-                              <button
-                                onClick={() => togglePrompt(`single-${item.id}`)}
-                                className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full text-left"
-                              >
-                                {expandedPrompts.has(`single-${item.id}`) ? (
-                                  <ChevronUp className="h-3 w-3" />
-                                ) : (
-                                  <ChevronDown className="h-3 w-3" />
-                                )}
-                                Image Prompt
-                                {!expandedPrompts.has(`single-${item.id}`) && (
-                                  <span className="text-muted-foreground/60 truncate flex-1">
-                                    — {truncateText(item.metadata?.imagePrompt || "", 50)}
-                                  </span>
-                                )}
-                              </button>
-                              {expandedPrompts.has(`single-${item.id}`) && (
-                                <p className="text-xs text-muted-foreground leading-relaxed pl-5">
-                                  {item.metadata?.imagePrompt}
-                                </p>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => handleGenerateImage(item.id, item.metadata?.imagePrompt || "")}
-                                disabled={generatingImage === item.id}
-                              >
-                                {generatingImage === item.id ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Generating...
-                                  </>
-                                ) : allImages.length > 0 ? (
-                                  <>
-                                    <RefreshCw className="mr-2 h-4 w-4" />
-                                    Generate Another
-                                  </>
-                                ) : (
-                                  <>
-                                    <ImageIcon className="mr-2 h-4 w-4" />
-                                    Generate Image
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </TabsContent>
 
                       {/* Caption Tab */}
