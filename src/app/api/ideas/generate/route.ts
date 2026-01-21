@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient, DEFAULT_MODEL, extractTextContent } from "@/lib/anthropic/client";
 import {
   IDEATION_SYSTEM_PROMPT,
   buildIdeationUserPrompt,
@@ -8,19 +8,8 @@ import {
   type VoiceConfig,
 } from "@/lib/prompts";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(
-        { error: "Anthropic API key not configured" },
-        { status: 500 }
-      );
-    }
-
     const supabase = await createClient();
     const body = await request.json();
     const { inputId, ideaCount = 4 } = body;
@@ -91,9 +80,10 @@ export async function POST(request: NextRequest) {
       validatedIdeaCount
     );
 
-    // Call Claude Opus 4.5
+    // Get the singleton client and call Claude Opus 4.5
+    const anthropic = getAnthropicClient();
     const message = await anthropic.messages.create({
-      model: "claude-opus-4-5-20251101",
+      model: DEFAULT_MODEL,
       max_tokens: 4096,
       messages: [
         {
@@ -104,10 +94,8 @@ export async function POST(request: NextRequest) {
       system: IDEATION_SYSTEM_PROMPT,
     });
 
-    // Parse the response
-    const responseText = message.content[0].type === "text"
-      ? message.content[0].text
-      : "";
+    // Parse the response using helper
+    const responseText = extractTextContent(message);
 
     let ideas;
     try {
@@ -115,7 +103,7 @@ export async function POST(request: NextRequest) {
       let jsonStr = "";
 
       // Strategy 1: Look for JSON in markdown code blocks
-      const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const codeBlockMatch = responseText.match(/\`\`\`(?:json)?\s*([\s\S]*?)\`\`\`/);
       if (codeBlockMatch) {
         jsonStr = codeBlockMatch[1].trim();
       }
@@ -168,7 +156,7 @@ export async function POST(request: NextRequest) {
       reasoning: string;
       confidenceScore: number | { overall: number; hookStrength?: number; valueDensity?: number; shareability?: number; platformFit?: number };
     }) => {
-      // Extract overall confidence score whether it's a number or object
+      // Extract overall confidence score whether it is a number or object
       const overallConfidence = typeof idea.confidenceScore === "number"
         ? idea.confidenceScore
         : idea.confidenceScore?.overall ?? 75;

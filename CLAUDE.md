@@ -492,6 +492,11 @@ Use `/role:handoff` to document session state when passing work to another role 
 | Generation jobs hook | `src/hooks/use-generation-jobs.ts` |
 | SWR data hooks | `src/hooks/use-swr-hooks.ts` |
 | Content card component | `src/components/content/content-card.tsx` |
+| Anthropic client | `src/lib/anthropic/client.ts` |
+| Google AI client | `src/lib/google/client.ts` |
+| API response helpers | `src/lib/api/response.ts` |
+| Retry utilities | `src/lib/api/retry.ts` |
+| Usage logger | `src/lib/api/usage-logger.ts` |
 | Database types | `src/types/database.ts` |
 | PRD | `docs/PRD.md` |
 | Rules | `RULES.md` |

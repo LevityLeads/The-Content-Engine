@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient, MODELS, extractTextContent as extractAITextContent } from "@/lib/anthropic/client";
 
 interface BrandAnalysis {
   voice: {
@@ -355,7 +355,7 @@ function extractImages(html: string, baseUrl: string): string[] {
 // Extract text content for analysis
 function extractTextContent(html: string): string {
   // Remove scripts, styles, and HTML tags
-  let text = html
+  const text = html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
     .replace(/<[^>]+>/g, " ")
@@ -428,7 +428,9 @@ export async function POST(request: NextRequest) {
     console.log(`Brand analysis: Detected fonts - heading: ${fonts.heading}, body: ${fonts.body}, all: ${fonts.detected.join(', ')}`);
 
     // Use Claude to analyze the brand voice
-    const anthropic = new Anthropic();
+    // Using SONNET for brand analysis - good balance of speed and quality for text extraction
+    // This runs during brand creation UX where responsiveness matters
+    const anthropic = getAnthropicClient();
 
     const analysisPrompt = `Analyze this website content and extract brand voice and style guidelines.
 
@@ -452,7 +454,7 @@ Based on this content, provide a brand analysis in the following JSON format:
 Respond ONLY with the JSON, no additional text.`;
 
     const aiResponse = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: MODELS.SONNET, // SONNET for speed - brand analysis is a UX-sensitive operation
       max_tokens: 1024,
       messages: [
         {
@@ -464,7 +466,7 @@ Respond ONLY with the JSON, no additional text.`;
 
     let voiceAnalysis;
     try {
-      const responseText = aiResponse.content[0].type === "text" ? aiResponse.content[0].text : "";
+      const responseText = extractAITextContent(aiResponse);
       // Extract JSON from response (handle potential markdown code blocks)
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
