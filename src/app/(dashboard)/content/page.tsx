@@ -280,7 +280,7 @@ export default function ContentPage() {
         const imgMap: Record<number, CarouselImage[]> = {};
         const unmatchedImages: CarouselImage[] = [];
 
-        data.images.forEach((img: ContentImage & { created_at?: string }) => {
+        data.images.forEach((img: ContentImage & { created_at?: string; slide_number?: number }) => {
           if (img.url && !img.url.startsWith("placeholder:")) {
             const carouselImg: CarouselImage = {
               id: img.id,
@@ -292,6 +292,16 @@ export default function ContentPage() {
               durationSeconds: img.duration_seconds,
             };
 
+            // First check if slide_number is set directly in the database
+            if (img.slide_number && img.slide_number > 0) {
+              if (!imgMap[img.slide_number]) {
+                imgMap[img.slide_number] = [];
+              }
+              imgMap[img.slide_number].push(carouselImg);
+              return; // Found match, continue to next image
+            }
+
+            // Fall back to matching by prompt pattern
             const patterns = [
               /^\[slide\s*(\d+)\]/i,
               /slide\s*(\d+)\s*:/i,
