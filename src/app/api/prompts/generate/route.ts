@@ -256,7 +256,7 @@ export async function POST(request: NextRequest) {
     // Fetch the content with metadata (includes existing design systems)
     const { data: content, error: contentError } = await supabase
       .from("content")
-      .select("id, platform, brand_id, metadata, ideas(concept, angle)")
+      .select("id, platform, brand_id, metadata, copy_carousel_slides, ideas(concept, angle)")
       .eq("id", contentId)
       .single();
 
@@ -266,6 +266,28 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Parse ALL carousel slides from the database for design system context
+    // This ensures the design system is created with full carousel context
+    // even when generating just one slide
+    const allCarouselSlides: Array<{ slideNumber: number; text: string }> = [];
+    if (content.copy_carousel_slides && Array.isArray(content.copy_carousel_slides)) {
+      for (const slideData of content.copy_carousel_slides) {
+        try {
+          const slide = typeof slideData === 'string' ? JSON.parse(slideData) : slideData;
+          if (slide && slide.text) {
+            allCarouselSlides.push({
+              slideNumber: slide.slideNumber || allCarouselSlides.length + 1,
+              text: slide.text,
+            });
+          }
+        } catch {
+          // Skip invalid slide data
+        }
+      }
+    }
+    // Fall back to requested slides if no carousel slides in DB
+    const slidesForDesignSystem = allCarouselSlides.length > 0 ? allCarouselSlides : slides;
 
     // Fetch brand info for design system constraints
     let brandConfig: BrandVisualConfig | null = null;
@@ -297,9 +319,11 @@ export async function POST(request: NextRequest) {
     if (!designSystem) {
       console.log(`Generating new design system for style: ${effectiveStyle}`);
 
+      // Use ALL carousel slides for design system context (not just requested slides)
+      // This ensures consistency even when generating slides one at a time
       const designSystemPrompt = buildDesignSystemPrompt(
         effectiveStyle,
-        slides,
+        slidesForDesignSystem,
         content.platform,
         brandConfig,
         ideaContext
