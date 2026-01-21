@@ -2,15 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Clock, Palette, Type, Camera, PenTool, Box, Shapes, Layers, Wand2, ChevronDown, ChevronRight, Square, CheckSquare, Trash2, AlertCircle, CheckCircle2, XCircle, Zap, Video } from "lucide-react";
+import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Clock, ChevronDown, ChevronRight, Square, CheckSquare, Trash2, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { type VisualStyle } from "@/lib/prompts";
 import { useBrand } from "@/contexts/brand-context";
-import { VideoCostDialog } from "@/components/video/video-cost-dialog";
-import { type VideoModelKey } from "@/lib/video-models";
 
 interface Idea {
   id: string;
@@ -68,83 +65,6 @@ const platformConfig: Record<string, { icon: React.ReactNode; label: string; col
   },
 };
 
-// Visual style configuration for the style selector (includes experimental, video, and mixed-carousel)
-type StyleOption = VisualStyle | "auto" | "experimental" | "video" | "mixed-carousel";
-const visualStyleConfig: Record<StyleOption, { icon: React.ReactNode; label: string; description: string; color: string; activeColor: string }> = {
-  auto: {
-    icon: <Wand2 className="h-4 w-4" />,
-    label: "Auto",
-    description: "AI chooses best style",
-    color: "border-purple-500/30 text-purple-400",
-    activeColor: "bg-purple-600 text-white border-purple-600",
-  },
-  typography: {
-    icon: <Type className="h-4 w-4" />,
-    label: "Typography",
-    description: "Bold text-focused designs",
-    color: "border-slate-500/30 text-slate-400",
-    activeColor: "bg-slate-700 text-white border-slate-700",
-  },
-  photorealistic: {
-    icon: <Camera className="h-4 w-4" />,
-    label: "Photo",
-    description: "Photo-quality backgrounds",
-    color: "border-emerald-500/30 text-emerald-400",
-    activeColor: "bg-emerald-600 text-white border-emerald-600",
-  },
-  illustration: {
-    icon: <PenTool className="h-4 w-4" />,
-    label: "Illustration",
-    description: "Hand-drawn/digital art",
-    color: "border-orange-500/30 text-orange-400",
-    activeColor: "bg-orange-500 text-white border-orange-500",
-  },
-  "3d-render": {
-    icon: <Box className="h-4 w-4" />,
-    label: "3D Render",
-    description: "Modern 3D scenes",
-    color: "border-cyan-500/30 text-cyan-400",
-    activeColor: "bg-cyan-600 text-white border-cyan-600",
-  },
-  "abstract-art": {
-    icon: <Shapes className="h-4 w-4" />,
-    label: "Abstract",
-    description: "Bold shapes & gradients",
-    color: "border-rose-500/30 text-rose-400",
-    activeColor: "bg-rose-500 text-white border-rose-500",
-  },
-  collage: {
-    icon: <Layers className="h-4 w-4" />,
-    label: "Collage",
-    description: "Mixed media layers",
-    color: "border-amber-500/30 text-amber-400",
-    activeColor: "bg-amber-600 text-white border-amber-600",
-  },
-  experimental: {
-    icon: <Zap className="h-4 w-4" />,
-    label: "Experimental",
-    description: "Wild & boundary-pushing",
-    color: "border-fuchsia-500/30 text-fuchsia-400",
-    activeColor: "bg-gradient-to-r from-fuchsia-600 via-pink-500 to-orange-500 text-white border-transparent",
-  },
-  video: {
-    icon: <Video className="h-4 w-4" />,
-    label: "Video",
-    description: "AI-generated video ($$$)",
-    color: "border-violet-500/30 text-violet-400",
-    activeColor: "bg-violet-600 text-white border-violet-600",
-  },
-  "mixed-carousel": {
-    icon: <Layers className="h-4 w-4" />,
-    label: "Video+Images",
-    description: "Video slide 1 + images",
-    color: "border-indigo-500/30 text-indigo-400",
-    activeColor: "bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-transparent",
-  },
-};
-
-const STYLE_OPTIONS: StyleOption[] = ["auto", "typography", "photorealistic", "illustration", "3d-render", "abstract-art", "collage", "experimental", "video", "mixed-carousel"];
-
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   approved: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -163,8 +83,6 @@ export default function IdeasPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   // Track selected platforms per idea
   const [selectedPlatforms, setSelectedPlatforms] = useState<Record<string, string[]>>({});
-  // Track selected visual style per idea (for Instagram carousels)
-  const [selectedVisualStyles, setSelectedVisualStyles] = useState<Record<string, StyleOption>>({});
   // Collapsed card view state
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -174,10 +92,6 @@ export default function IdeasPage() {
   const [isBulkApproving, setIsBulkApproving] = useState(false);
   const [isBulkRejecting, setIsBulkRejecting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  // Video dialog state
-  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
-  const [videoDialogIdeaId, setVideoDialogIdeaId] = useState<string | null>(null);
-  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
 
   useEffect(() => {
     fetchIdeas();
@@ -231,14 +145,6 @@ export default function IdeasPage() {
 
   const getSelectedPlatforms = (ideaId: string, defaultPlatforms: string[]): string[] => {
     return selectedPlatforms[ideaId] || defaultPlatforms || [...ALL_PLATFORMS];
-  };
-
-  const getSelectedVisualStyle = (ideaId: string): StyleOption => {
-    return selectedVisualStyles[ideaId] || "auto";
-  };
-
-  const setVisualStyle = (ideaId: string, style: StyleOption) => {
-    setSelectedVisualStyles((prev) => ({ ...prev, [ideaId]: style }));
   };
 
   const toggleCard = (id: string) => {
@@ -395,21 +301,6 @@ export default function IdeasPage() {
   };
 
   const handleAction = async (id: string, status: "approved" | "rejected") => {
-    // If approving with video or mixed-carousel style selected, show video dialog instead
-    if (status === "approved") {
-      const visualStyle = getSelectedVisualStyle(id);
-      if (visualStyle === "video" || visualStyle === "mixed-carousel") {
-        setVideoDialogIdeaId(id);
-        setVideoDialogOpen(true);
-        return;
-      }
-    }
-
-    await processApproval(id, status);
-  };
-
-  // Separate function for actual approval processing
-  const processApproval = async (id: string, status: "approved" | "rejected", videoOptions?: { model: VideoModelKey; duration: number; includeAudio: boolean }) => {
     setActionLoading(id);
     setSuccessMessage(null);
     try {
@@ -429,20 +320,15 @@ export default function IdeasPage() {
         );
 
         // If approved, generate content for selected platforms only
+        // Note: Visual style and image/video prompts are generated later in the Content page
         if (status === "approved") {
           const idea = ideas.find((i) => i.id === id);
           const platforms = getSelectedPlatforms(id, idea?.target_platforms || []);
-          const visualStyle = getSelectedVisualStyle(id);
 
           setActionLoading(null);
           setGeneratingContent(id);
 
-          // Build message based on whether Instagram is selected and a style is chosen
-          const hasInstagram = platforms.includes("instagram");
-          const isVideo = visualStyle === "video";
-          const styleLabel = visualStyle !== "auto" ? visualStyleConfig[visualStyle].label : "Auto-selected";
-          const styleMsg = hasInstagram ? ` (${styleLabel} style)` : "";
-          setSuccessMessage(`Idea approved! Generating content for ${platforms.join(", ")}${styleMsg}...`);
+          setSuccessMessage(`Idea approved! Generating content for ${platforms.join(", ")}...`);
 
           const contentRes = await fetch("/api/content/generate", {
             method: "POST",
@@ -450,11 +336,7 @@ export default function IdeasPage() {
             body: JSON.stringify({
               ideaId: id,
               platforms,
-              // Only pass visualStyle if not "auto" - undefined lets AI choose
-              // "video" must be passed through so carousel API knows to generate video for slide 1
-              visualStyle: visualStyle !== "auto" ? visualStyle : undefined,
-              // Pass video options if generating video
-              videoOptions: isVideo ? videoOptions : undefined,
+              // Visual style is now selected in Content page, not here
             }),
           });
 
@@ -484,26 +366,6 @@ export default function IdeasPage() {
       setActionLoading(null);
       setGeneratingContent(null);
     }
-  };
-
-  // Handle video generation confirmation
-  const handleVideoConfirm = async (options: { model: VideoModelKey; duration: number; includeAudio: boolean }) => {
-    if (!videoDialogIdeaId) return;
-    setIsGeneratingVideo(true);
-    setVideoDialogOpen(false);
-    await processApproval(videoDialogIdeaId, "approved", options);
-    setIsGeneratingVideo(false);
-    setVideoDialogIdeaId(null);
-  };
-
-  // Handle fallback to image when user cancels video
-  const handleVideoFallbackToImage = () => {
-    if (!videoDialogIdeaId) return;
-    // Set style to auto and proceed with regular approval
-    setVisualStyle(videoDialogIdeaId, "auto");
-    setVideoDialogOpen(false);
-    processApproval(videoDialogIdeaId, "approved");
-    setVideoDialogIdeaId(null);
   };
 
   const pendingCount = ideas.filter((i) => i.status === "pending").length;
@@ -861,39 +723,6 @@ export default function IdeasPage() {
                         </div>
                       )}
 
-                      {/* Visual Style Selector - Only show when Instagram is selected */}
-                      {idea.status === "pending" && selected.includes("instagram") && (
-                        <div className="space-y-2 pt-2 border-t border-muted/30">
-                          <div className="flex items-center gap-2">
-                            <Palette className="h-4 w-4 text-muted-foreground" />
-                            <p className="text-sm font-medium text-muted-foreground">Carousel visual style:</p>
-                          </div>
-                          <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap">
-                            {STYLE_OPTIONS.map((style) => {
-                              const config = visualStyleConfig[style];
-                              const isSelected = getSelectedVisualStyle(idea.id) === style;
-                              return (
-                                <button
-                                  key={style}
-                                  onClick={() => setVisualStyle(idea.id, style)}
-                                  className={cn(
-                                    "flex flex-col items-center gap-1 px-3 py-2 rounded-lg border-2 transition-all text-center",
-                                    isSelected ? config.activeColor : config.color,
-                                    "hover:opacity-90"
-                                  )}
-                                  title={config.description}
-                                >
-                                  {config.icon}
-                                  <span className="text-xs font-medium">{config.label}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {visualStyleConfig[getSelectedVisualStyle(idea.id)].description}
-                          </p>
-                        </div>
-                      )}
 
                       {/* Key Points */}
                       {idea.key_points && idea.key_points.length > 0 && (
@@ -1039,18 +868,6 @@ export default function IdeasPage() {
             )}
           </CardContent>
         </Card>
-      )}
-
-      {/* Video Cost Dialog */}
-      {selectedBrand?.id && (
-        <VideoCostDialog
-          open={videoDialogOpen}
-          onOpenChange={setVideoDialogOpen}
-          onConfirm={handleVideoConfirm}
-          onFallbackToImage={handleVideoFallbackToImage}
-          brandId={selectedBrand.id}
-          isGenerating={isGeneratingVideo}
-        />
       )}
     </div>
   );
