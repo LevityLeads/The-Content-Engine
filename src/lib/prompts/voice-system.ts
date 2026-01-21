@@ -55,6 +55,8 @@ export interface VisualConfig {
   };
   image_style?: string;
   color_palette?: string[];
+  example_posts?: string[]; // User-uploaded example images (base64 or URLs)
+  master_brand_prompt?: string; // AI-generated visual brand description from example posts
 }
 
 export const VOICE_ARCHETYPES = {
@@ -321,6 +323,15 @@ Avoid jargon unless necessary. Write like a knowledgeable friend, not a corporat
         sections.push(`Bad Example ${i + 1}: "${ex}"`);
       });
     }
+  }
+
+  // MASTER BRAND PROMPT: If available, use this as the PRIMARY visual directive
+  // It's AI-generated from analyzing the brand's actual example posts
+  if (visualConfig?.master_brand_prompt) {
+    sections.push(`### MASTER BRAND DIRECTIVE (CRITICAL - FOLLOW THIS EXACTLY)`);
+    sections.push(`The following brand guidelines were generated from analyzing this brand's actual content. Follow these EXACTLY:`);
+    sections.push(visualConfig.master_brand_prompt);
+    sections.push(`\n**IMPORTANT**: This master brand prompt takes priority over any other visual instructions. Use it as the primary guide for all image prompts and visual descriptions.`);
   }
 
   // VISUAL CONFIG: Add brand colors for image generation consistency
