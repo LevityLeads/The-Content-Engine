@@ -445,6 +445,7 @@ export default function ContentPage() {
             secondary_color: selectedBrand.visual_config.secondary_color,
             image_style: selectedBrand.visual_config.image_style,
             fonts: selectedBrand.visual_config.fonts,
+            master_brand_prompt: selectedBrand.visual_config.master_brand_prompt,
           } : undefined,
         }),
       });
@@ -582,6 +583,7 @@ export default function ContentPage() {
             secondary_color: selectedBrand.visual_config.secondary_color,
             image_style: selectedBrand.visual_config.image_style,
             fonts: selectedBrand.visual_config.fonts,
+            master_brand_prompt: selectedBrand.visual_config.master_brand_prompt,
           } : undefined,
         }),
       });

@@ -28,6 +28,8 @@ export interface VisualConfig {
   image_style?: string;
   extracted_images?: string[];
   color_palette?: string[];
+  example_posts?: string[]; // User-uploaded example images (base64 or URLs)
+  master_brand_prompt?: string; // AI-generated visual brand description from example posts
 }
 
 export interface BrandWithConfig extends Omit<Brand, "voice_config" | "visual_config"> {
