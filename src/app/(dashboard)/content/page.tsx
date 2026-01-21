@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Layers, Calendar, GripVertical, ArrowRight, Video, Play } from "lucide-react";
+import { useState, useEffect } from "react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Calendar, ArrowRight, Video, Play } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
+import { VIDEO_MODEL_OPTIONS, DEFAULT_VIDEO_MODEL, type VideoModelKey } from "@/lib/video-models";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +14,7 @@ import { ImageCarousel, type CarouselImage } from "@/components/ui/image-carouse
 import { PlatformPostMockup } from "@/components/ui/platform-mockups";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { GenerationStatus } from "@/components/ui/generation-status";
-import { useGenerationJobs, type GenerationJob } from "@/hooks/use-generation-jobs";
+import { useGenerationJobs } from "@/hooks/use-generation-jobs";
 import { cn } from "@/lib/utils";
 import { useBrand } from "@/contexts/brand-context";
 
@@ -136,11 +137,11 @@ export default function ContentPage() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkApproving, setIsBulkApproving] = useState(false);
   const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
-  const [generatingCompositeCarousel, setGeneratingCompositeCarousel] = useState<string | null>(null);
-  const [selectedTextStyle, setSelectedTextStyle] = useState<string>("bold-editorial");
-  const [selectedTextColor, setSelectedTextColor] = useState<string>("white-coral");
-  const [selectedBackgroundStyle, setSelectedBackgroundStyle] = useState<string>("gradient-dark");
-  const [generationMode, setGenerationMode] = useState<"ai-generation" | "composite">("ai-generation");
+  const [generatingAllVideos, setGeneratingAllVideos] = useState<string | null>(null);
+  const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModelKey>(DEFAULT_VIDEO_MODEL);
+  const [mediaMode, setMediaMode] = useState<"image" | "video">("image");
+  const [generatingPrompt, setGeneratingPrompt] = useState<string | null>(null);
+  const [videoPrompts, setVideoPrompts] = useState<Record<string, string>>({});
   const [captionPanelWidth, setCaptionPanelWidth] = useState<number>(320); // Default ~1/3 width
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
   const [publishingId, setPublishingId] = useState<string | null>(null);
@@ -163,9 +164,8 @@ export default function ContentPage() {
   const [editingSlideText, setEditingSlideText] = useState<{ contentId: string; slideNumber: number } | null>(null);
   const [editedSlideText, setEditedSlideText] = useState<string>("");
   const [savingSlideText, setSavingSlideText] = useState(false);
-  // Visual style change state
+  // Visual style state
   const [selectedVisualStyle, setSelectedVisualStyle] = useState<Record<string, string>>({});
-  const [isChangingStyle, setIsChangingStyle] = useState<string | null>(null);
   // Bulk Magic Schedule state
   const [bulkMagicDialogOpen, setBulkMagicDialogOpen] = useState(false);
   const [bulkSuggestions, setBulkSuggestions] = useState<Array<{
@@ -450,54 +450,240 @@ export default function ContentPage() {
     setTimeout(() => setImageMessage(null), 5000);
   };
 
-  // Generate carousel with composite system (consistent text rendering)
-  // If visualStyle is "video" or "mixed-carousel", will generate video for slide 1
-  const handleGenerateCompositeCarousel = async (contentId: string, slides: CarouselSlide[], visualStyle?: string) => {
-    setGeneratingCompositeCarousel(contentId);
-    const isVideoCarousel = visualStyle === "video" || visualStyle === "mixed-carousel";
-    setImageMessage(isVideoCarousel
-      ? "Generating mixed carousel (video + images)..."
-      : "Generating carousel with consistent styling...");
+  // Generate video for a single slide or all slides
+  const handleGenerateVideo = async (contentId: string, slideNumber: number, videoPrompt: string) => {
+    const key = `${contentId}-video-${slideNumber}`;
+    setGeneratingSlides((prev) => ({
+      ...prev,
+      [contentId]: [...(prev[contentId] || []), slideNumber],
+    }));
+    setImageMessage(`Generating video for slide ${slideNumber}...`);
+
     try {
-      const response = await fetch("/api/images/carousel", {
+      const response = await fetch("/api/videos/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contentId,
-          slides: slides.map((s) => ({
-            slideNumber: s.slideNumber,
-            text: s.text,
-          })),
-          textStyle: selectedTextStyle,
-          textColor: selectedTextColor,
-          backgroundStyle: selectedBackgroundStyle,
-          visualStyle: visualStyle, // Pass visualStyle to trigger video generation
-          // Pass brand colors and fonts for visual consistency
-          brandColors: selectedBrand?.visual_config ? {
-            primary_color: selectedBrand.visual_config.primary_color,
-            accent_color: selectedBrand.visual_config.accent_color,
-            secondary_color: selectedBrand.visual_config.secondary_color,
-            image_style: selectedBrand.visual_config.image_style,
-            fonts: selectedBrand.visual_config.fonts,
-            master_brand_prompt: selectedBrand.visual_config.master_brand_prompt,
-          } : undefined,
+          prompt: videoPrompt,
+          model: selectedVideoModel,
+          duration: 5,
+          includeAudio: false,
+          slideNumber,
         }),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        setImageMessage(`Generated ${data.images.length} slides with consistent styling!`);
-        // Refresh images for this content
+        setImageMessage(`Video generated for slide ${slideNumber}!`);
         fetchImagesForContent(contentId);
       } else {
-        setImageMessage(`Error: ${data.error || "Failed to generate carousel"}`);
+        setImageMessage(`Error: ${data.error || "Failed to generate video"}`);
       }
     } catch (error) {
-      console.error("Error generating composite carousel:", error);
-      setImageMessage("Error generating composite carousel");
+      console.error("Error generating video:", error);
+      setImageMessage("Error generating video");
     } finally {
-      setGeneratingCompositeCarousel(null);
+      setGeneratingSlides((prev) => ({
+        ...prev,
+        [contentId]: (prev[contentId] || []).filter((n) => n !== slideNumber),
+      }));
+      setTimeout(() => setImageMessage(null), 5000);
+    }
+  };
+
+  // Generate prompts and videos for all slides
+  const handleGenerateAllVideos = async (contentId: string, slides: CarouselSlide[]) => {
+    setGeneratingAllVideos(contentId);
+    setImageMessage("Generating prompts and videos for all slides...");
+
+    try {
+      // First generate prompts for all slides
+      const contentItem = content.find((c) => c.id === contentId);
+      const currentStyle = selectedVisualStyle[contentId] || contentItem?.metadata?.carouselStyle || "photorealistic";
+
+      const promptResponse = await fetch("/api/prompts/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          slides: slides.map((s) => ({ slideNumber: s.slideNumber, text: s.text })),
+          visualStyle: currentStyle,
+          mediaType: "video",
+          brandId: selectedBrand?.id,
+        }),
+      });
+
+      const promptData = await promptResponse.json();
+
+      if (!promptData.success) {
+        setImageMessage(`Error: ${promptData.error || "Failed to generate prompts"}`);
+        return;
+      }
+
+      // Then generate videos using those prompts
+      const generatedPrompts = promptData.prompts as Array<{ slideNumber: number; prompt: string }>;
+
+      // Update video prompts state
+      const newVideoPrompts: Record<string, string> = {};
+      generatedPrompts.forEach((p) => {
+        newVideoPrompts[`${contentId}-${p.slideNumber}`] = p.prompt;
+      });
+      setVideoPrompts((prev) => ({ ...prev, ...newVideoPrompts }));
+
+      // Generate videos in parallel (with some batching to avoid overwhelming the API)
+      const batchSize = 2;
+      for (let i = 0; i < generatedPrompts.length; i += batchSize) {
+        const batch = generatedPrompts.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map((p) => handleGenerateVideo(contentId, p.slideNumber, p.prompt))
+        );
+      }
+
+      setImageMessage("All videos generated!");
+    } catch (error) {
+      console.error("Error generating all videos:", error);
+      setImageMessage("Error generating videos");
+    } finally {
+      setGeneratingAllVideos(null);
+      setTimeout(() => setImageMessage(null), 5000);
+    }
+  };
+
+  // Generate prompt and then image for a single slide
+  const handleGenerateWithPrompt = async (contentId: string, slide: CarouselSlide) => {
+    const key = `${contentId}-${slide.slideNumber}`;
+    setGeneratingPrompt(key);
+    setGeneratingSlides((prev) => ({
+      ...prev,
+      [contentId]: [...(prev[contentId] || []), slide.slideNumber],
+    }));
+    setImageMessage("Generating prompt and image...");
+
+    try {
+      const contentItem = content.find((c) => c.id === contentId);
+      const currentStyle = selectedVisualStyle[contentId] || contentItem?.metadata?.carouselStyle || "photorealistic";
+
+      // Generate prompt
+      const promptResponse = await fetch("/api/prompts/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          slides: [{ slideNumber: slide.slideNumber, text: slide.text }],
+          visualStyle: currentStyle,
+          mediaType: "image",
+          brandId: selectedBrand?.id,
+        }),
+      });
+
+      const promptData = await promptResponse.json();
+
+      if (!promptData.success) {
+        setImageMessage(`Error: ${promptData.error || "Failed to generate prompt"}`);
+        return;
+      }
+
+      const generatedPrompt = promptData.prompts[0]?.prompt;
+      if (!generatedPrompt) {
+        setImageMessage("Error: No prompt generated");
+        return;
+      }
+
+      // Update the slide's imagePrompt in local state
+      setContent((prev) =>
+        prev.map((c) => {
+          if (c.id !== contentId) return c;
+          if (!c.copy_carousel_slides) return c;
+          const updatedSlides = c.copy_carousel_slides.map((slideData) => {
+            const s = typeof slideData === 'string' ? JSON.parse(slideData) : slideData;
+            if (s.slideNumber === slide.slideNumber) {
+              return JSON.stringify({ ...s, imagePrompt: generatedPrompt });
+            }
+            return typeof slideData === 'string' ? slideData : JSON.stringify(slideData);
+          });
+          return { ...c, copy_carousel_slides: updatedSlides };
+        })
+      );
+
+      // Now generate the image with the prompt
+      await handleGenerateImage(contentId, generatedPrompt, slide.slideNumber);
+
+    } catch (error) {
+      console.error("Error generating with prompt:", error);
+      setImageMessage("Error generating image");
+    } finally {
+      setGeneratingPrompt(null);
+      setGeneratingSlides((prev) => ({
+        ...prev,
+        [contentId]: (prev[contentId] || []).filter((n) => n !== slide.slideNumber),
+      }));
+      setTimeout(() => setImageMessage(null), 5000);
+    }
+  };
+
+  // Generate prompts and images for all slides
+  const handleGenerateAllWithPrompts = async (contentId: string, slides: CarouselSlide[]) => {
+    setImageMessage("Generating prompts and images for all slides...");
+    setGeneratingPrompt(contentId);
+
+    try {
+      const contentItem = content.find((c) => c.id === contentId);
+      const currentStyle = selectedVisualStyle[contentId] || contentItem?.metadata?.carouselStyle || "photorealistic";
+
+      // First generate prompts for all slides
+      const promptResponse = await fetch("/api/prompts/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          slides: slides.map((s) => ({ slideNumber: s.slideNumber, text: s.text })),
+          visualStyle: currentStyle,
+          mediaType: "image",
+          brandId: selectedBrand?.id,
+        }),
+      });
+
+      const promptData = await promptResponse.json();
+
+      if (!promptData.success) {
+        setImageMessage(`Error: ${promptData.error || "Failed to generate prompts"}`);
+        return;
+      }
+
+      const generatedPrompts = promptData.prompts as Array<{ slideNumber: number; prompt: string }>;
+
+      // Update slides with new prompts
+      setContent((prev) =>
+        prev.map((c) => {
+          if (c.id !== contentId) return c;
+          if (!c.copy_carousel_slides) return c;
+          const updatedSlides = c.copy_carousel_slides.map((slideData) => {
+            const s = typeof slideData === 'string' ? JSON.parse(slideData) : slideData;
+            const newPrompt = generatedPrompts.find((p) => p.slideNumber === s.slideNumber);
+            if (newPrompt) {
+              return JSON.stringify({ ...s, imagePrompt: newPrompt.prompt });
+            }
+            return typeof slideData === 'string' ? slideData : JSON.stringify(slideData);
+          });
+          return { ...c, copy_carousel_slides: updatedSlides };
+        })
+      );
+
+      // Generate images using those prompts
+      const slidesWithPrompts = slides.map((s) => ({
+        ...s,
+        imagePrompt: generatedPrompts.find((p) => p.slideNumber === s.slideNumber)?.prompt || s.imagePrompt,
+      }));
+
+      await handleGenerateAllSlides(contentId, slidesWithPrompts);
+
+    } catch (error) {
+      console.error("Error generating all with prompts:", error);
+      setImageMessage("Error generating images");
+    } finally {
+      setGeneratingPrompt(null);
       setTimeout(() => setImageMessage(null), 5000);
     }
   };
@@ -602,88 +788,6 @@ export default function ContentPage() {
     }
   };
 
-  // Regenerate carousel images with a different visual style
-  const handleRegenerateWithStyle = async (contentId: string, slides: CarouselSlide[], visualStyle: string) => {
-    setIsChangingStyle(contentId);
-    setImageMessage(`Regenerating with ${visualStyle} style...`);
-
-    try {
-      // Create a job to track the regeneration
-      let jobId: string | null = null;
-      const initialSlideStatuses = slides.map((slide) => ({
-        slideNumber: slide.slideNumber,
-        status: 'pending' as const,
-      }));
-
-      try {
-        const jobRes = await fetch("/api/images/jobs", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contentId,
-            type: 'carousel',
-            totalItems: slides.length,
-            metadata: { slideStatuses: initialSlideStatuses, mode: 'style-change', newStyle: visualStyle },
-          }),
-        });
-        const jobData = await jobRes.json();
-        if (jobData.success) {
-          jobId = jobData.job.id;
-        }
-      } catch (err) {
-        console.error("Error creating job:", err);
-      }
-
-      // Call the carousel API with the new style
-      const response = await fetch("/api/images/carousel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contentId,
-          slides: slides.map((s) => ({
-            slideNumber: s.slideNumber,
-            text: s.text,
-            imagePrompt: s.imagePrompt,
-          })),
-          model: selectedModel,
-          textStyle: selectedTextStyle,
-          textColor: selectedTextColor,
-          backgroundStyle: selectedBackgroundStyle,
-          visualStyle, // Pass the new visual style
-          jobId,
-          // Pass brand colors and fonts for visual consistency
-          brandColors: selectedBrand?.visual_config ? {
-            primary_color: selectedBrand.visual_config.primary_color,
-            accent_color: selectedBrand.visual_config.accent_color,
-            secondary_color: selectedBrand.visual_config.secondary_color,
-            image_style: selectedBrand.visual_config.image_style,
-            fonts: selectedBrand.visual_config.fonts,
-            master_brand_prompt: selectedBrand.visual_config.master_brand_prompt,
-          } : undefined,
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setImageMessage(`Style changed to ${visualStyle}! Regenerating images...`);
-        // Update local selected style
-        setSelectedVisualStyle((prev) => ({ ...prev, [contentId]: visualStyle }));
-        // Refresh images after a short delay
-        setTimeout(() => {
-          fetchImagesForContent(contentId);
-          refreshJobs();
-        }, 1000);
-      } else {
-        setImageMessage(data.error || "Failed to regenerate with new style");
-      }
-    } catch (err) {
-      console.error("Error regenerating with style:", err);
-      setImageMessage("Error regenerating with new style");
-    } finally {
-      setIsChangingStyle(null);
-      setTimeout(() => setImageMessage(null), 5000);
-    }
-  };
 
   const handleCopyToClipboard = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);
@@ -1608,94 +1712,72 @@ export default function ContentPage() {
         style={{ userSelect: isDraggingDivider ? 'none' : 'auto' }}
       >
         {/* Left Panel: Slide Content */}
-        <div className="w-[240px] flex-shrink-0 flex flex-col border-r border-muted/30 pr-3 overflow-y-auto">
-          {/* Model Selector */}
-          <div className="mb-2">
-            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Model</label>
-            <select
-              className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs"
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value as ImageModelKey)}
-            >
-              {MODEL_OPTIONS.map((model) => (
-                <option key={model.key} value={model.key}>{model.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Visual Style Selector with Change Button */}
-          <div className="mb-2">
-            <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Visual Style</label>
-            <div className="flex gap-1.5">
-              <select
-                className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
-                value={selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)}
-                onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
-              >
-                {visualStyleOptions.map((style) => (
-                  <option key={style.id} value={style.id}>{style.label}</option>
-                ))}
-              </select>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-[10px]"
-                onClick={() => handleRegenerateWithStyle(
-                  item.id,
-                  slides,
-                  selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)
-                )}
-                disabled={isChangingStyle === item.id || generatingCompositeCarousel === item.id}
-              >
-                {isChangingStyle === item.id ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3 w-3" />
-                )}
-              </Button>
-            </div>
-            {item.metadata?.carouselStyle && (
-              <div className="text-[9px] text-muted-foreground mt-0.5">
-                Current: {visualStyleOptions.find(s => s.id === getCarouselStyleId(item.metadata?.carouselStyle))?.label || getCarouselStyleId(item.metadata?.carouselStyle)}
-              </div>
-            )}
-          </div>
-
-          {/* AI Generation / Composite Tabs */}
-          <Tabs defaultValue="ai-generation" value={generationMode} onValueChange={(v) => setGenerationMode(v as "ai-generation" | "composite")} className="flex-1 flex flex-col">
-            <TabsList className="w-full h-7 mb-2">
-              <TabsTrigger value="ai-generation" className="flex-1 text-[10px] h-6">
-                <Sparkles className="h-3 w-3 mr-1" />
-                AI Generation
+        <div className="w-[260px] flex-shrink-0 flex flex-col border-r border-muted/30 pr-3 overflow-y-auto">
+          {/* Image/Video Toggle at the top */}
+          <Tabs defaultValue="image" value={mediaMode} onValueChange={(v) => setMediaMode(v as "image" | "video")} className="flex-1 flex flex-col">
+            <TabsList className="w-full h-8 mb-3">
+              <TabsTrigger value="image" className="flex-1 text-xs h-7">
+                <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+                Image
               </TabsTrigger>
-              <TabsTrigger value="composite" className="flex-1 text-[10px] h-6">
-                <Layers className="h-3 w-3 mr-1" />
-                Composite
+              <TabsTrigger value="video" className="flex-1 text-xs h-7">
+                <Video className="h-3.5 w-3.5 mr-1.5" />
+                Video
               </TabsTrigger>
             </TabsList>
 
-            {/* Generate All Slides Button */}
-            <Button
-              className="w-full h-8 mb-3 bg-emerald-600 hover:bg-emerald-700"
-              onClick={() => {
-                if (generationMode === "composite") {
-                  handleGenerateCompositeCarousel(item.id, slides, item.metadata?.visualStyle);
-                } else {
-                  handleGenerateAllSlides(item.id, slides);
-                }
-              }}
-              disabled={Object.keys(generatingSlides[item.id] || {}).length > 0 || generatingCompositeCarousel === item.id}
-            >
-              <ImageIcon className="mr-2 h-3.5 w-3.5" />
-              <span className="text-xs">Generate all slides</span>
-            </Button>
+            {/* Image Mode Content */}
+            <TabsContent value="image" className="flex-1 flex flex-col mt-0 space-y-2 overflow-y-auto">
+              {/* Model Selector */}
+              <div>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Model</label>
+                <select
+                  className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value as ImageModelKey)}
+                >
+                  {MODEL_OPTIONS.map((model) => (
+                    <option key={model.key} value={model.key}>{model.name}</option>
+                  ))}
+                </select>
+              </div>
 
-            {/* SLIDE CONTENT Section */}
-            <div className="mb-2">
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Slide Content</div>
+              {/* Visual Style Selector */}
+              <div>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Visual Style</label>
+                <select
+                  className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs"
+                  value={selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)}
+                  onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                >
+                  {visualStyleOptions.map((style) => (
+                    <option key={style.id} value={style.id}>{style.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Generate All Images Button */}
+              <Button
+                className="w-full h-8 bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => handleGenerateAllWithPrompts(item.id, slides)}
+                disabled={Object.keys(generatingSlides[item.id] || {}).length > 0 || generatingPrompt === item.id}
+              >
+                {generatingPrompt === item.id ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ImageIcon className="mr-2 h-3.5 w-3.5" />
+                )}
+                <span className="text-xs">{slides.length > 1 ? "Generate all images" : "Generate image"}</span>
+              </Button>
+
+              {/* Divider */}
+              <div className="border-t border-muted/30 my-1" />
+
+              {/* SLIDE CONTENT Section */}
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Slide Content</div>
 
               {/* Slide Text */}
-              <div className="mb-2">
+              <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] text-muted-foreground">Slide Text:</span>
                   <div className="flex gap-0.5">
@@ -1726,10 +1808,7 @@ export default function ContentPage() {
                   <div className="text-xs leading-relaxed text-foreground">{slide.text}</div>
                 )}
               </div>
-            </div>
 
-            {/* AI Generation Tab */}
-            <TabsContent value="ai-generation" className="flex-1 flex flex-col mt-0 space-y-2 overflow-y-auto">
               {/* Slide Prompt */}
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -1738,13 +1817,13 @@ export default function ContentPage() {
                     <Button variant="ghost" size="icon" className="h-5 w-5" title="Edit" disabled>
                       <Pencil className="h-2.5 w-2.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" title="Regenerate" disabled>
-                      <RefreshCw className="h-2.5 w-2.5" />
+                    <Button variant="ghost" size="icon" className="h-5 w-5" title="Regenerate" onClick={() => handleGenerateWithPrompt(item.id, slide)} disabled={isGenerating || generatingPrompt === `${item.id}-${slide.slideNumber}`}>
+                      {generatingPrompt === `${item.id}-${slide.slideNumber}` ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RefreshCw className="h-2.5 w-2.5" />}
                     </Button>
                   </div>
                 </div>
                 <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground leading-relaxed max-h-[60px] overflow-y-auto">
-                  {slide.imagePrompt}
+                  {slide.imagePrompt || <span className="italic">Prompt will be generated when you click Generate</span>}
                 </div>
               </div>
 
@@ -1752,8 +1831,8 @@ export default function ContentPage() {
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] text-muted-foreground">Style Variants</span>
-                  <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber)} disabled={isGenerating}>
-                    {isGenerating ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ImageIcon className="mr-1 h-3 w-3" />}
+                  <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleGenerateWithPrompt(item.id, slide)} disabled={isGenerating || generatingPrompt !== null}>
+                    {isGenerating || generatingPrompt === `${item.id}-${slide.slideNumber}` ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ImageIcon className="mr-1 h-3 w-3" />}
                     Generate Another
                   </Button>
                 </div>
@@ -1771,85 +1850,176 @@ export default function ContentPage() {
               </div>
             </TabsContent>
 
-            {/* Composite Tab */}
-            <TabsContent value="composite" className="flex-1 flex flex-col mt-0 space-y-1.5 overflow-y-auto">
-              {/* COMPOSITE SETTINGS Section */}
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Composite Settings</div>
-
-              {/* Text Style */}
+            {/* Video Mode Content */}
+            <TabsContent value="video" className="flex-1 flex flex-col mt-0 space-y-2 overflow-y-auto">
+              {/* Model Selector */}
               <div>
-                <label className="text-[10px] text-muted-foreground mb-0.5 block">Text Style</label>
-                <select className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs" value={selectedTextStyle} onChange={(e) => setSelectedTextStyle(e.target.value)}>
-                  <option value="bold-editorial">Bold Editorial</option>
-                  <option value="clean-modern">Clean Modern</option>
-                  <option value="dramatic">Dramatic</option>
-                  <option value="minimal">Minimal</option>
-                  <option value="statement">Statement</option>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Model</label>
+                <select
+                  className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs"
+                  value={selectedVideoModel}
+                  onChange={(e) => setSelectedVideoModel(e.target.value as VideoModelKey)}
+                >
+                  {VIDEO_MODEL_OPTIONS.map((model) => (
+                    <option key={model.key} value={model.key}>{model.name} - ${model.costPerSecond}/sec</option>
+                  ))}
                 </select>
               </div>
 
-              {/* Text Color */}
+              {/* Visual Style Selector */}
               <div>
-                <label className="text-[10px] text-muted-foreground mb-0.5 block">Text Color</label>
-                <select className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs" value={selectedTextColor} onChange={(e) => setSelectedTextColor(e.target.value)}>
-                  <option value="white-coral">White & Coral</option>
-                  <option value="white-teal">White & Teal</option>
-                  <option value="white-gold">White & Gold</option>
-                  <option value="white-blue">White & Blue</option>
-                  <option value="dark-coral">Dark & Coral</option>
-                  <option value="dark-blue">Dark & Blue</option>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Visual Style</label>
+                <select
+                  className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs"
+                  value={selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)}
+                  onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                >
+                  {visualStyleOptions.map((style) => (
+                    <option key={style.id} value={style.id}>{style.label}</option>
+                  ))}
                 </select>
               </div>
 
-              {/* Background Style */}
+              {/* Generate All Videos Button */}
+              <Button
+                className="w-full h-8 bg-purple-600 hover:bg-purple-700"
+                onClick={() => handleGenerateAllVideos(item.id, slides)}
+                disabled={Object.keys(generatingSlides[item.id] || {}).length > 0 || generatingAllVideos === item.id}
+              >
+                {generatingAllVideos === item.id ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Video className="mr-2 h-3.5 w-3.5" />
+                )}
+                <span className="text-xs">{slides.length > 1 ? "Generate all videos" : "Generate video"}</span>
+              </Button>
+
+              {/* Divider */}
+              <div className="border-t border-muted/30 my-1" />
+
+              {/* Video Prompt */}
               <div>
-                <label className="text-[10px] text-muted-foreground mb-0.5 block">Background Style</label>
-                <select className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs" value={selectedBackgroundStyle} onChange={(e) => setSelectedBackgroundStyle(e.target.value)}>
-                  <optgroup label="Typography">
-                    <option value="gradient-dark">Dark Gradient</option>
-                    <option value="gradient-warm">Warm Gradient</option>
-                    <option value="abstract-shapes">Abstract Shapes</option>
-                    <option value="bokeh-dark">Bokeh</option>
-                    <option value="minimal-solid">Solid</option>
-                  </optgroup>
-                  <optgroup label="Photorealistic">
-                    <option value="photo-landscape">Landscape</option>
-                    <option value="photo-urban">Urban/City</option>
-                    <option value="photo-nature">Nature Close-up</option>
-                    <option value="photo-ocean">Ocean/Sunset</option>
-                  </optgroup>
-                  <optgroup label="Illustration">
-                    <option value="illust-flat">Flat Vector</option>
-                    <option value="illust-watercolor">Watercolor</option>
-                    <option value="illust-geometric">Geometric</option>
-                  </optgroup>
-                  <optgroup label="3D / Art">
-                    <option value="3d-geometric">3D Geometric</option>
-                    <option value="3d-abstract">3D Abstract</option>
-                    <option value="art-expressive">Expressive Art</option>
-                    <option value="collage-vintage">Vintage Collage</option>
-                  </optgroup>
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] text-muted-foreground">Video Prompt:</span>
+                  <div className="flex gap-0.5">
+                    <Button variant="ghost" size="icon" className="h-5 w-5" title="Edit" disabled>
+                      <Pencil className="h-2.5 w-2.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      title="Regenerate"
+                      onClick={async () => {
+                        const key = `${item.id}-${slide.slideNumber}`;
+                        setGeneratingPrompt(key);
+                        try {
+                          const currentStyle = selectedVisualStyle[item.id] || item.metadata?.carouselStyle || "photorealistic";
+                          const promptResponse = await fetch("/api/prompts/generate", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              contentId: item.id,
+                              slides: [{ slideNumber: slide.slideNumber, text: slide.text }],
+                              visualStyle: currentStyle,
+                              mediaType: "video",
+                              brandId: selectedBrand?.id,
+                            }),
+                          });
+                          const promptData = await promptResponse.json();
+                          if (promptData.success && promptData.prompts[0]) {
+                            setVideoPrompts((prev) => ({ ...prev, [key]: promptData.prompts[0].prompt }));
+                          }
+                        } finally {
+                          setGeneratingPrompt(null);
+                        }
+                      }}
+                      disabled={generatingPrompt === `${item.id}-${slide.slideNumber}`}
+                    >
+                      {generatingPrompt === `${item.id}-${slide.slideNumber}` ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RefreshCw className="h-2.5 w-2.5" />}
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground leading-relaxed max-h-[80px] overflow-y-auto">
+                  {videoPrompts[`${item.id}-${slide.slideNumber}`] || <span className="italic">Video prompt will be generated when you click Generate</span>}
+                </div>
               </div>
 
-              {/* Style Variants */}
+              {/* Style Variants - shows both images and videos */}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] text-muted-foreground">Style Variants</span>
-                  <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleGenerateCompositeCarousel(item.id, slides, item.metadata?.visualStyle)} disabled={generatingCompositeCarousel === item.id}>
-                    {generatingCompositeCarousel === item.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ImageIcon className="mr-1 h-3 w-3" />}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-[10px] px-2"
+                    onClick={async () => {
+                      const key = `${item.id}-${slide.slideNumber}`;
+                      const existingPrompt = videoPrompts[key];
+                      if (existingPrompt) {
+                        await handleGenerateVideo(item.id, slide.slideNumber, existingPrompt);
+                      } else {
+                        // Generate prompt first, then video
+                        setGeneratingPrompt(key);
+                        try {
+                          const currentStyle = selectedVisualStyle[item.id] || item.metadata?.carouselStyle || "photorealistic";
+                          const promptResponse = await fetch("/api/prompts/generate", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              contentId: item.id,
+                              slides: [{ slideNumber: slide.slideNumber, text: slide.text }],
+                              visualStyle: currentStyle,
+                              mediaType: "video",
+                              brandId: selectedBrand?.id,
+                            }),
+                          });
+                          const promptData = await promptResponse.json();
+                          if (promptData.success && promptData.prompts[0]) {
+                            const newPrompt = promptData.prompts[0].prompt;
+                            setVideoPrompts((prev) => ({ ...prev, [key]: newPrompt }));
+                            await handleGenerateVideo(item.id, slide.slideNumber, newPrompt);
+                          }
+                        } finally {
+                          setGeneratingPrompt(null);
+                        }
+                      }
+                    }}
+                    disabled={isGenerating || generatingPrompt !== null}
+                  >
+                    {isGenerating ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Video className="mr-1 h-3 w-3" />}
                     Generate Another
                   </Button>
                 </div>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="flex gap-1.5 overflow-x-auto pb-2">
                   {slideImgs.length > 0 ? (
-                    slideImgs.map((img, idx) => (
-                      <button key={img.id} onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)} className={cn("aspect-[4/5] rounded overflow-hidden border-2 transition-all", idx === safeVersionIdx ? "border-primary ring-1 ring-primary/30" : "border-muted opacity-70 hover:opacity-100")} title={`Version ${idx + 1}`}>
-                        <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
-                      </button>
-                    ))
+                    slideImgs.map((img, idx) => {
+                      const isVideo = img.url?.includes('video') || img.url?.startsWith('data:video');
+                      return (
+                        <button
+                          key={img.id}
+                          onClick={() => setVersionIndex(item.id, slide.slideNumber, idx)}
+                          className={cn(
+                            "flex-shrink-0 w-20 aspect-[4/5] rounded overflow-hidden border-2 transition-all relative",
+                            idx === safeVersionIdx ? "border-primary ring-1 ring-primary/30" : "border-muted opacity-70 hover:opacity-100"
+                          )}
+                          title={`Version ${idx + 1}${isVideo ? ' (Video)' : ' (Image)'}`}
+                        >
+                          {isVideo ? (
+                            <>
+                              <video src={img.url} className="w-full h-full object-cover" muted />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <Play className="h-4 w-4 text-white" />
+                              </div>
+                            </>
+                          ) : (
+                            <img src={img.url} alt={`v${idx + 1}`} className="w-full h-full object-cover" />
+                          )}
+                        </button>
+                      );
+                    })
                   ) : (
-                    <div className="col-span-3 py-4 text-center text-[10px] text-muted-foreground">No images generated yet</div>
+                    <div className="w-full py-4 text-center text-[10px] text-muted-foreground">No media generated yet</div>
                   )}
                 </div>
               </div>
@@ -2263,8 +2433,10 @@ export default function ContentPage() {
                       if (job) {
                         clearJob(job.id);
                         // Re-trigger generation based on type
-                        if (job.type === 'composite') {
-                          handleGenerateCompositeCarousel(item.id, carouselSlides || [], item.metadata?.visualStyle);
+                        if (job.type === 'video' && carouselSlides) {
+                          handleGenerateAllVideos(item.id, carouselSlides);
+                        } else if (carouselSlides) {
+                          handleGenerateAllWithPrompts(item.id, carouselSlides);
                         } else if (item.metadata?.imagePrompt) {
                           handleGenerateImage(item.id, item.metadata?.imagePrompt || "");
                         }
@@ -2380,8 +2552,10 @@ export default function ContentPage() {
                             if (job) {
                               clearJob(job.id);
                               // Re-trigger generation based on type
-                              if (job.type === 'composite') {
-                                handleGenerateCompositeCarousel(item.id, carouselSlides || [], item.metadata?.visualStyle);
+                              if (job.type === 'video' && carouselSlides) {
+                                handleGenerateAllVideos(item.id, carouselSlides);
+                              } else if (carouselSlides) {
+                                handleGenerateAllWithPrompts(item.id, carouselSlides);
                               } else if (item.metadata?.imagePrompt) {
                                 handleGenerateImage(item.id, item.metadata?.imagePrompt || "");
                               }

@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 export interface GenerationJob {
   id: string;
   content_id: string;
-  type: "single" | "carousel" | "composite";
+  type: "single" | "carousel" | "composite" | "video";
   status: "pending" | "generating" | "completed" | "failed";
   progress: number;
   total_items: number;
