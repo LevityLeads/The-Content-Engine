@@ -57,6 +57,15 @@ export function useGenerationJobs(options: UseGenerationJobsOptions = {}): UseGe
   const [jobsByContent, setJobsByContent] = useState<Record<string, GenerationJob[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Ref to store jobsByContent for checking active jobs inside the interval
+  // This prevents the polling effect from recreating on every state change
+  const jobsByContentRef = useRef<Record<string, GenerationJob[]>>({});
+
+  // Keep the ref in sync with state
+  useEffect(() => {
+    jobsByContentRef.current = jobsByContent;
+  }, [jobsByContent]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -111,7 +120,8 @@ export function useGenerationJobs(options: UseGenerationJobsOptions = {}): UseGe
     const startPolling = () => {
       pollIntervalRef.current = setInterval(() => {
         // Only poll if there are active jobs
-        const hasActiveJobs = Object.values(jobsByContent).some(jobs =>
+        // Use ref to avoid recreating the effect on every state change
+        const hasActiveJobs = Object.values(jobsByContentRef.current).some(jobs =>
           jobs.some(job => job.status === "generating" || job.status === "pending")
         );
 
@@ -128,7 +138,7 @@ export function useGenerationJobs(options: UseGenerationJobsOptions = {}): UseGe
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [autoPoll, pollInterval, fetchJobs, jobsByContent]);
+  }, [autoPoll, pollInterval, fetchJobs]);
 
   const activeJobs = Object.values(jobsByContent)
     .flat()

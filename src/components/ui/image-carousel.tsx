@@ -47,6 +47,7 @@ export function ImageCarousel({
 }: ImageCarouselProps) {
   const [internalIndex, setInternalIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(true);
 
   // Support controlled mode
   const isControlled = controlledIndex !== undefined;
@@ -81,6 +82,11 @@ export function ImageCarousel({
   const safeIndex = Math.min(currentIndex, validImages.length - 1);
   const currentImage = validImages[safeIndex];
 
+  // Reset loading state when current image changes
+  useEffect(() => {
+    setIsImageLoading(true);
+  }, [safeIndex]);
+
   const goToPrevious = () => {
     const newIndex = safeIndex > 0 ? safeIndex - 1 : validImages.length - 1;
     setCurrentIndex(newIndex);
@@ -110,11 +116,20 @@ export function ImageCarousel({
               poster={undefined}
             />
           ) : (
-            <img
-              src={currentImage.url}
-              alt={`Generated image ${safeIndex + 1} of ${validImages.length}`}
-              className="w-full h-full object-cover"
-            />
+            <>
+              {isImageLoading && (
+                <div className="absolute inset-0 bg-zinc-800 animate-pulse flex items-center justify-center">
+                  <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-400 rounded-full animate-spin" />
+                </div>
+              )}
+              <img
+                src={currentImage.url}
+                alt={`Generated image ${safeIndex + 1} of ${validImages.length}`}
+                className={cn("w-full h-full object-cover transition-opacity", isImageLoading ? "opacity-0" : "opacity-100")}
+                onLoad={() => setIsImageLoading(false)}
+                onError={() => setIsImageLoading(false)}
+              />
+            </>
           )}
 
           {/* Model badge - top left */}
