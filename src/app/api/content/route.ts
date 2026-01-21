@@ -70,6 +70,27 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    // If approving content, clear the design systems from metadata
+    // This allows fresh design systems to be generated for future edits
+    if (updates.status === "approved") {
+      // Fetch current content to get existing metadata
+      const { data: existing } = await supabase
+        .from("content")
+        .select("metadata")
+        .eq("id", id)
+        .single();
+
+      if (existing?.metadata) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const metadata = existing.metadata as Record<string, any>;
+        // Remove designSystems but keep other metadata
+        const { designSystems, ...restMetadata } = metadata;
+        if (designSystems) {
+          updates.metadata = restMetadata;
+        }
+      }
+    }
+
     const { data: content, error } = await supabase
       .from("content")
       .update(updates)

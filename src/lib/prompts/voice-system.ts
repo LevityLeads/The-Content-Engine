@@ -44,6 +44,23 @@ export interface VoiceConfig {
   };
 }
 
+// Saved design system preset structure
+export interface SavedDesignSystemPreset {
+  id: string;
+  name: string;
+  visualStyle: string; // e.g., "typography", "photorealistic"
+  designSystem: {
+    background: string;
+    primaryColor: string;
+    accentColor: string;
+    typography: string;
+    layout: string;
+    mood: string;
+    textOverlay?: string;
+  };
+  createdAt: string;
+}
+
 // Visual config interface for brand colors/styling
 export interface VisualConfig {
   primary_color?: string;
@@ -57,6 +74,7 @@ export interface VisualConfig {
   color_palette?: string[];
   example_posts?: string[]; // User-uploaded example images (base64 or URLs)
   master_brand_prompt?: string; // AI-generated visual brand description from example posts
+  savedDesignSystems?: SavedDesignSystemPreset[]; // Saved design system presets
 }
 
 export const VOICE_ARCHETYPES = {

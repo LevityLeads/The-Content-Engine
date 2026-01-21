@@ -239,7 +239,7 @@ OUTPUT: Return ONLY the image prompt with a unique scene for this specific slide
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contentId, slides, visualStyle, mediaType, brandId } = body;
+    const { contentId, slides, visualStyle, mediaType, brandId, forceRegenerate } = body;
     const effectiveStyle = visualStyle || "photorealistic";
     const effectiveMediaType = (mediaType || "image") as "image" | "video";
 
@@ -313,11 +313,11 @@ export async function POST(request: NextRequest) {
     // Check for existing design system for this style
     const existingMetadata = (content.metadata || {}) as Record<string, unknown>;
     const existingDesignSystems = (existingMetadata.designSystems || {}) as Record<string, DesignSystem>;
-    let designSystem: DesignSystem | null = existingDesignSystems[effectiveStyle] || null;
+    let designSystem: DesignSystem | null = forceRegenerate ? null : (existingDesignSystems[effectiveStyle] || null);
 
-    // If no design system exists for this style, generate one
+    // If no design system exists for this style (or forceRegenerate), generate one
     if (!designSystem) {
-      console.log(`Generating new design system for style: ${effectiveStyle}`);
+      console.log(`${forceRegenerate ? 'Force regenerating' : 'Generating new'} design system for style: ${effectiveStyle}`);
 
       // Use ALL carousel slides for design system context (not just requested slides)
       // This ensures consistency even when generating slides one at a time
