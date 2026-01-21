@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles, ExternalLink, Unlink, X, Video, DollarSign, Trash2 } from "lucide-react";
+import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles, ExternalLink, Unlink, X, Video, DollarSign, Upload, ImageIcon, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -90,6 +90,10 @@ function SettingsPageContent() {
   // Delete dialog state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  // Example posts state
+  const [examplePosts, setExamplePosts] = useState<string[]>([]);
+  const [isAnalyzingVisuals, setIsAnalyzingVisuals] = useState(false);
+
   // Handle OAuth callback messages from URL params
   useEffect(() => {
     const success = searchParams.get("success");
@@ -149,6 +153,8 @@ function SettingsPageContent() {
       setVisualConfig(selectedBrand.visual_config || {});
       // Pre-fill analyze URL with existing source URL if available
       setAnalyzeUrl(selectedBrand.voice_config?.source_url || "");
+      // Load example posts if they exist
+      setExamplePosts(selectedBrand.visual_config?.example_posts || []);
       // Fetch social accounts for this brand
       fetchSocialAccounts();
       // Fetch video usage and config
@@ -313,6 +319,91 @@ function SettingsPageContent() {
       setSaveMessage({ type: "error", text: "Network error. Please try again." });
     } finally {
       setIsAnalyzing(false);
+      setTimeout(() => setSaveMessage(null), 5000);
+    }
+  };
+
+  // Handle example post image upload
+  const handleExamplePostUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const maxPosts = 3;
+    const remainingSlots = maxPosts - examplePosts.length;
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+
+    const newPosts: string[] = [];
+
+    for (const file of filesToProcess) {
+      if (!file.type.startsWith("image/")) continue;
+
+      // Convert to base64
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      newPosts.push(base64);
+    }
+
+    setExamplePosts((prev) => [...prev, ...newPosts].slice(0, maxPosts));
+    // Reset the file input
+    e.target.value = "";
+  };
+
+  // Remove an example post
+  const handleRemoveExamplePost = (index: number) => {
+    setExamplePosts((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Analyze example posts with AI to generate master brand prompt
+  const handleAnalyzeExamplePosts = async () => {
+    if (examplePosts.length === 0 || !selectedBrand) return;
+
+    setIsAnalyzingVisuals(true);
+    setSaveMessage(null);
+
+    try {
+      const res = await fetch("/api/brands/analyze-visuals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: examplePosts }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.analysis) {
+        // Update visual config with example posts and master prompt
+        const updatedVisualConfig: VisualConfig = {
+          ...visualConfig,
+          example_posts: examplePosts,
+          master_brand_prompt: data.analysis.master_brand_prompt,
+          // Optionally update colors if detected
+          ...(data.analysis.colors?.primary && { primary_color: data.analysis.colors.primary }),
+          ...(data.analysis.colors?.accent && { accent_color: data.analysis.colors.accent }),
+        };
+
+        setVisualConfig(updatedVisualConfig);
+
+        // Save to database
+        const result = await updateBrand(selectedBrand.id, {
+          visual_config: updatedVisualConfig,
+        });
+
+        if (result) {
+          setSaveMessage({ type: "success", text: "Visual brand analyzed! Master prompt generated." });
+        } else {
+          setSaveMessage({ type: "error", text: "Analysis succeeded but failed to save" });
+        }
+      } else {
+        setSaveMessage({ type: "error", text: data.error || "Failed to analyze images" });
+      }
+    } catch (err) {
+      console.error("Error analyzing example posts:", err);
+      setSaveMessage({ type: "error", text: "Network error. Please try again." });
+    } finally {
+      setIsAnalyzingVisuals(false);
       setTimeout(() => setSaveMessage(null), 5000);
     }
   };
@@ -853,6 +944,80 @@ function SettingsPageContent() {
                 <p className="text-xs text-muted-foreground mt-1">Used for body text & captions</p>
               </div>
             </div>
+          </div>
+
+          {/* Example Posts - Visual Brand Reference */}
+          <div className="pt-4 border-t">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4" />
+                  Example Posts
+                </label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload 2-3 example posts from this brand. AI will analyze them to create a master visual prompt.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3 flex gap-3 flex-wrap">
+              {examplePosts.map((post, i) => (
+                <div key={i} className="relative group">
+                  <img
+                    src={post}
+                    alt={`Example post ${i + 1}`}
+                    className="h-24 w-24 rounded-lg object-cover border"
+                  />
+                  <button
+                    onClick={() => handleRemoveExamplePost(i)}
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+
+              {examplePosts.length < 3 && (
+                <label className="h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
+                  <Upload className="h-6 w-6 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground mt-1">Upload</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleExamplePostUpload}
+                  />
+                </label>
+              )}
+            </div>
+
+            {examplePosts.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <Button
+                  onClick={handleAnalyzeExamplePosts}
+                  disabled={isAnalyzingVisuals}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {isAnalyzingVisuals ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  {isAnalyzingVisuals ? "Analyzing..." : "Analyze & Generate Brand Prompt"}
+                </Button>
+
+                {visualConfig.master_brand_prompt && (
+                  <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                    <p className="text-xs font-medium text-emerald-400 mb-1">Master Brand Prompt Generated</p>
+                    <p className="text-xs text-muted-foreground line-clamp-3">
+                      {visualConfig.master_brand_prompt}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {visualConfig.extracted_images && visualConfig.extracted_images.length > 0 && (
