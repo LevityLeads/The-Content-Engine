@@ -163,12 +163,13 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE a brand
+// DELETE a brand with cascade deletion
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
+    const confirm = searchParams.get("confirm");
 
     if (!id) {
       return NextResponse.json(
@@ -177,26 +178,86 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Check if brand has associated content
-    const { count } = await supabase
-      .from("content")
-      .select("*", { count: "exact", head: true })
-      .eq("brand_id", id);
-
-    if (count && count > 0) {
+    // Require explicit confirmation to delete
+    if (confirm !== "delete") {
       return NextResponse.json(
-        { error: "Cannot delete brand with existing content. Delete content first." },
+        { error: "Deletion requires confirmation. Pass confirm=delete to proceed." },
         { status: 400 }
       );
     }
 
-    const { error } = await supabase
+    // Get counts for response
+    const [
+      { count: contentCount },
+      { count: ideasCount },
+      { count: inputsCount },
+      { count: imagesCount },
+    ] = await Promise.all([
+      supabase.from("content").select("*", { count: "exact", head: true }).eq("brand_id", id),
+      supabase.from("ideas").select("*", { count: "exact", head: true }).eq("brand_id", id),
+      supabase.from("inputs").select("*", { count: "exact", head: true }).eq("brand_id", id),
+      supabase.from("images").select("*", { count: "exact", head: true }).eq("brand_id", id),
+    ]);
+
+    // Delete all related data in order (respecting foreign key constraints)
+    // 1. Delete images (linked to content)
+    const { error: imagesError } = await supabase
+      .from("images")
+      .delete()
+      .eq("brand_id", id);
+
+    if (imagesError) {
+      console.error("Error deleting images:", imagesError);
+    }
+
+    // 2. Delete content
+    const { error: contentError } = await supabase
+      .from("content")
+      .delete()
+      .eq("brand_id", id);
+
+    if (contentError) {
+      console.error("Error deleting content:", contentError);
+    }
+
+    // 3. Delete ideas
+    const { error: ideasError } = await supabase
+      .from("ideas")
+      .delete()
+      .eq("brand_id", id);
+
+    if (ideasError) {
+      console.error("Error deleting ideas:", ideasError);
+    }
+
+    // 4. Delete inputs
+    const { error: inputsError } = await supabase
+      .from("inputs")
+      .delete()
+      .eq("brand_id", id);
+
+    if (inputsError) {
+      console.error("Error deleting inputs:", inputsError);
+    }
+
+    // 5. Delete social accounts
+    const { error: socialError } = await supabase
+      .from("social_accounts")
+      .delete()
+      .eq("brand_id", id);
+
+    if (socialError) {
+      console.error("Error deleting social accounts:", socialError);
+    }
+
+    // 6. Finally, delete the brand itself
+    const { error: brandError } = await supabase
       .from("brands")
       .delete()
       .eq("id", id);
 
-    if (error) {
-      console.error("Error deleting brand:", error);
+    if (brandError) {
+      console.error("Error deleting brand:", brandError);
       return NextResponse.json(
         { error: "Failed to delete brand" },
         { status: 500 }
@@ -205,6 +266,12 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      deleted: {
+        content: contentCount || 0,
+        ideas: ideasCount || 0,
+        inputs: inputsCount || 0,
+        images: imagesCount || 0,
+      },
     });
   } catch (error) {
     console.error("Error in DELETE /api/brands:", error);
