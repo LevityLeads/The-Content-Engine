@@ -34,15 +34,17 @@ export const VIDEO_MODEL_OPTIONS = Object.entries(VIDEO_MODELS).map(([key, value
 }));
 
 // Platform-specific video settings
+// Note: Veo API only supports 16:9, 9:16, and 1:1 aspect ratios
 export const PLATFORM_VIDEO_CONFIG = {
   instagram: {
     // Instagram Reels / Carousel first slide
+    // Veo doesn't support 4:5, so we use 9:16 for vertical content
     aspectRatios: {
-      feed: "4:5",      // Portrait for feed
+      feed: "9:16",      // Vertical (closest to 4:5 that Veo supports)
       reels: "9:16",    // Vertical for reels
       story: "9:16",    // Vertical for stories
     },
-    defaultAspectRatio: "4:5",
+    defaultAspectRatio: "9:16",
     maxDuration: 8,
     recommendedDuration: 5,
     supportsAudio: true,
