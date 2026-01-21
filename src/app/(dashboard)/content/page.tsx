@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Calendar, ArrowRight, Video, Play } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
-import { VIDEO_MODEL_OPTIONS, DEFAULT_VIDEO_MODEL, type VideoModelKey } from "@/lib/video-models";
+import { VIDEO_MODEL_OPTIONS, DEFAULT_VIDEO_MODEL, VIDEO_MODELS, type VideoModelKey } from "@/lib/video-models";
+import { estimateVideoCost } from "@/lib/video-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -150,6 +151,8 @@ export default function ContentPage() {
   const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
   const [generatingAllVideos, setGeneratingAllVideos] = useState<string | null>(null);
   const [selectedVideoModel, setSelectedVideoModel] = useState<VideoModelKey>(DEFAULT_VIDEO_MODEL);
+  const [includeAudio, setIncludeAudio] = useState<boolean>(false);
+  const [videoDuration, setVideoDuration] = useState<number>(5);
   const [mediaMode, setMediaMode] = useState<"image" | "video">("image");
   const [generatingPrompt, setGeneratingPrompt] = useState<string | null>(null);
   const [videoPrompts, setVideoPrompts] = useState<Record<string, string>>({});
@@ -277,7 +280,7 @@ export default function ContentPage() {
         const imgMap: Record<number, CarouselImage[]> = {};
         const unmatchedImages: CarouselImage[] = [];
 
-        data.images.forEach((img: ContentImage & { created_at?: string }) => {
+        data.images.forEach((img: ContentImage & { created_at?: string; slide_number?: number }) => {
           if (img.url && !img.url.startsWith("placeholder:")) {
             const carouselImg: CarouselImage = {
               id: img.id,
@@ -285,8 +288,20 @@ export default function ContentPage() {
               model: img.model,
               createdAt: img.created_at,
               prompt: img.prompt,
+              mediaType: img.media_type,
+              durationSeconds: img.duration_seconds,
             };
 
+            // First check if slide_number is set directly in the database
+            if (img.slide_number && img.slide_number > 0) {
+              if (!imgMap[img.slide_number]) {
+                imgMap[img.slide_number] = [];
+              }
+              imgMap[img.slide_number].push(carouselImg);
+              return; // Found match, continue to next image
+            }
+
+            // Fall back to matching by prompt pattern
             const patterns = [
               /^\[slide\s*(\d+)\]/i,
               /slide\s*(\d+)\s*:/i,
@@ -483,8 +498,8 @@ export default function ContentPage() {
           contentId,
           prompt: videoPrompt,
           model: selectedVideoModel,
-          duration: 5,
-          includeAudio: false,
+          duration: videoDuration,
+          includeAudio: includeAudio,
           slideNumber,
         }),
       });
@@ -1898,6 +1913,80 @@ export default function ContentPage() {
                 </select>
               </div>
 
+              {/* Duration and Audio Settings */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Duration</label>
+                  <select
+                    className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs"
+                    value={videoDuration}
+                    onChange={(e) => setVideoDuration(parseInt(e.target.value))}
+                  >
+                    <option value={3}>3 sec</option>
+                    <option value={4}>4 sec</option>
+                    <option value={5}>5 sec</option>
+                    <option value={6}>6 sec</option>
+                    <option value={7}>7 sec</option>
+                    <option value={8}>8 sec</option>
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Audio</label>
+                  <button
+                    className={cn(
+                      "w-full h-7 rounded-md border px-2 text-xs flex items-center justify-center gap-1.5 transition-colors",
+                      includeAudio
+                        ? "bg-purple-600 border-purple-600 text-white"
+                        : "bg-background border-input text-muted-foreground hover:border-purple-500/50"
+                    )}
+                    onClick={() => setIncludeAudio(!includeAudio)}
+                  >
+                    {includeAudio ? (
+                      <>
+                        <Check className="h-3 w-3" />
+                        On
+                      </>
+                    ) : (
+                      "Off"
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Cost Estimate */}
+              {(() => {
+                const estimate = estimateVideoCost(selectedVideoModel, videoDuration, includeAudio);
+                const totalForAllSlides = estimate.totalCost * slides.length;
+                return (
+                  <div className="rounded-lg bg-muted/40 border border-muted p-2.5">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-medium text-muted-foreground">Estimated Cost</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        ${totalForAllSlides.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="text-[9px] text-muted-foreground space-y-0.5">
+                      <div className="flex justify-between">
+                        <span>Video ({videoDuration}s × ${VIDEO_MODELS[selectedVideoModel].costPerSecond}/s)</span>
+                        <span>${(videoDuration * VIDEO_MODELS[selectedVideoModel].costPerSecond * slides.length).toFixed(2)}</span>
+                      </div>
+                      {includeAudio && (
+                        <div className="flex justify-between">
+                          <span>Audio ({videoDuration}s × ${VIDEO_MODELS[selectedVideoModel].audioCostPerSecond}/s)</span>
+                          <span>${(videoDuration * VIDEO_MODELS[selectedVideoModel].audioCostPerSecond * slides.length).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {slides.length > 1 && (
+                        <div className="flex justify-between pt-0.5 border-t border-muted mt-1">
+                          <span>× {slides.length} videos</span>
+                          <span className="font-medium">${totalForAllSlides.toFixed(2)} total</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Generate All Videos Button */}
               <Button
                 className="w-full h-8 bg-purple-600 hover:bg-purple-700"
@@ -2089,17 +2178,38 @@ export default function ContentPage() {
                   >
                     {cardImage ? (
                       <div className="relative w-full h-full">
-                        <img
-                          src={cardImage.url}
-                          alt={`Slide ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
+                        {cardImage.mediaType === "video" ? (
+                          <>
+                            <video
+                              src={cardImage.url}
+                              className="w-full h-full object-cover"
+                              muted
+                              loop
+                              playsInline
+                              autoPlay={isCurrent}
+                            />
+                            {!isCurrent && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
+                                  <Play className="h-6 w-6 text-black ml-1" fill="currentColor" />
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <img
+                            src={cardImage.url}
+                            alt={`Slide ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
                         <Badge
                           className={cn(
                             "absolute top-2 right-2 border-0",
                             isCurrent ? "bg-primary text-primary-foreground" : "bg-black/60 text-white"
                           )}
                         >
+                          {cardImage.mediaType === "video" && <Video className="h-3 w-3 mr-1" />}
                           {idx + 1}
                         </Badge>
                         {isCurrent && (
@@ -2145,19 +2255,31 @@ export default function ContentPage() {
             {slides.map((s, idx) => {
               const thumbImage = getSlideImage(idx);
               const isCurrent = idx === currentSlideIdx;
+              const isVideo = thumbImage?.mediaType === "video";
               return (
                 <button
                   key={s.slideNumber}
                   onClick={() => setCurrentSlide(item.id, idx)}
                   className={cn(
-                    "w-16 h-20 rounded-lg overflow-hidden border-2 transition-all",
+                    "w-16 h-20 rounded-lg overflow-hidden border-2 transition-all relative",
                     isCurrent
                       ? "border-primary ring-2 ring-primary/30 scale-105"
                       : "border-muted opacity-60 hover:opacity-100"
                   )}
                 >
                   {thumbImage ? (
-                    <img src={thumbImage.url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+                    <>
+                      {isVideo ? (
+                        <video src={thumbImage.url} className="w-full h-full object-cover" muted />
+                      ) : (
+                        <img src={thumbImage.url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+                      )}
+                      {isVideo && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <Play className="h-4 w-4 text-white" fill="currentColor" />
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="w-full h-full bg-muted/50 flex items-center justify-center">
                       <span className="text-xs text-muted-foreground">{idx + 1}</span>
