@@ -90,7 +90,8 @@ git push -u origin claude/your-branch  # Auto-merges to main → Vercel deploys
 | Auth | Supabase Auth | - |
 | AI - Text | Claude Opus 4.5 | claude-opus-4-5-20251101 |
 | AI - Images | Google Gemini | gemini-2.5-flash-image |
-| Publishing | Late.dev API | (integration pending) |
+| AI - Video | Google Veo 3 | veo-3.1-fast, veo-3.0 |
+| Publishing | Late.dev API | Implemented |
 | Hosting | Vercel | - |
 
 ## Project Structure
@@ -102,41 +103,63 @@ src/
 │   │   ├── inputs/           # Input capture page
 │   │   ├── ideas/            # Idea review page
 │   │   ├── content/          # Content generation & review
-│   │   ├── calendar/         # Scheduling (stub)
+│   │   ├── calendar/         # Scheduling with magic schedule
 │   │   ├── analytics/        # Analytics (stub)
+│   │   ├── experiments/      # Experiments page
 │   │   └── settings/         # Brand & account settings
 │   ├── api/                  # API routes
-│   │   ├── brands/           # Brand CRUD + website analyzer
-│   │   ├── inputs/           # POST/GET inputs
+│   │   ├── brands/           # Brand CRUD + website analyzer + delete
+│   │   ├── inputs/           # POST/GET inputs + image analysis
 │   │   ├── ideas/            # Ideas CRUD + generate
-│   │   ├── content/          # Content CRUD + generate
-│   │   └── images/           # Image generation routes
+│   │   ├── content/          # Content CRUD + generate + publish
+│   │   ├── images/           # Image generation (single + carousel)
+│   │   ├── videos/           # Video generation (Veo 3)
+│   │   ├── social-accounts/  # Late.dev OAuth + account linking
+│   │   └── schedule/         # Best time to post suggestions
 │   └── layout.tsx            # Root layout
 ├── components/
-│   ├── brand/                # Brand switcher, creation dialog
+│   ├── brand/                # Brand switcher, creation, deletion dialogs
+│   ├── video/                # Video cost dialog
 │   ├── ui/                   # Base components (button, card, etc.)
 │   └── layout/               # Layout components (sidebar)
 ├── contexts/
 │   └── brand-context.tsx     # Multi-client brand state management
 ├── hooks/
-│   └── use-brand-api.ts      # Brand-aware API helpers
+│   ├── use-brand-api.ts      # Brand-aware API helpers
+│   └── use-generation-jobs.ts # Async job polling
 ├── lib/
-│   ├── prompts/              # AI prompt system (~1300 lines)
+│   ├── prompts/              # AI prompt system
 │   │   ├── ideation-prompt.ts
 │   │   ├── content-prompt.ts
 │   │   ├── voice-system.ts
 │   │   ├── hook-library.ts
-│   │   └── content-pillars.ts
+│   │   ├── content-pillars.ts
+│   │   ├── visual-styles.ts
+│   │   └── marketer-persona.ts
+│   ├── slide-templates/      # Carousel design system
+│   │   ├── types.ts          # Design system types & presets
+│   │   └── templates.tsx     # Slide template components
+│   ├── late/                 # Late.dev API integration
+│   │   ├── client.ts         # Publishing API client
+│   │   └── types.ts          # Late.dev types
+│   ├── scheduling/           # Scheduling utilities
+│   │   └── best-practices.ts # Platform posting times
 │   ├── supabase/             # Database clients
-│   └── image-models.ts       # Image generation config
+│   ├── image-models.ts       # Image generation config
+│   ├── video-models.ts       # Veo 3 video config
+│   └── video-utils.ts        # Video cost estimation
 └── types/
     └── database.ts           # Supabase types
 
 supabase/
-└── migrations/               # Database migrations
+└── migrations/
+    ├── 001_initial_schema.sql
+    ├── 002_generation_jobs.sql
+    └── 003_video_support.sql
 
 docs/
-└── PRD.md                    # Product Requirements Document
+├── PRD.md                    # Product Requirements Document
+└── AUDIT_REPORT.md           # Codebase audit report
 ```
 
 ## Multi-Client System
@@ -147,8 +170,10 @@ The dashboard supports multiple clients/brands with isolated data and customizab
 1. **Brand Switcher**: Dropdown in sidebar to switch between clients
 2. **Add New Client**: Enter name + website URL → AI extracts brand guidelines
 3. **Website Analysis**: Claude analyzes the site for voice/tone, Gemini extracts colors
-4. **Style Guide**: Editable brand voice, colors, and strictness settings
-5. **Data Isolation**: Each client's inputs, ideas, and content are separate
+4. **Example Posts Analysis**: Upload example posts for visual style alignment
+5. **Style Guide**: Editable brand voice, colors, and strictness settings
+6. **Data Isolation**: Each client's inputs, ideas, and content are separate
+7. **Brand Deletion**: Double-confirmation deletion with data preview
 
 ### Brand Configuration
 ```typescript
@@ -184,15 +209,16 @@ All data endpoints support `?brandId=xxx` query param for filtering by client.
 ## Content Pipeline
 
 ```
-INPUT → PARSE → IDEATE → [HUMAN REVIEW] → GENERATE → [HUMAN REVIEW] → PUBLISH
+INPUT → PARSE → IDEATE → [HUMAN REVIEW] → GENERATE → [HUMAN REVIEW] → SCHEDULE → PUBLISH
 ```
 
 1. **Input**: Text, URL, or document upload
 2. **Ideation**: Claude generates 4 content ideas per input
 3. **Review**: User approves/rejects ideas
-4. **Generation**: Claude writes copy, Gemini creates images
+4. **Generation**: Claude writes copy, Gemini creates images/videos
 5. **Review**: User edits/approves content
-6. **Publish**: Schedule or post via Late.dev (Coming Soon)
+6. **Schedule**: Magic schedule button for optimal posting times
+7. **Publish**: Post via Late.dev integration (supports republishing)
 
 ## Git Workflow
 
@@ -272,7 +298,7 @@ SUPABASE_SERVICE_ROLE_KEY= # For admin operations
 
 ### Claude (Text Generation)
 - Model: `claude-opus-4-5-20251101`
-- Used for: Ideation, copywriting
+- Used for: Ideation, copywriting, brand voice analysis
 - Prompts in: `src/lib/prompts/`
 - Max tokens: 4096
 
@@ -284,6 +310,32 @@ SUPABASE_SERVICE_ROLE_KEY= # For admin operations
   | Instagram | 4:5 | 1080x1350 |
   | Twitter | 16:9 | 1600x900 |
   | LinkedIn | 16:9 | 1200x675 |
+
+### Veo 3 (Video Generation)
+- Models: `veo-3.1-fast` (cost-effective), `veo-3.0` (highest quality)
+- Pricing:
+  | Model | Video | Audio | Max Duration |
+  |-------|-------|-------|--------------|
+  | Veo 3.1 Fast | $0.15/sec | $0.10/sec | 8 sec |
+  | Veo 3.0 Standard | $0.50/sec | $0.25/sec | 8 sec |
+- Platform aspect ratios:
+  | Platform | Aspect Ratio | Notes |
+  |----------|--------------|-------|
+  | Instagram | 9:16 | Vertical (Reels/Stories) |
+  | Twitter | 16:9 | Landscape |
+  | LinkedIn | 16:9 | Landscape |
+- Supports mixed carousels (video as slide 1 + image slides)
+- Cost estimation and budget controls built-in
+
+### Slide Templates (Carousel Design System)
+Five preset visual styles for consistent carousels:
+| Style | Description |
+|-------|-------------|
+| `bold-editorial` | Bold, premium feel (72px headlines) |
+| `clean-modern` | Clean, professional (64px headlines) |
+| `dramatic` | Impactful, attention-grabbing (84px headlines) |
+| `minimal` | Elegant, understated (56px headlines) |
+| `statement` | Bold, commanding (96px headlines) |
 
 ### Carousel Rules (Critical)
 Each slide's image prompt must be **fully self-contained** - no references to other slides. Include complete design spec in every prompt:
@@ -405,14 +457,29 @@ Use `/role:handoff` to document session state when passing work to another role 
 | Brand context | `src/contexts/brand-context.tsx` |
 | Brand switcher | `src/components/brand/brand-switcher.tsx` |
 | Brand creation | `src/components/brand/brand-creation-dialog.tsx` |
+| Brand deletion | `src/components/brand/brand-deletion-dialog.tsx` |
 | Website analyzer API | `src/app/api/brands/analyze/route.ts` |
+| Visual analyzer API | `src/app/api/brands/analyze-visuals/route.ts` |
 | Brands API | `src/app/api/brands/route.ts` |
 | Ideation prompts | `src/lib/prompts/ideation-prompt.ts` |
 | Content prompts | `src/lib/prompts/content-prompt.ts` |
 | Voice system | `src/lib/prompts/voice-system.ts` |
 | Hook patterns | `src/lib/prompts/hook-library.ts` |
+| Visual styles | `src/lib/prompts/visual-styles.ts` |
 | Image generation | `src/app/api/images/generate/route.ts` |
+| Carousel generation | `src/app/api/images/carousel/route.ts` |
 | Image models | `src/lib/image-models.ts` |
+| Video generation | `src/app/api/videos/generate/route.ts` |
+| Video models | `src/lib/video-models.ts` |
+| Video utilities | `src/lib/video-utils.ts` |
+| Video cost dialog | `src/components/video/video-cost-dialog.tsx` |
+| Slide templates | `src/lib/slide-templates/types.ts` |
+| Late.dev client | `src/lib/late/client.ts` |
+| Publish API | `src/app/api/content/publish/route.ts` |
+| Social accounts API | `src/app/api/social-accounts/route.ts` |
+| Schedule suggestions | `src/app/api/schedule/suggest/route.ts` |
+| Best practices | `src/lib/scheduling/best-practices.ts` |
+| Generation jobs hook | `src/hooks/use-generation-jobs.ts` |
 | Database types | `src/types/database.ts` |
 | PRD | `docs/PRD.md` |
 | Rules | `RULES.md` |
@@ -423,11 +490,13 @@ Use `/role:handoff` to document session state when passing work to another role 
 |-------|---------|
 | `organizations` | Multi-tenant support (parent of brands) |
 | `brands` | Client/brand config with `voice_config` and `visual_config` JSON |
-| `social_accounts` | Connected platforms per brand (Coming Soon) |
+| `social_accounts` | Connected platforms per brand via Late.dev |
 | `inputs` | Raw content capture (filtered by `brand_id`) |
 | `ideas` | Generated content ideas (filtered by `brand_id`) |
 | `content` | Platform-specific posts (filtered by `brand_id`) |
 | `images` | Generated images (linked to content) |
+| `generation_jobs` | Async job tracking for content/image generation |
+| `video_generation` | Video generation tracking and budget management |
 | `analytics` | Post performance metrics |
 | `feedback_events` | Learning system data |
 

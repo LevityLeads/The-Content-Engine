@@ -36,7 +36,7 @@ All generated images must use the correct aspect ratio for their platform:
 | LinkedIn | 16:9 | 1200x675 | Landscape (optimal professional feed) |
 
 ### Image Model
-- **Current model**: Nano Banana Flash (`gemini-2.5-flash-image`)
+- **Current model**: Gemini 2.5 Flash Image (`gemini-2.5-flash-image`)
 - Fast generation (3-5 seconds)
 - Supports aspect ratios: `1:1`, `4:5`, `16:9`, `9:16`
 
@@ -45,6 +45,61 @@ All images should include:
 - Scroll-stopping headlines with bold, readable typography
 - Text that is large, high-contrast, and legible on mobile
 - Visual hierarchy that draws the eye to key messages
+
+---
+
+## Video Generation Rules
+
+### Video Models
+| Model | Speed | Cost/sec | Audio Cost/sec | Best For |
+|-------|-------|----------|----------------|----------|
+| Veo 3.1 Fast | Fast | $0.15 | $0.10 | Quick iterations, cost-effective |
+| Veo 3.0 Standard | Slow | $0.50 | $0.25 | Highest quality, premium content |
+
+### Platform-Specific Aspect Ratios
+- **Instagram**: 9:16 (vertical - Reels/Stories)
+- **Twitter/LinkedIn**: 16:9 (landscape)
+
+### Duration Limits
+- Minimum: 3 seconds
+- Maximum: 8 seconds
+- Recommended: 5-6 seconds
+
+### Mixed Carousels
+Video can be slide 1 of a carousel (Instagram, LinkedIn only):
+- Twitter does NOT support mixed carousels
+- Video generates first, then static image slides follow
+
+### Cost Controls
+- Always show cost estimate before generation
+- Budget validation prevents overspending
+- Usage tracking per brand
+
+---
+
+## Slide Templates (Carousel Design System)
+
+### Available Style Presets
+| Preset | Headline Size | Weight | Aesthetic |
+|--------|--------------|--------|-----------|
+| `bold-editorial` | 72px | 700 | Bold, editorial, premium |
+| `clean-modern` | 64px | 600 | Clean, modern, professional |
+| `dramatic` | 84px | 800 | Dramatic, impactful |
+| `minimal` | 56px | 500 | Minimal, elegant |
+| `statement` | 96px | 700 | Statement, commanding |
+
+### Color Presets
+| Preset | Primary | Accent | Background |
+|--------|---------|--------|------------|
+| `white-coral` | #ffffff | #ff6b6b | Dark |
+| `white-teal` | #ffffff | #20b2aa | Dark |
+| `white-gold` | #f5f5dc | #d4af37 | Dark |
+| `white-blue` | #ffffff | #3b82f6 | Dark |
+| `dark-coral` | #1a1a1a | #ff6b6b | Light |
+| `dark-blue` | #1a1a1a | #2563eb | Light |
+
+### Design System Usage
+Templates are rendered programmatically via Satori for pixel-perfect consistency across all carousel slides.
 
 ---
 
@@ -154,6 +209,31 @@ GEMINI_API_KEY=        # Google Gemini for image generation
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
+
+---
+
+## Late.dev Publishing
+
+### Connection Flow
+1. User clicks "Connect" on a platform in Settings
+2. OAuth flow via Late.dev
+3. Account linked to brand
+4. Same Late.dev account can link to multiple brands
+
+### Publishing States
+```
+draft → approved → scheduled → published
+```
+
+### Republishing
+- Published content can be republished
+- Creates new post on platform
+- Useful for evergreen content
+
+### Scheduling
+- Magic schedule button suggests optimal posting times
+- Based on platform best practices
+- Times stored in content record
 
 ---
 
