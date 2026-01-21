@@ -288,6 +288,8 @@ export default function ContentPage() {
               model: img.model,
               createdAt: img.created_at,
               prompt: img.prompt,
+              mediaType: img.media_type,
+              durationSeconds: img.duration_seconds,
             };
 
             const patterns = [
@@ -2166,17 +2168,38 @@ export default function ContentPage() {
                   >
                     {cardImage ? (
                       <div className="relative w-full h-full">
-                        <img
-                          src={cardImage.url}
-                          alt={`Slide ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
+                        {cardImage.mediaType === "video" ? (
+                          <>
+                            <video
+                              src={cardImage.url}
+                              className="w-full h-full object-cover"
+                              muted
+                              loop
+                              playsInline
+                              autoPlay={isCurrent}
+                            />
+                            {!isCurrent && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
+                                  <Play className="h-6 w-6 text-black ml-1" fill="currentColor" />
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <img
+                            src={cardImage.url}
+                            alt={`Slide ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
                         <Badge
                           className={cn(
                             "absolute top-2 right-2 border-0",
                             isCurrent ? "bg-primary text-primary-foreground" : "bg-black/60 text-white"
                           )}
                         >
+                          {cardImage.mediaType === "video" && <Video className="h-3 w-3 mr-1" />}
                           {idx + 1}
                         </Badge>
                         {isCurrent && (
@@ -2222,19 +2245,31 @@ export default function ContentPage() {
             {slides.map((s, idx) => {
               const thumbImage = getSlideImage(idx);
               const isCurrent = idx === currentSlideIdx;
+              const isVideo = thumbImage?.mediaType === "video";
               return (
                 <button
                   key={s.slideNumber}
                   onClick={() => setCurrentSlide(item.id, idx)}
                   className={cn(
-                    "w-16 h-20 rounded-lg overflow-hidden border-2 transition-all",
+                    "w-16 h-20 rounded-lg overflow-hidden border-2 transition-all relative",
                     isCurrent
                       ? "border-primary ring-2 ring-primary/30 scale-105"
                       : "border-muted opacity-60 hover:opacity-100"
                   )}
                 >
                   {thumbImage ? (
-                    <img src={thumbImage.url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+                    <>
+                      {isVideo ? (
+                        <video src={thumbImage.url} className="w-full h-full object-cover" muted />
+                      ) : (
+                        <img src={thumbImage.url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+                      )}
+                      {isVideo && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <Play className="h-4 w-4 text-white" fill="currentColor" />
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="w-full h-full bg-muted/50 flex items-center justify-center">
                       <span className="text-xs text-muted-foreground">{idx + 1}</span>
