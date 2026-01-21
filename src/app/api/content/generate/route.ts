@@ -86,11 +86,42 @@ export async function POST(request: NextRequest) {
     } | null;
     const brandVoicePrompt = buildVoicePrompt(voiceConfig, visualConfig);
 
-    // For AI prompt, only pass valid IMAGE styles, not "video" or "mixed-carousel"
-    // which are special modes for video generation. The AI doesn't know these styles.
-    // We'll store the original visualStyle in metadata for the carousel API to use.
-    const isVideoMode = visualStyle === "video" || visualStyle === "mixed-carousel";
+    // Determine content mode based on visualStyle
+    // - "video" = Single video post (no carousel)
+    // - "mixed-carousel" = Carousel with video slide(s) + images
+    // - other styles = Regular carousel with images only
+    const isSingleVideoMode = visualStyle === "video";
+    const isMixedCarouselMode = visualStyle === "mixed-carousel";
+    const isVideoMode = isSingleVideoMode || isMixedCarouselMode;
+
+    // For AI prompt, only pass valid IMAGE styles
     const imageStyleForPrompt = isVideoMode ? undefined : visualStyle as VisualStyle | undefined;
+
+    // Add special instructions for video mode
+    let additionalInstructions: string | undefined;
+    if (isSingleVideoMode) {
+      additionalInstructions = `
+IMPORTANT: Generate content for a SINGLE VIDEO POST (not a carousel).
+
+For Instagram video posts:
+- Do NOT generate carouselSlides
+- Generate a compelling caption in primaryCopy
+- Generate a videoPrompt field with a detailed prompt for AI video generation
+- The videoPrompt should describe: scene, action, mood, style, camera movement
+- Keep the video concept simple and focused on ONE key message
+
+Example videoPrompt: "Cinematic shot of ocean waves crashing on rocky shore at golden hour. Camera slowly pans across the scene. Dramatic lighting with warm orange and deep blue tones. Peaceful, contemplative mood. 4K quality, smooth motion."
+
+Return format for video posts:
+{
+  "platform": "instagram",
+  "primaryCopy": "Your caption here...",
+  "hashtags": [...],
+  "cta": "...",
+  "videoPrompt": "Detailed video generation prompt...",
+  "carouselSlides": null
+}`;
+    }
 
     // Build the enhanced user prompt using the new prompt system
     const userPrompt = buildContentUserPrompt(
@@ -103,7 +134,7 @@ export async function POST(request: NextRequest) {
       ideaData.inputs?.raw_content || "No source content available",
       platformsToGenerate || [],
       brandVoicePrompt,
-      undefined, // additionalInstructions
+      additionalInstructions,
       imageStyleForPrompt // Only pass valid image styles to AI prompt
     );
 
@@ -152,6 +183,7 @@ export async function POST(request: NextRequest) {
       threadParts?: string[] | null;
       carouselSlides?: Array<{ slideNumber: number; text: string; imagePrompt: string }> | null;
       imagePrompt?: string;
+      videoPrompt?: string;
       carouselStyle?: Record<string, unknown> | string;
     }) => ({
       idea_id: ideaId,
@@ -162,14 +194,18 @@ export async function POST(request: NextRequest) {
       copy_cta: post.cta || null,
       copy_thread_parts: post.threadParts || null,
       // Convert carousel slides objects to JSON strings for TEXT[] column
-      copy_carousel_slides: post.carouselSlides
-        ? post.carouselSlides.map((slide) => JSON.stringify(slide))
-        : null,
+      // For single video mode, don't include carousel slides
+      copy_carousel_slides: (isSingleVideoMode || !post.carouselSlides)
+        ? null
+        : post.carouselSlides.map((slide) => JSON.stringify(slide)),
       status: "draft",
       metadata: {
         imagePrompt: post.imagePrompt || null,
+        videoPrompt: post.videoPrompt || null,
         carouselStyle: post.carouselStyle || null,
         visualStyle: visualStyle || null,
+        // Content type for UI rendering
+        contentType: isSingleVideoMode ? "video" : (post.carouselSlides ? "carousel" : "single-image"),
       },
     }));
 

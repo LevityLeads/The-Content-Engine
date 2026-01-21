@@ -46,7 +46,9 @@ interface Content {
   scheduled_for: string | null;
   metadata: {
     imagePrompt?: string;
+    videoPrompt?: string;
     visualStyle?: string; // "video" | "mixed-carousel" | other visual styles
+    contentType?: "video" | "carousel" | "single-image"; // Content format type
     carouselStyle?: string | {
       visualStyle?: string;
       font?: string;
@@ -494,6 +496,47 @@ export default function ContentPage() {
       setImageMessage("Error generating composite carousel");
     } finally {
       setGeneratingCompositeCarousel(null);
+      setTimeout(() => setImageMessage(null), 5000);
+    }
+  };
+
+  // Generate single video for video-only content (not carousel)
+  const [generatingSingleVideo, setGeneratingSingleVideo] = useState<string | null>(null);
+
+  const handleGenerateSingleVideo = async (contentId: string, videoPrompt?: string) => {
+    setGeneratingSingleVideo(contentId);
+    setImageMessage("Generating video... This may take 1-2 minutes.");
+
+    try {
+      // Get the content item to find the video prompt
+      const contentItem = content.find((c) => c.id === contentId);
+      const prompt = videoPrompt || contentItem?.metadata?.videoPrompt || contentItem?.copy_primary || "Create an engaging social media video";
+
+      const response = await fetch("/api/videos/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          prompt,
+          duration: 5,
+          includeAudio: false,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setImageMessage("Video generated successfully!");
+        // Refresh images/videos for this content
+        fetchImagesForContent(contentId);
+      } else {
+        setImageMessage(`Error: ${data.error || "Failed to generate video"}`);
+      }
+    } catch (error) {
+      console.error("Error generating single video:", error);
+      setImageMessage("Error generating video");
+    } finally {
+      setGeneratingSingleVideo(null);
       setTimeout(() => setImageMessage(null), 5000);
     }
   };
@@ -1197,7 +1240,7 @@ export default function ContentPage() {
     return slideImgs;
   };
 
-  const getAllContentImages = (contentId: string): CarouselImage[] => {
+  const getAllContentImages = (contentId: string): (CarouselImage & { mediaType?: string })[] => {
     const contentImgs = images[contentId] || [];
     return contentImgs
       .filter(img => img.url && !img.url.startsWith("placeholder:"))
@@ -1205,6 +1248,7 @@ export default function ContentPage() {
         id: img.id,
         url: img.url,
         model: img.model,
+        mediaType: img.media_type,
       }));
   };
 
@@ -2115,13 +2159,18 @@ export default function ContentPage() {
           {content.map((item) => {
             const isExpanded = expandedCards.has(item.id);
             const hasCarousel = !!(item.copy_carousel_slides && item.copy_carousel_slides.length > 0);
+            // Check if this is single video content (visualStyle === "video" without carousel slides)
+            const isSingleVideo = item.metadata?.visualStyle === "video" && !hasCarousel;
+            const isMixedCarousel = item.metadata?.visualStyle === "mixed-carousel";
             const { parsed: carouselSlides } = parseCarouselSlides(item.copy_carousel_slides);
             const totalSlides = carouselSlides?.length || 0;
             const allSlidesApproved = totalSlides > 0 ? areAllSlidesApproved(item.id, totalSlides) : true;
-            const postType = getPostType(item);
+            const postType = isSingleVideo ? "Video" : getPostType(item);
             const allImages = getAllContentImages(item.id);
             const currentSlide = getCurrentSlide(item.id);
             const hasImages = hasGeneratedImage(item.id);
+            // Check if there's a video in the images
+            const hasVideo = allImages.some((img) => img.mediaType === "video");
 
             return (
               <Card key={item.id} className="overflow-hidden">
@@ -2367,7 +2416,53 @@ export default function ContentPage() {
                       {/* Preview Tab - Platform Mockup */}
                       <TabsContent value="preview" className="m-0 p-4">
                         <div className="max-w-md mx-auto">
-                          {hasCarousel && carouselSlides ? (
+                          {/* Single Video Content */}
+                          {isSingleVideo ? (
+                            <PlatformPostMockup platform={item.platform}>
+                              <div className="relative aspect-[4/5] bg-black/10">
+                                {hasVideo ? (
+                                  <>
+                                    <video
+                                      src={allImages.find((img) => img.mediaType === "video")?.url}
+                                      controls
+                                      className="w-full h-full object-cover"
+                                    />
+                                    <Badge className="absolute top-2 left-2 bg-violet-600 text-white border-0 z-10">
+                                      <Video className="h-3 w-3 mr-1" />
+                                      Video
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  <div className="w-full h-full flex flex-col items-center justify-center p-6">
+                                    <Video className="h-16 w-16 mb-4 text-violet-400" />
+                                    <p className="text-sm text-muted-foreground mb-4 text-center">No video generated yet</p>
+                                    <Button
+                                      onClick={() => handleGenerateSingleVideo(item.id, item.metadata?.videoPrompt)}
+                                      disabled={generatingSingleVideo === item.id}
+                                      className="bg-violet-600 hover:bg-violet-700"
+                                    >
+                                      {generatingSingleVideo === item.id ? (
+                                        <>
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          Generating Video...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Video className="mr-2 h-4 w-4" />
+                                          Generate Video
+                                        </>
+                                      )}
+                                    </Button>
+                                    {item.metadata?.videoPrompt && (
+                                      <p className="text-xs text-muted-foreground mt-3 text-center max-w-xs">
+                                        Prompt: {item.metadata.videoPrompt.substring(0, 100)}...
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </PlatformPostMockup>
+                          ) : hasCarousel && carouselSlides ? (
                             <PlatformPostMockup platform={item.platform}>
                               <div className="relative">
                                 <div className="relative aspect-[4/5] bg-black/10">

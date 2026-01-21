@@ -391,8 +391,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if this is a mixed carousel request (video slide 1 + images)
-    // Also treat plain "video" as mixed carousel when generating carousel content
-    const isMixedCarousel = visualStyle === 'mixed-carousel' || visualStyle === 'video-carousel' || visualStyle === 'video';
+    // Note: "video" style is now for single video posts, not carousel
+    // Only "mixed-carousel" and "video-carousel" trigger video generation in carousels
+    const isMixedCarousel = visualStyle === 'mixed-carousel' || visualStyle === 'video-carousel';
     let videoGeneratedForSlide1 = false;
     let videoSlide1Result: { id: string; url: string; media_type: string } | null = null;
 
