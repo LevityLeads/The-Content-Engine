@@ -294,6 +294,14 @@ SUPABASE_SERVICE_ROLE_KEY= # For admin operations
   - `Fix content deletion not persisting`
   - `Refactor prompt system for better hook variety`
 
+### Performance Patterns
+- **Parallel fetching**: Use `Promise.all()` when fetching multiple independent resources
+- **Deduplication**: Use refs to prevent duplicate concurrent API calls for the same resource
+- **Memoization**: Use `useMemo` for expensive computed values (e.g., filter counts)
+- **Polling stability**: When polling with `setInterval`, use refs for state access to avoid effect recreation
+- **Loading states**: Always show skeleton loaders or spinners during data fetching
+- **Image loading**: Use `onLoad`/`onError` handlers with opacity transitions for smooth image display
+
 ## AI Integration Details
 
 ### Claude (Text Generation)
@@ -473,6 +481,8 @@ Use `/role:handoff` to document session state when passing work to another role 
 | Video models | `src/lib/video-models.ts` |
 | Video utilities | `src/lib/video-utils.ts` |
 | Video cost dialog | `src/components/video/video-cost-dialog.tsx` |
+| Skeleton loaders | `src/components/ui/skeleton.tsx` |
+| Image carousel | `src/components/ui/image-carousel.tsx` |
 | Slide templates | `src/lib/slide-templates/types.ts` |
 | Late.dev client | `src/lib/late/client.ts` |
 | Publish API | `src/app/api/content/publish/route.ts` |
