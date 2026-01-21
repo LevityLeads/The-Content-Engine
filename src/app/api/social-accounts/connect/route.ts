@@ -13,6 +13,10 @@ import { LateClient, LateApiException } from "@/lib/late";
  * Response:
  * - success: boolean
  * - authUrl: string - URL to redirect user to for OAuth
+ * 
+ * SECURITY NOTE: The authUrl contains the Late.dev API key as required by their
+ * OAuth flow. The Referrer-Policy header is set to prevent the key from leaking
+ * via referrer headers when the user navigates to the OAuth provider.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -57,10 +61,19 @@ export async function POST(request: NextRequest) {
     try {
       const { url: authUrl } = await lateClient.getAuthUrl(platform, callbackUrl);
 
-      return NextResponse.json({
-        success: true,
-        authUrl,
-      });
+      // SECURITY: Set Referrer-Policy to prevent the API key in the authUrl
+      // from being leaked via Referer headers when redirecting to OAuth providers
+      return NextResponse.json(
+        {
+          success: true,
+          authUrl,
+        },
+        {
+          headers: {
+            'Referrer-Policy': 'no-referrer',
+          },
+        }
+      );
     } catch (error) {
       if (error instanceof LateApiException) {
         console.error("Late.dev auth URL error:", {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropicClient, DEFAULT_MODEL, extractTextContent } from "@/lib/anthropic/client";
 import {
   CONTENT_SYSTEM_PROMPT,
   buildContentUserPrompt,
@@ -9,19 +9,8 @@ import {
   type VisualStyle,
 } from "@/lib/prompts";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(
-        { error: "Anthropic API key not configured" },
-        { status: 500 }
-      );
-    }
-
     const supabase = await createClient();
     const body = await request.json();
     // Use string type for visualStyle to accept "video", "mixed-carousel", etc.
@@ -138,9 +127,10 @@ Return format for video posts:
       imageStyleForPrompt // Only pass valid image styles to AI prompt
     );
 
-    // Call Claude Opus 4.5
+    // Get the singleton client and call Claude Opus 4.5
+    const anthropic = getAnthropicClient();
     const message = await anthropic.messages.create({
-      model: "claude-opus-4-5-20251101",
+      model: DEFAULT_MODEL,
       max_tokens: 4096,
       messages: [
         {
@@ -151,14 +141,12 @@ Return format for video posts:
       system: CONTENT_SYSTEM_PROMPT,
     });
 
-    // Parse the response
-    const responseText = message.content[0].type === "text"
-      ? message.content[0].text
-      : "";
+    // Parse the response using helper
+    const responseText = extractTextContent(message);
 
     let posts;
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      const jsonMatch = responseText.match(/{[sS]*}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         posts = parsed.posts || [];

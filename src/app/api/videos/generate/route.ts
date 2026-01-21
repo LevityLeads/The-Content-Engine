@@ -4,6 +4,16 @@ import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL, type VideoModelKey, getAspectRatioFo
 import { estimateVideoCost, checkBudgetLimits, calculateActualCost } from "@/lib/video-utils";
 import { type BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
 
+/**
+ * Exponential backoff with jitter for video polling
+ * Starts at 5s, increases to max 30s between polls
+ */
+function getBackoffDelay(attempt: number, baseDelay: number = 5000, maxDelay: number = 30000): number {
+  const exponentialDelay = baseDelay * Math.pow(1.5, attempt);
+  const jitter = Math.random() * 1000; // Add up to 1s of jitter
+  return Math.min(exponentialDelay + jitter, maxDelay);
+}
+
 // Helper to update job status
 async function updateJobStatus(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -30,12 +40,11 @@ async function updateJobStatus(
   await supabase.from("generation_jobs").update(updateData).eq("id", jobId);
 }
 
-// Poll for video generation completion
+// Poll for video generation completion with exponential backoff
 async function pollVideoGeneration(
   operationName: string,
   apiKey: string,
-  maxAttempts: number = 60,
-  pollInterval: number = 5000
+  maxAttempts: number = 30
 ): Promise<{ success: boolean; videoData?: string; isUrl?: boolean; error?: string }> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
@@ -51,7 +60,11 @@ async function pollVideoGeneration(
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Poll error:", errorText);
+        console.error("[Video] Poll error:", errorText);
+        // Wait before retrying on error
+        const delay = getBackoffDelay(attempt);
+        console.log(`[Video] Polling attempt ${attempt + 1} failed, waiting ${Math.round(delay/1000)}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
         continue;
       }
 
@@ -66,7 +79,7 @@ async function pollVideoGeneration(
         const generatedSample = data.response?.generateVideoResponse?.generatedSamples?.[0];
         const videoUri = generatedSample?.video?.uri;
         if (videoUri) {
-          console.log("Found video URI:", videoUri);
+          console.log("[Video] Found video URI:", videoUri);
           return { success: true, videoData: videoUri, isUrl: true };
         }
 
@@ -80,15 +93,19 @@ async function pollVideoGeneration(
         // Include response structure in error for debugging
         const responseKeys = data.response ? Object.keys(data.response).join(', ') : 'none';
         const fullStructure = JSON.stringify(data, null, 2).substring(0, 500);
-        console.error("Unknown response structure:", fullStructure);
+        console.error("[Video] Unknown response structure:", fullStructure);
         return { success: false, error: `No video in response. Keys: [${responseKeys}]. Structure: ${fullStructure}` };
       }
 
-      // Not done yet, wait and try again
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      // Not done yet, wait with exponential backoff and try again
+      const delay = getBackoffDelay(attempt);
+      console.log(`[Video] Polling attempt ${attempt + 1}, waiting ${Math.round(delay/1000)}s...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
     } catch (err) {
-      console.error("Poll error:", err);
-      // Continue polling on error
+      console.error("[Video] Poll error:", err);
+      // Wait before retrying on error
+      const delay = getBackoffDelay(attempt);
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
@@ -363,11 +380,11 @@ CRITICAL RULES:
       let videoBase64: string;
       if (pollResult.isUrl) {
         try {
-          console.log("Downloading video from URL:", pollResult.videoData);
+          console.log("[Video] Downloading video from URL:", pollResult.videoData);
           videoBase64 = await downloadVideoAsBase64(pollResult.videoData, googleApiKey);
-          console.log("Video downloaded, size:", videoBase64.length, "chars");
+          console.log("[Video] Video downloaded, size:", videoBase64.length, "chars");
         } catch (downloadError) {
-          console.error("Failed to download video:", downloadError);
+          console.error("[Video] Failed to download video:", downloadError);
           if (jobId) {
             await updateJobStatus(supabase, jobId, {
               status: "failed",
@@ -418,7 +435,7 @@ CRITICAL RULES:
         .single();
 
       if (saveError) {
-        console.error("Error saving video:", saveError);
+        console.error("[Video] Error saving video:", saveError);
         if (jobId) {
           await updateJobStatus(supabase, jobId, {
             status: "failed",

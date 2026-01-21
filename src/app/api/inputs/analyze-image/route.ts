@@ -1,19 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+import { getAnthropicClient, MODELS, extractTextContent } from "@/lib/anthropic/client";
 
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(
-        { error: "Anthropic API key not configured" },
-        { status: 500 }
-      );
-    }
-
     const body = await request.json();
     const { imageData, mediaType } = body;
 
@@ -36,8 +25,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Use Claude's vision capability to analyze the image
+    // OPUS for highest quality image analysis - vision tasks benefit from the best model
+    const anthropic = getAnthropicClient();
+
     const message = await anthropic.messages.create({
-      model: "claude-opus-4-5-20251101",
+      model: MODELS.OPUS, // OPUS for vision - highest quality analysis for content creation input
       max_tokens: 2000,
       messages: [
         {
@@ -72,9 +64,7 @@ Format your response as a clear, well-structured analysis that can be used as in
       ],
     });
 
-    const analysis = message.content[0].type === "text"
-      ? message.content[0].text
-      : "";
+    const analysis = extractTextContent(message);
 
     return NextResponse.json({
       success: true,

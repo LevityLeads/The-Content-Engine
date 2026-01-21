@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import Anthropic from "@anthropic-ai/sdk";
-
-const anthropic = new Anthropic();
+import { getAnthropicClient, MODELS, extractTextContent } from "@/lib/anthropic/client";
 
 // Visual style descriptions for prompt generation
 const VISUAL_STYLE_DESCRIPTIONS: Record<string, string> = {
@@ -135,6 +133,9 @@ export async function POST(request: NextRequest) {
       : "";
 
     // Generate prompts for each slide
+    // Using SONNET for prompt generation - fast turnaround for multiple slides
+    // These prompts are then used by Gemini, so speed matters more than perfection
+    const anthropic = getAnthropicClient();
     const prompts: Array<{ slideNumber: number; prompt: string }> = [];
 
     for (const slide of slides) {
@@ -149,7 +150,7 @@ export async function POST(request: NextRequest) {
 
       // Call Claude to generate the prompt
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: MODELS.SONNET, // SONNET for speed - generating prompts for Gemini doesn't need OPUS quality
         max_tokens: 800,
         messages: [
           {
@@ -160,9 +161,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Extract the generated prompt
-      const generatedPrompt = response.content[0].type === "text"
-        ? response.content[0].text.trim()
-        : "";
+      const generatedPrompt = extractTextContent(response).trim();
 
       prompts.push({
         slideNumber,

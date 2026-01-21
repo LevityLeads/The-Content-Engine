@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       .from("brands")
       .select("id, name")
       .eq("id", id)
-      .single();
+      .single() as { data: { id: string; name: string } | null; error: Error | null };
 
     if (brandError || !brand) {
       return NextResponse.json(

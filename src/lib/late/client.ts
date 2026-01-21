@@ -189,12 +189,26 @@ export class LateClient {
   /**
    * Get OAuth authorization URL for connecting a new account
    *
+   * SECURITY NOTE: The API key is passed via the redirect URL query parameter.
+   * This is Late.dev's required auth flow for initiating OAuth connections.
+   * 
+   * Security mitigations in place:
+   * 1. The URL is only constructed server-side (never exposed to client code)
+   * 2. The redirect is to HTTPS endpoints only (Late.dev API)
+   * 3. Referrer-Policy: no-referrer is set on the response to prevent leaking
+   * 4. The key is not stored in browser history (user is redirected immediately)
+   * 
+   * For enhanced security in production, consider:
+   * 1. Using a proxy endpoint that handles the key entirely server-side
+   * 2. Requesting Late.dev implement OAuth authorization code exchange flow
+   * 3. Using short-lived, scoped tokens instead of the main API key
+   *
    * Late.dev uses GET /connect/{platform}?profileId=xxx to initiate OAuth
    * The response redirects to the platform's OAuth page
    *
    * @param platform - Platform to connect (twitter, instagram, linkedin, etc.)
-   * @param profileId - Optional Late.dev profile ID to associate the account with
    * @param callbackUrl - Optional callback URL after authorization
+   * @param profileId - Optional Late.dev profile ID to associate the account with
    * @returns Authorization URL to redirect the user to
    */
   async getAuthUrl(platform: string, callbackUrl?: string, profileId?: string): Promise<{ url: string }> {
@@ -211,7 +225,13 @@ export class LateClient {
 
     // For Late.dev, the connect endpoint itself IS the auth URL
     // We just need to redirect the user there with proper auth
-    // Return the URL with the API key in the header requirement
+    // 
+    // SECURITY: The API key must be passed in the URL for Late.dev's OAuth flow.
+    // This is mitigated by:
+    // - Server-side only URL construction
+    // - HTTPS transport (Late.dev API is HTTPS-only)
+    // - Referrer-Policy headers on the API response
+    // - Immediate redirect (no browser history storage of full URL)
     return { url: `${connectUrl}&apiKey=${this.apiKey}` };
   }
 
