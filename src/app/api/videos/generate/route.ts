@@ -258,7 +258,6 @@ CRITICAL RULES:
             parameters: {
               aspectRatio,
               sampleCount: 1,
-              personGeneration: "allow_adult",
             },
           }),
         }
