@@ -132,9 +132,14 @@ ${ideaContext}
 ${brandConstraints}
 
 ## DESIGN SYSTEM REQUIREMENTS
-Create specific, concrete design choices:
+Create specific, concrete design choices that will be applied consistently across ALL slides.
 
-1. **Background**: Exact background treatment (solid color with hex, gradient with hex codes, or style description for photorealistic)
+NOTE: Each slide will have DIFFERENT imagery/scenes, but they should all share these visual treatments:
+
+1. **Background Style**: The TYPE of background treatment - NOT a specific scene
+   - For typography: "solid #hex" or "gradient from #hex to #hex"
+   - For photorealistic: describe the STYLE (e.g., "moody nature scenes with soft lighting" NOT "a misty forest")
+   - For illustration: describe the ART STYLE (e.g., "flat vector with limited palette")
 2. **Primary Color**: Main text/element color (hex code)
 3. **Accent Color**: Highlight color for emphasis (hex code)
 4. **Typography**: Font treatment (style, weight, approximate size feel, alignment)
@@ -144,7 +149,7 @@ ${visualStyle === "photorealistic" ? '7. **Text Overlay**: How text remains read
 
 Return ONLY valid JSON in this exact format:
 {
-  "background": "exact description with hex codes if applicable",
+  "background": "background STYLE/treatment (not a specific scene)",
   "primaryColor": "#hexcode",
   "accentColor": "#hexcode",
   "typography": "specific font treatment description",
@@ -167,55 +172,68 @@ function buildSlidePromptWithDesignSystem(
 
   if (mediaType === "video") {
     const styleGuidance = VIDEO_STYLE_GUIDANCE[visualStyle] || VIDEO_STYLE_GUIDANCE.photorealistic;
-    return `Generate a video prompt for slide ${slideNumber}/${totalSlides} using the EXACT design system below.
+    return `Generate a video prompt for slide ${slideNumber}/${totalSlides} using the design system below.
 
-## DESIGN SYSTEM (MUST FOLLOW EXACTLY)
-- Background: ${designSystem.background}
-- Primary Color: ${designSystem.primaryColor}
-- Accent Color: ${designSystem.accentColor}
-- Mood: ${designSystem.mood}
+## DESIGN SYSTEM (Visual Treatment - MUST FOLLOW)
+- Color Palette: ${designSystem.primaryColor}, ${designSystem.accentColor}
+- Mood/Atmosphere: ${designSystem.mood}
+- Visual Style: ${visualStyle}
 
-## VISUAL STYLE: ${visualStyle}
+## VISUAL STYLE GUIDANCE
 ${styleGuidance}
 
-## SLIDE CONTENT
+## THIS SLIDE'S CONTENT
 "${slideText}"
 
-## REQUIREMENTS
-1. Create a 5-8 second video scene that matches the design system colors and mood
-2. The video must feel like part of a cohesive carousel series
-3. Include: camera movement, visual motion, atmosphere
-4. DO NOT include text overlays (added separately)
-5. Keep prompt under 600 characters
+## CRITICAL REQUIREMENTS
+1. Create a UNIQUE 5-8 second video scene that MATCHES THIS SLIDE'S TEXT
+2. The scene should visually represent or metaphorically convey the message: "${slideText}"
+3. Use the color palette and mood from the design system
+4. Each slide needs a DIFFERENT scene - this is slide ${slideNumber} of ${totalSlides}
+5. DO NOT include text overlays (added separately)
+6. Keep prompt under 600 characters
 
-OUTPUT: Return ONLY the video generation prompt.`;
+OUTPUT: Return ONLY the video generation prompt describing a unique scene for this specific slide.`;
   }
 
   // Image prompt
-  return `Generate an image prompt for slide ${slideNumber}/${totalSlides} using the EXACT design system below.
+  return `Generate an image prompt for slide ${slideNumber}/${totalSlides} of a ${platform} carousel.
 
-## DESIGN SYSTEM (MUST FOLLOW EXACTLY)
-- Background: ${designSystem.background}
-- Primary Color: ${designSystem.primaryColor}
-- Accent Color: ${designSystem.accentColor}
+## DESIGN SYSTEM (Visual Treatment - Apply to ALL imagery)
+- Color Palette: ${designSystem.primaryColor} (primary), ${designSystem.accentColor} (accent)
 - Typography: ${designSystem.typography}
 - Layout: ${designSystem.layout}
 - Mood: ${designSystem.mood}
-${designSystem.textOverlay ? `- Text Overlay: ${designSystem.textOverlay}` : ""}
+${designSystem.textOverlay ? `- Text Treatment: ${designSystem.textOverlay}` : ""}
 
-## VISUAL STYLE: ${visualStyle} - ${styleDesc}
+## VISUAL STYLE: ${visualStyle}
+${styleDesc}
 
-## SLIDE CONTENT
+## THIS SLIDE'S MESSAGE
 "${slideText}"
 
-## REQUIREMENTS
-1. The prompt must implement the design system EXACTLY - same colors, same treatment
-2. Include the slide text as part of the image composition
-3. The prompt must be SELF-CONTAINED (no references to other slides)
-4. Keep prompt under 500 characters
-5. Platform: ${platform}
+## CRITICAL: UNIQUE SCENE PER SLIDE
+Each slide needs a DIFFERENT background scene/imagery that:
+1. Visually represents or metaphorically conveys THIS slide's message
+2. Tells part of the carousel's story (this is slide ${slideNumber} of ${totalSlides})
+3. Uses the same COLOR PALETTE and MOOD as other slides (for consistency)
+4. But has UNIQUE imagery/scene content (for storytelling)
 
-OUTPUT: Return ONLY the image generation prompt.`;
+Example: If the design system specifies "misty forest mood" -
+- Slide 1 might show: a path entering the forest
+- Slide 2 might show: sunlight breaking through trees
+- Slide 3 might show: a clearing with morning mist
+- Slide 4 might show: view from a hilltop overlooking forest
+All use same colors/mood but DIFFERENT scenes that progress the narrative.
+
+## REQUIREMENTS
+1. Create a UNIQUE scene that matches "${slideText}"
+2. Apply the design system's colors, typography, and mood
+3. The prompt must be SELF-CONTAINED
+4. Include the slide text in the composition
+5. Keep prompt under 500 characters
+
+OUTPUT: Return ONLY the image prompt with a unique scene for this specific slide.`;
 }
 
 export async function POST(request: NextRequest) {
