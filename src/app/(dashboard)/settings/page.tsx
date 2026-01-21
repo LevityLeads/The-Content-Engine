@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles, ExternalLink, Unlink, X, Video, DollarSign } from "lucide-react";
+import { Settings, Palette, Volume2, Link2, Bell, Save, Loader2, AlertCircle, Check, Globe, RefreshCw, Sparkles, ExternalLink, Unlink, X, Video, DollarSign, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useBrand, VoiceConfig, VisualConfig } from "@/contexts/brand-context";
 import { StrictnessSlider } from "@/components/brand/strictness-slider";
+import { BrandDeletionDialog } from "@/components/brand/brand-deletion-dialog";
 import { type BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
 import { VIDEO_MODELS, type VideoModelKey } from "@/lib/video-models";
 import { formatCost } from "@/lib/video-utils";
@@ -85,6 +86,9 @@ function SettingsPageContent() {
   // UI state
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Delete dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Handle OAuth callback messages from URL params
   useEffect(() => {
@@ -1204,6 +1208,44 @@ function SettingsPageContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Danger Zone */}
+      <Card className="border-red-500/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-500">
+            <Trash2 className="h-5 w-5" />
+            Danger Zone
+          </CardTitle>
+          <CardDescription>
+            Irreversible actions that permanently delete data
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-lg border border-red-500/30 p-4">
+            <div>
+              <p className="font-medium">Delete this client</p>
+              <p className="text-sm text-muted-foreground">
+                Permanently delete {selectedBrand.name} and all associated content, ideas, inputs, and images.
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Client
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delete Client Dialog */}
+      <BrandDeletionDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        brandId={selectedBrand.id}
+        brandName={selectedBrand.name}
+      />
 
       {/* Account Picker Modal */}
       {showAccountPicker && (

@@ -35,6 +35,17 @@ export interface BrandWithConfig extends Omit<Brand, "voice_config" | "visual_co
   visual_config: VisualConfig;
 }
 
+interface DeleteResult {
+  success: boolean;
+  deleted?: {
+    content: number;
+    ideas: number;
+    inputs: number;
+    images: number;
+  };
+  error?: string;
+}
+
 interface BrandContextType {
   brands: BrandWithConfig[];
   selectedBrand: BrandWithConfig | null;
@@ -44,6 +55,7 @@ interface BrandContextType {
   refreshBrands: () => Promise<void>;
   createBrand: (brand: Partial<BrandWithConfig>) => Promise<BrandWithConfig | null>;
   updateBrand: (brandId: string, updates: Partial<BrandWithConfig>) => Promise<BrandWithConfig | null>;
+  deleteBrand: (brandId: string) => Promise<DeleteResult>;
 }
 
 const BrandContext = createContext<BrandContextType | undefined>(undefined);
@@ -162,6 +174,48 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedBrand]);
 
+  const deleteBrand = useCallback(async (brandId: string): Promise<DeleteResult> => {
+    try {
+      const res = await fetch(`/api/brands?id=${brandId}&confirm=delete`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        // Remove from brands list
+        setBrands((prev) => prev.filter((b) => b.id !== brandId));
+
+        // If this was the selected brand, select another one
+        if (selectedBrand?.id === brandId) {
+          const remainingBrands = brands.filter((b) => b.id !== brandId);
+          if (remainingBrands.length > 0) {
+            setSelectedBrand(remainingBrands[0]);
+            localStorage.setItem(SELECTED_BRAND_KEY, remainingBrands[0].id);
+          } else {
+            setSelectedBrand(null);
+            localStorage.removeItem(SELECTED_BRAND_KEY);
+          }
+        }
+
+        return {
+          success: true,
+          deleted: data.deleted,
+        };
+      }
+
+      return {
+        success: false,
+        error: data.error || "Failed to delete brand",
+      };
+    } catch (err) {
+      console.error("Error deleting brand:", err);
+      return {
+        success: false,
+        error: "Network error. Please try again.",
+      };
+    }
+  }, [selectedBrand, brands]);
+
   return (
     <BrandContext.Provider
       value={{
@@ -173,6 +227,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
         refreshBrands,
         createBrand,
         updateBrand,
+        deleteBrand,
       }}
     >
       {children}
