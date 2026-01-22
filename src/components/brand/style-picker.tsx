@@ -120,26 +120,45 @@ export function StylePicker({
 
   if (isLoading) {
     return (
-      <div className="py-12 text-center space-y-4">
-        <div className="relative mx-auto w-16 h-16">
-          <Sparkles className="absolute inset-0 h-16 w-16 text-primary/20 animate-pulse" />
-          <Loader2 className="absolute inset-0 h-16 w-16 animate-spin text-primary" />
-        </div>
-        <div className="space-y-2">
+      <div className="py-8 space-y-6">
+        <div className="text-center space-y-2">
+          <div className="relative mx-auto w-16 h-16">
+            <Sparkles className="absolute inset-0 h-16 w-16 text-primary/20 animate-pulse" />
+            <Loader2 className="absolute inset-0 h-16 w-16 animate-spin text-primary" />
+          </div>
           <p className="text-sm font-medium">Generating style examples...</p>
           <p className="text-xs text-muted-foreground">
             Creating 4 unique visual styles for {brandName}
           </p>
         </div>
-        <div className="flex justify-center gap-1 pt-2">
-          {[0, 1, 2, 3].map((i) => (
+
+        {/* Preview placeholders showing what's being generated */}
+        <div className="grid grid-cols-2 gap-4">
+          {["Bold Typography", "Photo Style", "Modern 3D", "Abstract Art"].map((styleName, i) => (
             <div
               key={i}
-              className="w-2 h-2 rounded-full bg-primary/30 animate-pulse"
-              style={{ animationDelay: `${i * 200}ms` }}
-            />
+              className="rounded-lg overflow-hidden border-2 border-dashed border-muted animate-pulse"
+            >
+              <div className="aspect-[4/5] bg-muted/50 flex items-center justify-center">
+                <div className="text-center space-y-2">
+                  <Loader2
+                    className="h-6 w-6 animate-spin text-muted-foreground mx-auto"
+                    style={{ animationDelay: `${i * 150}ms` }}
+                  />
+                  <p className="text-xs text-muted-foreground">{styleName}</p>
+                </div>
+              </div>
+              <div className="p-3 bg-card/50">
+                <div className="h-4 bg-muted rounded w-3/4 mb-1" />
+                <div className="h-3 bg-muted/50 rounded w-1/2" />
+              </div>
+            </div>
           ))}
         </div>
+
+        <p className="text-xs text-center text-muted-foreground">
+          Using high-quality generation - this may take 30-60 seconds...
+        </p>
       </div>
     );
   }
@@ -233,15 +252,13 @@ export function StylePicker({
         ))}
       </div>
 
-      {/* Regenerate Option */}
-      {successfulSamples.length < 4 && (
-        <div className="text-center">
-          <Button variant="ghost" size="sm" onClick={generateSamples}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Regenerate samples
-          </Button>
-        </div>
-      )}
+      {/* Regenerate Option - Always show */}
+      <div className="text-center">
+        <Button variant="ghost" size="sm" onClick={generateSamples} disabled={isLoading}>
+          <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
+          {successfulSamples.length < 4 ? "Regenerate samples" : "Generate new samples"}
+        </Button>
+      </div>
 
       {/* Actions */}
       <div className="flex justify-between pt-4 border-t">
