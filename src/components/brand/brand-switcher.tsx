@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronsUpDown, Plus, Building2, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, Building2, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,12 +25,19 @@ interface BrandSwitcherProps {
 }
 
 export function BrandSwitcher({ onAddNew }: BrandSwitcherProps) {
-  const { brands, selectedBrand, isLoading, selectBrand } = useBrand();
+  const { brands, selectedBrand, isLoading, error, selectBrand, refreshBrands } = useBrand();
   const [open, setOpen] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const handleSelect = (brand: BrandWithConfig) => {
     selectBrand(brand.id);
     setOpen(false);
+  };
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    await refreshBrands();
+    setIsRetrying(false);
   };
 
   if (isLoading) {
@@ -42,6 +49,29 @@ export function BrandSwitcher({ onAddNew }: BrandSwitcherProps) {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white truncate">Loading...</p>
         </div>
+      </div>
+    );
+  }
+
+  // Show error state with retry option
+  if (error && brands.length === 0) {
+    return (
+      <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 bg-red-500/10 border border-red-500/30">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/20">
+          <AlertTriangle className="h-4 w-4 text-red-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-red-400 truncate">Failed to load</p>
+          <p className="text-xs text-red-400/70 truncate">{error}</p>
+        </div>
+        <button
+          onClick={handleRetry}
+          disabled={isRetrying}
+          className="p-1.5 rounded-lg hover:bg-red-500/20 transition-colors"
+          title="Retry"
+        >
+          <RefreshCw className={cn("h-4 w-4 text-red-400", isRetrying && "animate-spin")} />
+        </button>
       </div>
     );
   }
