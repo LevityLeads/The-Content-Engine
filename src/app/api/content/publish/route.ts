@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const adminClient = createAdminClient(); // For storage operations (bypasses RLS)
     const body = await request.json();
-    const { contentId, scheduledFor, republish } = body;
+    const { contentId, scheduledFor, republish, selectedImageIds } = body;
 
     // Validate required fields
     if (!contentId) {
@@ -89,32 +89,67 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch associated images
-    // For carousels, we only want the composite images (selected slides), not style variants
-    // Composite images have model: 'composite', while AI variants have other model names
-    // First try to get composite images (for carousels)
-    let { data: images, error: imagesError } = await supabase
-      .from("images")
-      .select("*")
-      .eq("content_id", contentId)
-      .eq("model", "composite") // Only get composite/selected carousel images
-      .order("created_at", { ascending: true });
+    // If selectedImageIds provided (from UI), use those specific images
+    // Otherwise fall back to composite images or all images
+    let images: Array<{
+      id: string;
+      url: string;
+      prompt?: string;
+      model?: string;
+      media_type?: string;
+    }> | null = null;
+    let imagesError: Error | null = null;
 
-    // If no composite images found, fall back to all images (for single-image posts)
-    if ((!images || images.length === 0) && !imagesError) {
-      const fallbackResult = await supabase
+    if (selectedImageIds && Array.isArray(selectedImageIds) && selectedImageIds.length > 0) {
+      // Use the specific images selected by the user in the UI
+      console.log(`Using ${selectedImageIds.length} user-selected image(s):`, selectedImageIds);
+      const { data: selectedImages, error: selectedError } = await supabase
+        .from("images")
+        .select("*")
+        .in("id", selectedImageIds);
+
+      if (selectedError) {
+        imagesError = selectedError;
+      } else if (selectedImages) {
+        // Sort by the order in selectedImageIds to maintain slide order
+        images = selectedImageIds
+          .map(id => selectedImages.find(img => img.id === id))
+          .filter((img): img is NonNullable<typeof img> => img !== undefined);
+        console.log(`Found ${images.length} of ${selectedImageIds.length} selected images`);
+      }
+    } else {
+      // Fallback: try composite images first, then all images
+      console.log("No selectedImageIds provided, using fallback image selection");
+
+      const { data: compositeImages, error: compositeError } = await supabase
         .from("images")
         .select("*")
         .eq("content_id", contentId)
+        .eq("model", "composite")
         .order("created_at", { ascending: true });
 
-      images = fallbackResult.data;
-      imagesError = fallbackResult.error;
+      if (compositeError) {
+        imagesError = compositeError;
+      } else if (compositeImages && compositeImages.length > 0) {
+        images = compositeImages;
+        console.log(`Found ${images.length} composite carousel image(s)`);
+      } else {
+        // Fall back to all images (for single-image posts)
+        const { data: allImages, error: allError } = await supabase
+          .from("images")
+          .select("*")
+          .eq("content_id", contentId)
+          .order("created_at", { ascending: true });
 
-      if (images && images.length > 0) {
-        console.log(`No composite images found, using ${images.length} regular image(s)`);
+        if (allError) {
+          imagesError = allError;
+        } else {
+          images = allImages;
+          if (images && images.length > 0) {
+            console.log(`No composite images found, using ${images.length} regular image(s)`);
+          }
+        }
       }
-    } else if (images && images.length > 0) {
-      console.log(`Found ${images.length} composite carousel image(s)`);
     }
 
     if (imagesError) {
