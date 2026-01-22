@@ -169,7 +169,7 @@ Return format for video posts:
       hashtags?: string[];
       cta?: string;
       threadParts?: string[] | null;
-      carouselSlides?: Array<{ slideNumber: number; text: string; imagePrompt: string }> | null;
+      carouselSlides?: Array<{ slideNumber: number; text: string; imagePrompt?: string; visualHint?: string }> | null;
       imagePrompt?: string;
       videoPrompt?: string;
       carouselStyle?: Record<string, unknown> | string;

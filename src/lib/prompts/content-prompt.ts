@@ -118,15 +118,21 @@ Then EVERY slide prompt MUST follow the chosen style's guidelines exactly. No mi
 
 ---
 
-## Carousel Slides (Text Only)
+## Carousel Slides (Text + Visual Direction)
 
-For Instagram carousels, generate slide TEXT only. Image prompts will be generated separately based on the user's visual style selection in the UI.
+For Instagram carousels, generate slide TEXT and a brief VISUAL HINT for each slide. The visual hint helps the image generation AI understand the emotional tone and scene concept.
 
 Each slide should have:
 - slideNumber: The slide position (1, 2, 3, etc.)
 - text: The text content for the slide
+- visualHint: A brief (10-20 word) description of the mood, metaphor, or scene that would complement this text
 
-Do NOT include imagePrompt in slides - this will be generated on-demand.
+The visualHint should capture:
+- The EMOTION of this specific slide (tension, revelation, hope, urgency, calm)
+- A visual METAPHOR or scene concept that matches the message
+- How this slide fits in the STORY ARC (hook = dramatic, middle = building, climax = peak impact, CTA = resolution)
+
+Do NOT include imagePrompt in slides - only the visualHint for creative direction.
 
 ---
 
@@ -302,19 +308,23 @@ Return a JSON array with content for each requested platform:
       "carouselSlides": [
         {
           "slideNumber": 1,
-          "text": "Hook text for slide 1 (attention-grabbing, creates curiosity)"
+          "text": "Hook text for slide 1 (attention-grabbing, creates curiosity)",
+          "visualHint": "dramatic tension, striking contrast, stop-scroll moment"
         },
         {
           "slideNumber": 2,
-          "text": "Content for slide 2 (first key point)"
+          "text": "Content for slide 2 (first key point)",
+          "visualHint": "building context, establishing scene, grounded feeling"
         },
         {
           "slideNumber": 3,
-          "text": "Content for slide 3 (second key point)"
+          "text": "Content for slide 3 (second key point)",
+          "visualHint": "rising action, momentum building, anticipation"
         },
         {
           "slideNumber": 4,
-          "text": "Final slide with CTA"
+          "text": "Final slide with CTA",
+          "visualHint": "resolution, clarity, actionable energy, forward motion"
         }
       ]
     }
@@ -381,9 +391,14 @@ Generate content for: ${platforms.map((p) => p.toUpperCase()).join(", ")}
 
 ${platforms.includes("instagram") ? `For Instagram: Create a carousel with the OPTIMAL number of slides for this content. Remember slide 1 is HOOK ONLY.
 
-Generate ONLY the slide TEXT content - do NOT include imagePrompt fields. Image prompts will be generated separately based on the user's visual style selection.
+For each slide, generate:
+1. TEXT: The slide copy (compelling, works with any visual style)
+2. VISUALHINT: Brief mood/metaphor direction (10-20 words) for the image AI
 
-Each slide should be compelling text that would work with any visual style.` : ""}
+The visualHint bridges your content strategy to visual execution. Think about:
+- What EMOTION does this slide evoke?
+- What visual METAPHOR would reinforce the message?
+- Where is this in the STORY ARC (hook/build/climax/resolution)?` : ""}
 ${platforms.includes("twitter") ? "For Twitter: If the idea warrants depth, create a thread. Otherwise, a powerful single tweet." : ""}
 
 ---
