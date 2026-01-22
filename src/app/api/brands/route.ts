@@ -4,37 +4,66 @@ import { createClient } from "@/lib/supabase/server";
 // GET all brands (for the current organization)
 export async function GET() {
   try {
-    const supabase = await createClient();
-
-    // For now, get all brands (we'll add organization filtering later with auth)
-    const { data: brands, error } = await supabase
-      .from("brands")
-      .select("*")
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("Error fetching brands:", error);
+    // Check environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      console.error("Missing Supabase environment variables");
       return NextResponse.json(
-        { error: "Failed to fetch brands" },
+        { success: false, error: "Database configuration error" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        brands: brands || [],
-      },
-      {
-        headers: {
-          'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
-        },
+    const supabase = await createClient();
+
+    // For now, get all brands (we'll add organization filtering later with auth)
+    // Add 10 second timeout to prevent infinite hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const { data: brands, error } = await supabase
+        .from("brands")
+        .select("*")
+        .order("created_at", { ascending: true })
+        .abortSignal(controller.signal);
+
+      clearTimeout(timeoutId);
+
+      if (error) {
+        console.error("Error fetching brands:", error);
+        return NextResponse.json(
+          { success: false, error: "Failed to fetch brands" },
+          { status: 500 }
+        );
       }
-    );
+
+      return NextResponse.json(
+        {
+          success: true,
+          brands: brands || [],
+        },
+        {
+          headers: {
+            'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
+          },
+        }
+      );
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.error("Brands fetch timed out");
+        return NextResponse.json(
+          { success: false, error: "Request timed out" },
+          { status: 504 }
+        );
+      }
+      throw fetchError;
+    }
   } catch (error) {
     console.error("Error in GET /api/brands:", error);
+    const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-      { error: "Internal server error" },
+      { success: false, error: message },
       { status: 500 }
     );
   }
