@@ -22,35 +22,32 @@ const SAMPLE_HEADLINES = [
   "Create boldly",
 ];
 
-// Visual style mapping based on keywords
-const KEYWORD_TO_VISUAL_STYLE: Record<string, VisualStyle[]> = {
-  // Visual style keywords
-  illustration: ["illustration"],
-  photography: ["photorealistic"],
-  photo: ["photorealistic"],
-  "3d": ["3d-render"],
-  abstract: ["abstract-art"],
-  minimalist: ["typography"],
-  minimal: ["typography"],
-  collage: ["collage"],
-  experimental: ["experimental"],
-
-  // Mood keywords (map to multiple styles)
-  soft: ["photorealistic", "illustration"],
-  bold: ["typography", "abstract-art"],
-  playful: ["illustration", "collage", "3d-render"],
-  serious: ["typography", "photorealistic"],
-  elegant: ["photorealistic", "typography"],
-  energetic: ["abstract-art", "3d-render", "experimental"],
-
-  // Color feel keywords
-  warm: ["illustration", "photorealistic"],
-  cool: ["3d-render", "typography"],
-  vibrant: ["abstract-art", "collage"],
-  muted: ["photorealistic", "typography"],
-  dark: ["typography", "photorealistic"],
-  light: ["illustration", "photorealistic"],
+// EXPLICIT visual style keywords - these directly specify a visual style
+// These take priority and are NOT diluted by mood/color keywords
+const EXPLICIT_VISUAL_STYLE_KEYWORDS: Record<string, VisualStyle> = {
+  illustration: "illustration",
+  photography: "photorealistic",
+  photo: "photorealistic",
+  "3d": "3d-render",
+  abstract: "abstract-art",
+  minimalist: "typography",
+  minimal: "typography",
+  collage: "collage",
+  experimental: "experimental",
 };
+
+// Mood/color keywords - these only affect text style and colors, NOT visual style
+// They should NOT add visual styles to the pool
+const MOOD_KEYWORDS = ["soft", "bold", "playful", "serious", "elegant", "energetic"];
+const COLOR_KEYWORDS = ["warm", "cool", "vibrant", "muted", "dark", "light"];
+
+// Fallback visual styles when no explicit style is selected
+const FALLBACK_VISUAL_STYLES: VisualStyle[] = [
+  "typography",
+  "photorealistic",
+  "illustration",
+  "3d-render",
+];
 
 // Text style preferences based on keywords
 const KEYWORD_TO_TEXT_STYLE: Record<string, string[]> = {
@@ -75,16 +72,6 @@ const KEYWORD_TO_COLOR: Record<string, string[]> = {
   soft: ["white-gold", "white-teal"],
 };
 
-// All visual styles for fallback
-const ALL_VISUAL_STYLES: VisualStyle[] = [
-  "typography",
-  "photorealistic",
-  "illustration",
-  "3d-render",
-  "abstract-art",
-  "collage",
-  "experimental",
-];
 
 export async function POST(request: NextRequest) {
   try {
@@ -176,16 +163,20 @@ function generateStyleConfigs(keywords: string[], count: number): StyleConfig[] 
   const configs: StyleConfig[] = [];
   const usedCombinations = new Set<string>();
 
-  // Collect all relevant visual styles from keywords
-  let relevantVisualStyles: VisualStyle[] = [];
+  // SEPARATE explicit visual style keywords from mood/color keywords
+  const explicitVisualStyles: VisualStyle[] = [];
   let relevantTextStyles: string[] = [];
   let relevantColors: string[] = [];
 
   for (const keyword of keywords) {
     const kw = keyword.toLowerCase();
-    if (KEYWORD_TO_VISUAL_STYLE[kw]) {
-      relevantVisualStyles.push(...KEYWORD_TO_VISUAL_STYLE[kw]);
+
+    // Check if it's an explicit visual style keyword
+    if (EXPLICIT_VISUAL_STYLE_KEYWORDS[kw]) {
+      explicitVisualStyles.push(EXPLICIT_VISUAL_STYLE_KEYWORDS[kw]);
     }
+
+    // Mood/color keywords only affect text style and colors
     if (KEYWORD_TO_TEXT_STYLE[kw]) {
       relevantTextStyles.push(...KEYWORD_TO_TEXT_STYLE[kw]);
     }
@@ -195,14 +186,17 @@ function generateStyleConfigs(keywords: string[], count: number): StyleConfig[] 
   }
 
   // Deduplicate
-  relevantVisualStyles = [...new Set(relevantVisualStyles)];
+  const uniqueVisualStyles = [...new Set(explicitVisualStyles)];
   relevantTextStyles = [...new Set(relevantTextStyles)];
   relevantColors = [...new Set(relevantColors)];
 
-  // Fallbacks if no matches
-  if (relevantVisualStyles.length === 0) {
-    relevantVisualStyles = ALL_VISUAL_STYLES.slice(0, 4);
-  }
+  // PRIORITY: If user explicitly selected visual styles, ONLY use those
+  // Otherwise fall back to default variety
+  const visualStylesToUse: VisualStyle[] = uniqueVisualStyles.length > 0
+    ? uniqueVisualStyles
+    : FALLBACK_VISUAL_STYLES;
+
+  // Fallbacks for text and color
   if (relevantTextStyles.length === 0) {
     relevantTextStyles = Object.keys(TEXT_STYLE_PRESETS);
   }
@@ -210,16 +204,34 @@ function generateStyleConfigs(keywords: string[], count: number): StyleConfig[] 
     relevantColors = Object.keys(TEXT_COLOR_PRESETS);
   }
 
-  // Generate combinations
+  // Generate combinations - ensuring variety within the selected visual style(s)
   let attempts = 0;
-  const maxAttempts = count * 3;
+  const maxAttempts = count * 5;
+
+  // If only one visual style, ensure we cycle through all text/color combos
+  const needsMoreVariety = visualStylesToUse.length === 1;
 
   while (configs.length < count && attempts < maxAttempts) {
     attempts++;
 
-    const visualStyle = relevantVisualStyles[Math.floor(Math.random() * relevantVisualStyles.length)];
-    const textStyle = relevantTextStyles[Math.floor(Math.random() * relevantTextStyles.length)];
-    const textColor = relevantColors[Math.floor(Math.random() * relevantColors.length)];
+    // Distribute evenly across visual styles if multiple, or use the single one
+    const styleIndex = configs.length % visualStylesToUse.length;
+    const visualStyle = visualStylesToUse[styleIndex];
+
+    // For variety within a single visual style, cycle through text/color combinations
+    let textStyle: string;
+    let textColor: string;
+
+    if (needsMoreVariety) {
+      // Systematic cycling for single visual style
+      textStyle = relevantTextStyles[configs.length % relevantTextStyles.length];
+      textColor = relevantColors[Math.floor(configs.length / relevantTextStyles.length) % relevantColors.length];
+    } else {
+      // Random selection for multiple visual styles
+      textStyle = relevantTextStyles[Math.floor(Math.random() * relevantTextStyles.length)];
+      textColor = relevantColors[Math.floor(Math.random() * relevantColors.length)];
+    }
+
     const headline = SAMPLE_HEADLINES[configs.length % SAMPLE_HEADLINES.length];
 
     const combo = `${visualStyle}-${textStyle}-${textColor}`;
@@ -229,11 +241,11 @@ function generateStyleConfigs(keywords: string[], count: number): StyleConfig[] 
     }
   }
 
-  // If we couldn't get enough unique combinations, fill with any remaining
+  // If we couldn't get enough unique combinations, fill with remaining
   while (configs.length < count) {
-    const visualStyle = ALL_VISUAL_STYLES[configs.length % ALL_VISUAL_STYLES.length];
-    const textStyle = Object.keys(TEXT_STYLE_PRESETS)[configs.length % Object.keys(TEXT_STYLE_PRESETS).length];
-    const textColor = Object.keys(TEXT_COLOR_PRESETS)[configs.length % Object.keys(TEXT_COLOR_PRESETS).length];
+    const visualStyle = visualStylesToUse[configs.length % visualStylesToUse.length];
+    const textStyle = relevantTextStyles[configs.length % relevantTextStyles.length];
+    const textColor = relevantColors[configs.length % relevantColors.length];
     const headline = SAMPLE_HEADLINES[configs.length % SAMPLE_HEADLINES.length];
     configs.push({ visualStyle, textStyle, textColor, headline });
   }
