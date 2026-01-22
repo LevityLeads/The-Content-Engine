@@ -3631,7 +3631,7 @@ export default function ContentPage() {
                           <>
                             <div className="flex items-center gap-2 text-sm text-emerald-400">
                               <CheckCircle2 className="h-4 w-4" />
-                              <span>Published{item.published_at ? ` on ${new Date(item.published_at).toLocaleDateString()}` : ""}</span>
+                              <span>Published</span>
                             </div>
                             <Button
                               variant="outline"
