@@ -882,7 +882,8 @@ function SettingsPageContent() {
             </div>
           </div>
 
-          {visualConfig.color_palette && visualConfig.color_palette.length > 0 && (
+          {/* Only show "Extracted" colors if URL analysis was done */}
+          {voiceConfig.source_url && visualConfig.color_palette && visualConfig.color_palette.length > 0 && (
             <div>
               <label className="text-sm font-medium">Extracted Color Palette</label>
               <div className="mt-2 flex gap-2">
@@ -1038,7 +1039,8 @@ function SettingsPageContent() {
             )}
           </div>
 
-          {visualConfig.extracted_images && visualConfig.extracted_images.length > 0 && (
+          {/* Only show "Extracted" images if URL analysis was done */}
+          {voiceConfig.source_url && visualConfig.extracted_images && visualConfig.extracted_images.length > 0 && (
             <div>
               <label className="text-sm font-medium">Extracted Images</label>
               <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
