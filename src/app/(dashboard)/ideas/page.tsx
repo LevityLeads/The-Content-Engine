@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, Check, X, Pencil, MoreHorizontal, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Clock, ChevronDown, ChevronRight, Square, CheckSquare, Trash2, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { Lightbulb, Check, X, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Clock, ChevronDown, ChevronRight, Square, CheckSquare, Trash2, AlertCircle, CheckCircle2, XCircle, MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useBrand } from "@/contexts/brand-context";
 
@@ -92,6 +94,10 @@ export default function IdeasPage() {
   const [isBulkApproving, setIsBulkApproving] = useState(false);
   const [isBulkRejecting, setIsBulkRejecting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Suggestion dialog state
+  const [suggestDialogId, setSuggestDialogId] = useState<string | null>(null);
+  const [suggestionText, setSuggestionText] = useState("");
+  const [isSuggesting, setIsSuggesting] = useState(false);
 
   useEffect(() => {
     fetchIdeas();
@@ -298,6 +304,59 @@ export default function IdeasPage() {
     }
 
     setIsBulkRejecting(false);
+  };
+
+  const handleSuggest = async () => {
+    if (!suggestDialogId || !suggestionText.trim()) return;
+
+    setIsSuggesting(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch("/api/ideas/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ideaId: suggestDialogId,
+          suggestions: suggestionText.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.idea) {
+        // Update the idea in local state
+        setIdeas((prev) =>
+          prev.map((idea) =>
+            idea.id === suggestDialogId
+              ? {
+                  ...idea,
+                  concept: data.idea.concept,
+                  angle: data.idea.angle,
+                  target_platforms: data.idea.target_platforms,
+                  key_points: data.idea.key_points,
+                  potential_hooks: data.idea.potential_hooks,
+                  ai_reasoning: data.idea.ai_reasoning,
+                  confidence_score: data.idea.confidence_score,
+                  status: "pending",
+                }
+              : idea
+          )
+        );
+        setSuccessMessage("Idea updated with your suggestions! Review and approve when ready.");
+        setSuggestDialogId(null);
+        setSuggestionText("");
+        // Expand the card to show the updated content
+        setExpandedCards((prev) => new Set([...prev, suggestDialogId]));
+      } else {
+        setErrorMessage(data.error || "Failed to apply suggestions");
+      }
+    } catch (err) {
+      console.error("Error applying suggestions:", err);
+      setErrorMessage("Network error - please try again");
+    } finally {
+      setIsSuggesting(false);
+    }
   };
 
   const handleAction = async (id: string, status: "approved" | "rejected") => {
@@ -775,7 +834,8 @@ export default function IdeasPage() {
                       {idea.status === "pending" && (
                         <div className="flex gap-2 pt-2 border-t">
                           <Button
-                            className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
+                            size="sm"
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white"
                             disabled={actionLoading === idea.id || generatingContent === idea.id || selected.length === 0}
                             onClick={() => handleAction(idea.id, "approved")}
                           >
@@ -787,17 +847,17 @@ export default function IdeasPage() {
                             ) : generatingContent === idea.id ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Generating for {selected.length} platform{selected.length > 1 ? "s" : ""}...
+                                Generating...
                               </>
                             ) : (
                               <>
                                 <Check className="mr-2 h-4 w-4" />
-                                Approve & Generate ({selected.length})
+                                Approve ({selected.length})
                               </>
                             )}
                           </Button>
                           <Button
-                            className="flex-1"
+                            size="sm"
                             variant="outline"
                             disabled={actionLoading === idea.id || generatingContent === idea.id}
                             onClick={() => handleAction(idea.id, "rejected")}
@@ -805,11 +865,18 @@ export default function IdeasPage() {
                             <X className="mr-2 h-4 w-4" />
                             Reject
                           </Button>
-                          <Button variant="outline" size="icon" disabled={generatingContent === idea.id}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="outline" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300"
+                            disabled={generatingContent === idea.id || isSuggesting}
+                            onClick={() => {
+                              setSuggestDialogId(idea.id);
+                              setSuggestionText("");
+                            }}
+                          >
+                            <MessageSquarePlus className="mr-2 h-4 w-4" />
+                            Suggest
                           </Button>
                         </div>
                       )}
@@ -869,6 +936,66 @@ export default function IdeasPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Suggestion Dialog */}
+      <Dialog
+        open={suggestDialogId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSuggestDialogId(null);
+            setSuggestionText("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Suggest Improvements</DialogTitle>
+            <DialogDescription>
+              Tell AI how to improve this idea. For example: &quot;make it funnier&quot;, &quot;add a statistic&quot;, &quot;focus more on beginners&quot;, etc.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <Textarea
+              placeholder="Enter your suggestions here..."
+              value={suggestionText}
+              onChange={(e) => setSuggestionText(e.target.value)}
+              className="min-h-[120px] resize-none"
+              disabled={isSuggesting}
+            />
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSuggestDialogId(null);
+                setSuggestionText("");
+              }}
+              disabled={isSuggesting}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={handleSuggest}
+              disabled={isSuggesting || !suggestionText.trim()}
+            >
+              {isSuggesting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Applying...
+                </>
+              ) : (
+                <>
+                  <MessageSquarePlus className="mr-2 h-4 w-4" />
+                  Apply Suggestions
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
