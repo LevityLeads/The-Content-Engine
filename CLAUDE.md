@@ -431,6 +431,106 @@ Each slide's image prompt must be **fully self-contained** - no references to ot
 - Visual elements
 - The actual text/headline
 
+## External API Documentation
+
+> **IMPORTANT**: When encountering API issues, errors, or making changes to API integrations, ALWAYS refer to the official documentation below. These docs contain the most up-to-date information on authentication, rate limits, error handling, and best practices.
+
+### Anthropic Claude API (Text Generation)
+
+| Resource | URL |
+|----------|-----|
+| **Main Documentation** | https://docs.anthropic.com/ |
+| **API Reference** | https://docs.anthropic.com/en/api |
+| **SDK (npm)** | `@anthropic-ai/sdk` |
+| **Cookbook & Examples** | https://github.com/anthropics/anthropic-cookbook |
+| **Model Changelog** | https://docs.anthropic.com/en/release-notes/api |
+
+**When to consult**: Authentication errors, rate limiting, token counting, response format issues, model selection, extended thinking, tool use.
+
+**Client location**: `src/lib/anthropic/client.ts`
+
+### Google Gemini API (Image Generation)
+
+| Resource | URL |
+|----------|-----|
+| **Main Documentation** | https://ai.google.dev/gemini-api/docs |
+| **Imagen Guide** | https://ai.google.dev/gemini-api/docs/imagen |
+| **SDK (npm)** | `@google/generative-ai` |
+| **Cookbook & Examples** | https://github.com/google-gemini/cookbook |
+| **Changelog** | https://ai.google.dev/gemini-api/docs/changelog |
+| **Gemini 3 Guide** | https://ai.google.dev/gemini-api/docs/gemini-3 |
+
+**When to consult**: Image generation failures, safety filter blocks, aspect ratio issues, model availability, SDK updates.
+
+**Client location**: `src/lib/google/client.ts`
+
+### Google Veo API (Video Generation)
+
+| Resource | URL |
+|----------|-----|
+| **Gemini API Video Docs** | https://ai.google.dev/gemini-api/docs/video |
+| **Vertex AI Video Overview** | https://docs.cloud.google.com/vertex-ai/generative-ai/docs/video/overview |
+| **Veo 3 Model Reference** | https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/veo/3-0-generate |
+| **Veo API Reference** | https://docs.cloud.google.com/vertex-ai/generative-ai/docs/model-reference/veo-video-generation |
+
+**When to consult**: Video generation timeouts, aspect ratio support, audio generation, polling issues, cost estimation.
+
+**API endpoint**: `https://generativelanguage.googleapis.com/v1beta/models/{model}:predictLongRunning`
+
+**Route location**: `src/app/api/videos/generate/route.ts`
+
+### Late.dev API (Social Publishing)
+
+| Resource | URL |
+|----------|-----|
+| **Main Documentation** | https://docs.getlate.dev/ |
+| **Posts API Reference** | https://docs.getlate.dev/core/posts |
+| **Website** | https://getlate.dev/ |
+
+**When to consult**: Publishing failures, platform-specific constraints, OAuth issues, account connection, rate limits, media requirements.
+
+**Supported platforms**: Twitter, Instagram, Facebook, LinkedIn, TikTok, YouTube, Pinterest, Reddit, Bluesky, Threads, Google Business, Telegram, Snapchat
+
+**Client location**: `src/lib/late/client.ts`
+
+### Supabase (Database & Auth)
+
+| Resource | URL |
+|----------|-----|
+| **Main Documentation** | https://supabase.com/docs |
+| **Getting Started** | https://supabase.com/docs/guides/getting-started |
+| **Database Guide** | https://supabase.com/docs/guides/database/overview |
+| **Auth Guide** | https://supabase.com/docs/guides/auth |
+| **SDK (npm)** | `@supabase/ssr` |
+| **Changelog** | https://supabase.com/changelog |
+
+**When to consult**: Query errors, RLS policy issues, authentication problems, real-time subscriptions, migrations.
+
+**Client locations**: `src/lib/supabase/client.ts`, `src/lib/supabase/server.ts`
+
+### Next.js (Framework)
+
+| Resource | URL |
+|----------|-----|
+| **Main Documentation** | https://nextjs.org/docs |
+| **App Router** | https://nextjs.org/docs/app |
+| **API Routes** | https://nextjs.org/docs/app/building-your-application/routing/route-handlers |
+
+**When to consult**: Routing issues, server/client component errors, build failures, deployment problems.
+
+### API Troubleshooting Quick Reference
+
+| Issue | First Check |
+|-------|-------------|
+| Claude API 401/403 | `ANTHROPIC_API_KEY` env var, [API docs](https://docs.anthropic.com/en/api) |
+| Claude rate limiting | [Rate limits](https://docs.anthropic.com/en/api/rate-limits) |
+| Gemini image fails | Safety filters, [Imagen docs](https://ai.google.dev/gemini-api/docs/imagen) |
+| Veo video timeout | Polling interval, [Video docs](https://ai.google.dev/gemini-api/docs/video) |
+| Late.dev 400/401 | `LATE_API_KEY` env var, [Late docs](https://docs.getlate.dev/) |
+| Late.dev platform error | Platform constraints, [Posts API](https://docs.getlate.dev/core/posts) |
+| Supabase RLS error | Policy config, [RLS docs](https://supabase.com/docs/guides/auth/row-level-security) |
+| Supabase query fails | Schema types, `src/types/database.ts` |
+
 ## Role-Based Workflow Details
 
 > **See "CRITICAL: Role-Based Workflow" section at the top for detection instructions.**
