@@ -104,7 +104,40 @@ npm run lint           # Must pass
 # + Any feature-specific tests defined in step 1
 ```
 
-### 4. Commit ONLY When All Tests Pass
+### 4. Parallel Test Execution
+
+When running multiple independent tests, use subagents to execute them in parallel:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🚀 PARALLEL TESTING                                     │
+│                                                         │
+│ Independent tests → Run in parallel with subagents      │
+│ Dependent tests   → Run sequentially                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+**When to parallelize:**
+- `npm run build` and `npm run lint` (independent)
+- Testing different API endpoints
+- Testing unrelated UI components
+- Multiple edge cases that don't share state
+
+**When to run sequentially:**
+- Tests that depend on previous test output
+- Tests that modify shared database state
+- Tests where order matters (e.g., create → read → delete)
+
+**Example:** Testing a new feature with build, lint, and API verification:
+```
+Subagent 1: npm run build
+Subagent 2: npm run lint
+Subagent 3: Test API endpoint returns correct data
+─────────────────────────────────────────────────
+All must pass → Then commit
+```
+
+### 5. Commit ONLY When All Tests Pass
 
 **DO NOT COMMIT if any test fails.** The workflow is:
 
@@ -120,7 +153,7 @@ Fix the errors
 Re-run tests ──────→ (loop until all pass)
 ```
 
-### 5. Test Categories by Task Type
+### 6. Test Categories by Task Type
 
 | Task Type | Required Tests |
 |-----------|----------------|
