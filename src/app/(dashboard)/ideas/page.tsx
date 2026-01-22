@@ -100,6 +100,12 @@ export default function IdeasPage() {
   const [isSuggesting, setIsSuggesting] = useState(false);
 
   useEffect(() => {
+    // CRITICAL: Only fetch when we have a selected brand to prevent cross-brand contamination
+    if (!selectedBrand?.id) {
+      setIdeas([]);
+      setIsLoading(false);
+      return;
+    }
     fetchIdeas();
   }, [filter, selectedBrand?.id]);
 
@@ -118,11 +124,17 @@ export default function IdeasPage() {
   }, [ideas]);
 
   const fetchIdeas = async () => {
+    // Guard: Don't fetch without a brand ID - prevents cross-brand data leakage
+    if (!selectedBrand?.id) {
+      setIdeas([]);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const params = new URLSearchParams();
       if (filter) params.set("status", filter);
-      if (selectedBrand?.id) params.set("brandId", selectedBrand.id);
+      params.set("brandId", selectedBrand.id);
       const url = `/api/ideas?${params.toString()}`;
       const res = await fetch(url);
       const data = await res.json();
