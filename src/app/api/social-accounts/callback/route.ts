@@ -63,7 +63,31 @@ export async function GET(request: NextRequest) {
     // Save to database
     const supabase = await createClient();
 
-    // Check if already connected
+    // SAFEGUARD: Check if this Late.dev account is already connected to a DIFFERENT brand
+    // This prevents cross-client data corruption
+    const { data: existingInOtherBrand } = await supabase
+      .from("social_accounts")
+      .select("id, brand_id, brands(name)")
+      .eq("late_account_id", lateAccountId)
+      .neq("brand_id", brandId)
+      .single();
+
+    if (existingInOtherBrand) {
+      console.error("Account already connected to different brand:", {
+        lateAccountId,
+        existingBrandId: existingInOtherBrand.brand_id,
+        requestedBrandId: brandId,
+      });
+      const redirectUrl = new URL(settingsUrl);
+      const brandName = (existingInOtherBrand.brands as { name: string } | null)?.name || "another client";
+      redirectUrl.searchParams.set(
+        "error",
+        `This ${platform} account is already connected to ${brandName}. Disconnect it there first.`
+      );
+      return NextResponse.redirect(redirectUrl.toString());
+    }
+
+    // Check if already connected to THIS brand
     const { data: existing } = await supabase
       .from("social_accounts")
       .select("id")

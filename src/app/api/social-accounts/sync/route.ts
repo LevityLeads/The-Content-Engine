@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { LateClient, LateApiException } from "@/lib/late";
+import { LateClient, LateApiException, LateAccount } from "@/lib/late";
 
 /**
  * POST /api/social-accounts/sync
  *
  * Sync connected accounts from Late.dev to our database.
- * This fetches all accounts from Late.dev and saves new ones to our social_accounts table.
+ * This ONLY updates accounts that already belong to this brand - it does NOT
+ * create new account associations. New accounts should only be connected via
+ * the OAuth callback flow which properly associates them with the correct brand.
+ *
+ * IMPORTANT: Late.dev returns ALL accounts for the API key, not filtered by brand.
+ * We must only sync accounts that were originally connected to THIS brand to prevent
+ * cross-client data corruption.
  *
  * Request body:
- * - brandId: string (required) - The brand to associate accounts with
+ * - brandId: string (required) - The brand to sync accounts for
  */
 export async function POST(request: NextRequest) {
   try {
@@ -77,22 +83,36 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    // Get existing accounts for this brand
-    const { data: existingForBrand } = await supabase
+    // Get existing accounts for this brand ONLY
+    // We will only update these - never insert accounts from Late.dev's global list
+    const { data: existingAccounts } = await supabase
       .from("social_accounts")
       .select("*")
       .eq("brand_id", brandId);
 
-    const existingForBrandIds = new Set(existingForBrand?.map((a) => a.late_account_id) || []);
+    if (!existingAccounts || existingAccounts.length === 0) {
+      // No accounts connected to this brand yet
+      return NextResponse.json({
+        success: true,
+        accounts: [],
+        updatedAccounts: 0,
+        totalFromLate: lateAccounts.length,
+        message: "No accounts connected to this brand. Use the Connect button to add accounts.",
+      });
+    }
 
-    // Insert or update accounts
-    let newAccounts = 0;
+    // Create a map of Late.dev accounts for quick lookup
+    const lateAccountMap = new Map<string, LateAccount>(lateAccounts.map((a) => [a.id, a]));
+
+    // Update ONLY accounts that belong to this brand
     const allAccounts = [];
-    const errors: string[] = [];
+    let updatedAccounts = 0;
 
-    for (const lateAccount of lateAccounts) {
-      if (existingForBrandIds.has(lateAccount.id)) {
-        // Already linked to this brand - just update
+    for (const existingAccount of existingAccounts) {
+      const lateAccount = lateAccountMap.get(existingAccount.late_account_id);
+
+      if (lateAccount) {
+        // Update with fresh data from Late.dev
         const { data: updated } = await supabase
           .from("social_accounts")
           .update({
@@ -100,79 +120,30 @@ export async function POST(request: NextRequest) {
             is_active: lateAccount.isActive !== false,
             updated_at: new Date().toISOString(),
           })
-          .eq("brand_id", brandId)
-          .eq("late_account_id", lateAccount.id)
+          .eq("id", existingAccount.id) // Use specific ID, not brand_id + late_account_id
           .select()
           .single();
 
         if (updated) {
+          updatedAccounts++;
           allAccounts.push({
             ...updated,
             profile_image_url: lateAccount.profileImageUrl,
           });
         }
       } else {
-        // Not yet linked to this brand - insert new record
-        // (Each brand gets its own social_accounts record, even if same Late.dev account)
-        // Normalize platform to lowercase for consistent querying
-        const normalizedPlatform = (lateAccount.platform || "").toLowerCase();
-        const { data: inserted, error: insertError } = await supabase
-          .from("social_accounts")
-          .insert({
-            brand_id: brandId,
-            platform: normalizedPlatform,
-            platform_user_id: `${lateAccount.id}_${brandId}`, // Make unique per brand
-            platform_username: lateAccount.username,
-            access_token_encrypted: "managed_by_late",
-            late_account_id: lateAccount.id,
-            is_active: lateAccount.isActive !== false,
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("Error inserting account:", insertError);
-          errors.push(`Failed to link ${lateAccount.platform} (@${lateAccount.username}): ${insertError.message}`);
-        } else {
-          newAccounts++;
-          allAccounts.push({
-            ...inserted,
-            profile_image_url: lateAccount.profileImageUrl,
-          });
-        }
-      }
-    }
-
-    // Also fetch any accounts we have that aren't in Late.dev anymore
-    const { data: ourAccounts } = await supabase
-      .from("social_accounts")
-      .select("*")
-      .eq("brand_id", brandId)
-      .eq("is_active", true);
-
-    // Add any accounts we already had that weren't updated
-    const syncedIds = new Set(allAccounts.map((a) => a.id));
-    for (const acc of ourAccounts || []) {
-      if (!syncedIds.has(acc.id)) {
-        allAccounts.push(acc);
+        // Account exists in our DB but not in Late.dev anymore
+        // Keep it but mark as potentially disconnected
+        console.log(`Account ${existingAccount.late_account_id} not found in Late.dev`);
+        allAccounts.push(existingAccount);
       }
     }
 
     return NextResponse.json({
       success: true,
       accounts: allAccounts,
-      newAccounts,
+      updatedAccounts,
       totalFromLate: lateAccounts.length,
-      errors: errors.length > 0 ? errors : undefined,
-      debug: {
-        lateAccountsFound: lateAccounts.map((a: { platform?: string; username?: string; id?: string }) => ({
-          platform: a.platform,
-          username: a.username,
-          id: a.id,
-        })),
-        brandId,
-        existingForBrandCount: existingForBrand?.length || 0,
-      },
     });
   } catch (error) {
     console.error("Error in POST /api/social-accounts/sync:", error);
