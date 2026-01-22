@@ -256,9 +256,10 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
           visual_config: (data.brand.visual_config as VisualConfig) || {},
         };
         setBrands((prev) => prev.map((b) => (b.id === brandId ? updatedBrand : b)));
-        if (selectedBrand?.id === brandId) {
-          setSelectedBrand(updatedBrand);
-        }
+        // Fix: Use functional update to avoid stale closure bug
+        // The previous code captured selectedBrand in the closure, which could become stale
+        // during async operations, causing the update to silently fail
+        setSelectedBrand((current) => (current?.id === brandId ? updatedBrand : current));
         return updatedBrand;
       }
       return null;
@@ -266,7 +267,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       console.error("Error updating brand:", err);
       return null;
     }
-  }, [selectedBrand]);
+  }, []); // Fix: Empty dependency array - brandId is passed as parameter
 
   const deleteBrand = useCallback(async (brandId: string): Promise<DeleteResult> => {
     try {
@@ -276,20 +277,31 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json();
 
       if (data.success) {
-        // Remove from brands list
-        setBrands((prev) => prev.filter((b) => b.id !== brandId));
+        // Track remaining brands for selection update
+        // This variable is set synchronously in setBrands before setSelectedBrand runs
+        let remainingBrands: BrandWithConfig[] = [];
 
-        // If this was the selected brand, select another one
-        if (selectedBrand?.id === brandId) {
-          const remainingBrands = brands.filter((b) => b.id !== brandId);
-          if (remainingBrands.length > 0) {
-            setSelectedBrand(remainingBrands[0]);
-            localStorage.setItem(SELECTED_BRAND_KEY, remainingBrands[0].id);
-          } else {
-            setSelectedBrand(null);
-            localStorage.removeItem(SELECTED_BRAND_KEY);
+        // Remove from brands list
+        setBrands((prev) => {
+          remainingBrands = prev.filter((b) => b.id !== brandId);
+          return remainingBrands;
+        });
+
+        // Fix: Use functional update to avoid stale closure bug
+        // The previous code captured selectedBrand and brands in the closure,
+        // which could become stale during async operations
+        setSelectedBrand((current) => {
+          if (current?.id === brandId) {
+            if (remainingBrands.length > 0) {
+              localStorage.setItem(SELECTED_BRAND_KEY, remainingBrands[0].id);
+              return remainingBrands[0];
+            } else {
+              localStorage.removeItem(SELECTED_BRAND_KEY);
+              return null;
+            }
           }
-        }
+          return current;
+        });
 
         return {
           success: true,
@@ -308,7 +320,7 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
         error: "Network error. Please try again.",
       };
     }
-  }, [selectedBrand, brands]);
+  }, []); // Fix: Empty dependency array - brandId is passed as parameter
 
   return (
     <BrandContext.Provider
