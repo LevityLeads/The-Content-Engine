@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Lightbulb, Check, X, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Facebook, Clock, ChevronDown, ChevronRight, Square, CheckSquare, Trash2, AlertCircle, CheckCircle2, XCircle, MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useBrand } from "@/contexts/brand-context";
+import { useIdeas } from "@/hooks/use-swr-hooks";
 
 interface Idea {
   id: string;
@@ -26,6 +27,12 @@ interface Idea {
     raw_content: string;
     type: string;
   };
+}
+
+// Type for SWR data structure
+interface IdeasData {
+  ideas: Idea[];
+  success: boolean;
 }
 
 const ALL_PLATFORMS = ["twitter", "instagram", "linkedin", "facebook"] as const;
@@ -83,11 +90,19 @@ const statusColors: Record<string, string> = {
 export default function IdeasPage() {
   const router = useRouter();
   const { selectedBrand } = useBrand();
-  const [ideas, setIdeas] = useState<Idea[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState<string>("pending");
+
+  // Use SWR hook for caching, deduplication, and stale-while-revalidate
+  const { ideas: rawIdeas, isLoading, isValidating, mutate } = useIdeas({
+    status: filter || undefined,
+    limit: 50,
+  });
+
+  // Memoize ideas to prevent unnecessary re-renders
+  const ideas = useMemo(() => rawIdeas || [], [rawIdeas]);
+
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [generatingContent, setGeneratingContent] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string>("pending");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   // Track selected platforms per idea
   const [selectedPlatforms, setSelectedPlatforms] = useState<Record<string, string[]>>({});
@@ -105,16 +120,6 @@ export default function IdeasPage() {
   const [suggestionText, setSuggestionText] = useState("");
   const [isSuggesting, setIsSuggesting] = useState(false);
 
-  useEffect(() => {
-    // CRITICAL: Only fetch when we have a selected brand to prevent cross-brand contamination
-    if (!selectedBrand?.id) {
-      setIdeas([]);
-      setIsLoading(false);
-      return;
-    }
-    fetchIdeas();
-  }, [filter, selectedBrand?.id]);
-
   // Initialize selected platforms when ideas load
   useEffect(() => {
     const initial: Record<string, string[]> = {};
@@ -128,31 +133,6 @@ export default function IdeasPage() {
       setSelectedPlatforms((prev) => ({ ...prev, ...initial }));
     }
   }, [ideas]);
-
-  const fetchIdeas = async () => {
-    // Guard: Don't fetch without a brand ID - prevents cross-brand data leakage
-    if (!selectedBrand?.id) {
-      setIdeas([]);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const params = new URLSearchParams();
-      if (filter) params.set("status", filter);
-      params.set("brandId", selectedBrand.id);
-      const url = `/api/ideas?${params.toString()}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.success) {
-        setIdeas(data.ideas || []);
-      }
-    } catch (err) {
-      console.error("Error fetching ideas:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const togglePlatform = (ideaId: string, platform: string) => {
     setSelectedPlatforms((prev) => {
@@ -212,7 +192,11 @@ export default function IdeasPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setIdeas((prev) => prev.filter((i) => i.id !== id));
+        // Optimistic update through SWR
+        mutate(
+          (current: IdeasData | undefined) => current ? { ...current, ideas: current.ideas.filter((i: Idea) => i.id !== id) } : current,
+          { revalidate: false }
+        );
         setDeleteConfirmId(null);
         setSelectedItems((prev) => {
           const newSet = new Set(prev);
@@ -256,7 +240,11 @@ export default function IdeasPage() {
     });
 
     if (successfulDeletes.length > 0) {
-      setIdeas((prev) => prev.filter((i) => !successfulDeletes.includes(i.id)));
+      // Optimistic update through SWR
+      mutate(
+        (current: IdeasData | undefined) => current ? { ...current, ideas: current.ideas.filter((i: Idea) => !successfulDeletes.includes(i.id)) } : current,
+        { revalidate: false }
+      );
       setSelectedItems((prev) => {
         const newSet = new Set(prev);
         successfulDeletes.forEach((id) => newSet.delete(id));
@@ -309,13 +297,21 @@ export default function IdeasPage() {
     });
 
     if (successfulRejects.length > 0) {
+      // Optimistic update through SWR
       if (filter === "pending") {
-        setIdeas((prev) => prev.filter((i) => !successfulRejects.includes(i.id)));
+        mutate(
+          (current: IdeasData | undefined) => current ? { ...current, ideas: current.ideas.filter((i: Idea) => !successfulRejects.includes(i.id)) } : current,
+          { revalidate: false }
+        );
       } else {
-        setIdeas((prev) =>
-          prev.map((i) =>
-            successfulRejects.includes(i.id) ? { ...i, status: "rejected" } : i
-          )
+        mutate(
+          (current: IdeasData | undefined) => current ? {
+            ...current,
+            ideas: current.ideas.map((i: Idea) =>
+              successfulRejects.includes(i.id) ? { ...i, status: "rejected" } : i
+            )
+          } : current,
+          { revalidate: false }
         );
       }
       setSelectedItems(new Set());
@@ -343,29 +339,34 @@ export default function IdeasPage() {
       const data = await res.json();
 
       if (data.success && data.idea) {
-        // Update the idea in local state
-        setIdeas((prev) =>
-          prev.map((idea) =>
-            idea.id === suggestDialogId
-              ? {
-                  ...idea,
-                  concept: data.idea.concept,
-                  angle: data.idea.angle,
-                  target_platforms: data.idea.target_platforms,
-                  key_points: data.idea.key_points,
-                  potential_hooks: data.idea.potential_hooks,
-                  ai_reasoning: data.idea.ai_reasoning,
-                  confidence_score: data.idea.confidence_score,
-                  status: "pending",
-                }
-              : idea
-          )
+        const updatedIdeaId = suggestDialogId;
+        // Optimistic update through SWR
+        mutate(
+          (current: IdeasData | undefined) => current ? {
+            ...current,
+            ideas: current.ideas.map((idea: Idea) =>
+              idea.id === updatedIdeaId
+                ? {
+                    ...idea,
+                    concept: data.idea.concept,
+                    angle: data.idea.angle,
+                    target_platforms: data.idea.target_platforms,
+                    key_points: data.idea.key_points,
+                    potential_hooks: data.idea.potential_hooks,
+                    ai_reasoning: data.idea.ai_reasoning,
+                    confidence_score: data.idea.confidence_score,
+                    status: "pending",
+                  }
+                : idea
+            )
+          } : current,
+          { revalidate: false }
         );
         setSuccessMessage("Idea updated with your suggestions! Review and approve when ready.");
         setSuggestDialogId(null);
         setSuggestionText("");
         // Expand the card to show the updated content
-        setExpandedCards((prev) => new Set([...prev, suggestDialogId]));
+        setExpandedCards((prev) => new Set([...prev, updatedIdeaId]));
       } else {
         setErrorMessage(data.error || "Failed to apply suggestions");
       }
@@ -389,11 +390,15 @@ export default function IdeasPage() {
 
       const data = await res.json();
       if (data.success) {
-        // Update local state
-        setIdeas((prev) =>
-          prev.map((idea) =>
-            idea.id === id ? { ...idea, status } : idea
-          )
+        // Update through SWR
+        mutate(
+          (current: IdeasData | undefined) => current ? {
+            ...current,
+            ideas: current.ideas.map((idea: Idea) =>
+              idea.id === id ? { ...idea, status } : idea
+            )
+          } : current,
+          { revalidate: false }
         );
 
         // If approved, generate content for selected platforms only
@@ -420,11 +425,15 @@ export default function IdeasPage() {
           const contentData = await contentRes.json();
           if (contentData.success) {
             setSuccessMessage(`Content generated for ${contentData.content?.length || 0} platform(s)! View in Content page.`);
-            // Update idea status to generated
-            setIdeas((prev) =>
-              prev.map((idea) =>
-                idea.id === id ? { ...idea, status: "generated" } : idea
-              )
+            // Update idea status to generated through SWR
+            mutate(
+              (current: IdeasData | undefined) => current ? {
+                ...current,
+                ideas: current.ideas.map((idea: Idea) =>
+                  idea.id === id ? { ...idea, status: "generated" } : idea
+                )
+              } : current,
+              { revalidate: false }
             );
           } else {
             setSuccessMessage("Idea approved but content generation failed. Try again from Content page.");
@@ -432,9 +441,15 @@ export default function IdeasPage() {
           setGeneratingContent(null);
         }
 
-        // If filtering by pending, remove from list
+        // If filtering by pending, remove from list through SWR
         if (filter === "pending") {
-          setIdeas((prev) => prev.filter((idea) => idea.id !== id));
+          mutate(
+            (current: IdeasData | undefined) => current ? {
+              ...current,
+              ideas: current.ideas.filter((idea: Idea) => idea.id !== id)
+            } : current,
+            { revalidate: false }
+          );
         }
       }
     } catch (err) {
@@ -445,7 +460,7 @@ export default function IdeasPage() {
     }
   };
 
-  const pendingCount = ideas.filter((i) => i.status === "pending").length;
+  const pendingCount = useMemo(() => ideas.filter((i) => i.status === "pending").length, [ideas]);
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -473,8 +488,8 @@ export default function IdeasPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchIdeas}>
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={() => mutate()} disabled={isValidating}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", isValidating && "animate-spin")} />
             Refresh
           </Button>
           <Badge variant="outline" className="text-sm">
