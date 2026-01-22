@@ -1844,6 +1844,21 @@ export default function ContentPage() {
     return "typography";
   };
 
+  // Get effective style for a content item, with brand default as fallback
+  const getEffectiveStyle = (contentId: string, contentMetadata?: Content["metadata"]): string => {
+    // Priority: 1. User selection, 2. Content saved style, 3. Brand default, 4. "typography"
+    if (selectedVisualStyle[contentId]) {
+      return selectedVisualStyle[contentId];
+    }
+    if (contentMetadata?.carouselStyle) {
+      return getCarouselStyleId(contentMetadata.carouselStyle);
+    }
+    if (selectedBrand?.visual_config?.defaultStyle?.visualStyle) {
+      return selectedBrand.visual_config.defaultStyle.visualStyle;
+    }
+    return "typography";
+  };
+
   const truncateText = (text: string | null | undefined, maxLength: number) => {
     if (!text) return "";
     if (text.length <= maxLength) return text;
@@ -2139,11 +2154,16 @@ export default function ContentPage() {
 
               {/* Visual Style Selector */}
               <div>
-                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Visual Style</label>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                  Visual Style
+                  {selectedBrand?.visual_config?.defaultStyle && !selectedVisualStyle[item.id] && !item.metadata?.carouselStyle && (
+                    <span className="ml-1 text-primary">(brand default)</span>
+                  )}
+                </label>
                 <div className="flex gap-1">
                   <select
                     className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
-                    value={selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)}
+                    value={getEffectiveStyle(item.id, item.metadata)}
                     onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
                   >
                     {visualStyleOptions.map((style) => (
@@ -2185,7 +2205,7 @@ export default function ContentPage() {
                           size="sm"
                           className="w-full justify-start h-7 text-xs"
                           onClick={() => openSavePresetDialog(item.id)}
-                          disabled={!item.metadata?.designSystems?.[selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)]}
+                          disabled={!item.metadata?.designSystems?.[getEffectiveStyle(item.id, item.metadata)]}
                         >
                           <Save className="h-3 w-3 mr-2" />
                           Save current style
@@ -2360,11 +2380,16 @@ export default function ContentPage() {
 
               {/* Visual Style Selector */}
               <div>
-                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Visual Style</label>
+                <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                  Visual Style
+                  {selectedBrand?.visual_config?.defaultStyle && !selectedVisualStyle[item.id] && !item.metadata?.carouselStyle && (
+                    <span className="ml-1 text-primary">(brand default)</span>
+                  )}
+                </label>
                 <div className="flex gap-1">
                   <select
                     className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
-                    value={selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)}
+                    value={getEffectiveStyle(item.id, item.metadata)}
                     onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
                   >
                     {visualStyleOptions.map((style) => (
@@ -2406,7 +2431,7 @@ export default function ContentPage() {
                           size="sm"
                           className="w-full justify-start h-7 text-xs"
                           onClick={() => openSavePresetDialog(item.id)}
-                          disabled={!item.metadata?.designSystems?.[selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)]}
+                          disabled={!item.metadata?.designSystems?.[getEffectiveStyle(item.id, item.metadata)]}
                         >
                           <Save className="h-3 w-3 mr-2" />
                           Save current style

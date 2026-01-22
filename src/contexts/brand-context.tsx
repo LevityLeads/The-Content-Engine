@@ -34,6 +34,23 @@ export interface SavedDesignSystemPreset {
   createdAt: string;
 }
 
+// Default brand style configuration (selected during onboarding)
+export interface BrandDefaultStyle {
+  visualStyle: string; // e.g., "typography", "photorealistic", "illustration"
+  textStyle: string; // e.g., "bold-editorial", "clean-modern"
+  textColor: string; // e.g., "white-coral", "dark-blue"
+  designSystem?: {
+    background: string;
+    primaryColor: string;
+    accentColor: string;
+    typography: string;
+    layout: string;
+    mood: string;
+  };
+  selectedAt: string; // ISO timestamp
+  sampleImageUsed?: string; // The sample image that was selected during onboarding
+}
+
 export interface VisualConfig {
   primary_color?: string;
   secondary_color?: string;
@@ -48,6 +65,7 @@ export interface VisualConfig {
   example_posts?: string[]; // User-uploaded example images (base64 or URLs)
   master_brand_prompt?: string; // AI-generated visual brand description from example posts
   savedDesignSystems?: SavedDesignSystemPreset[]; // Saved design system presets
+  defaultStyle?: BrandDefaultStyle; // Default style selected during onboarding
 }
 
 export interface BrandWithConfig extends Omit<Brand, "voice_config" | "visual_config"> {
