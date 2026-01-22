@@ -1067,10 +1067,14 @@ export default function ContentPage() {
     setPublishingId(contentId);
     setPublishMessage(null);
     try {
+      // Get the selected image IDs based on user's variant selections
+      const selectedImageIds = getSelectedImageIds(contentId);
+      console.log("Publishing with selected images:", selectedImageIds);
+
       const res = await fetch("/api/content/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentId }),
+        body: JSON.stringify({ contentId, selectedImageIds }),
       });
       const data = await res.json();
       if (data.success) {
@@ -1700,6 +1704,36 @@ export default function ContentPage() {
   const setVersionIndex = (contentId: string, slideNumber: number, index: number) => {
     const key = `${contentId}-${slideNumber}`;
     setSelectedVersionIndex((prev) => ({ ...prev, [key]: index }));
+  };
+
+  // Get the selected image IDs for publishing (one per slide based on user's variant selection)
+  const getSelectedImageIds = (contentId: string): string[] => {
+    const contentItem = content.find(c => c.id === contentId);
+    if (!contentItem) return [];
+
+    const { parsed: carouselSlides } = parseCarouselSlides(contentItem.copy_carousel_slides);
+
+    if (carouselSlides && carouselSlides.length > 0) {
+      // Carousel: get selected variant for each slide
+      const selectedIds: string[] = [];
+      for (const slide of carouselSlides) {
+        const slideImgs = getSlideImages(contentId, slide.slideNumber);
+        if (slideImgs.length > 0) {
+          const versionIdx = getVersionIndex(contentId, slide.slideNumber);
+          const safeIdx = Math.min(versionIdx, slideImgs.length - 1);
+          const selectedImg = slideImgs[safeIdx];
+          if (selectedImg?.id) {
+            selectedIds.push(selectedImg.id);
+          }
+        }
+      }
+      return selectedIds;
+    } else {
+      // Single image post: get the first valid image
+      const contentImgs = images[contentId] || [];
+      const validImg = contentImgs.find(img => img.url && !img.url.startsWith("placeholder:"));
+      return validImg ? [validImg.id] : [];
+    }
   };
 
   // Helper to extract visual style string from carouselStyle (which can be string or object)
