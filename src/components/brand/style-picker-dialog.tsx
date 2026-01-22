@@ -48,15 +48,13 @@ export function StylePickerDialog({
             Select the visual style that will be automatically applied to all new content for {brandName}.
           </DialogDescription>
         </DialogHeader>
-        {open && (
-          <StylePicker
-            key={mountKey}
-            brandColors={brandColors}
-            brandName={brandName}
-            onStyleSelected={onStyleSelected}
-            onSkip={() => onOpenChange(false)}
-          />
-        )}
+        <StylePicker
+          key={mountKey}
+          brandColors={brandColors}
+          brandName={brandName}
+          onStyleSelected={onStyleSelected}
+          onSkip={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );

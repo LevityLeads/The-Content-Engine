@@ -1103,7 +1103,10 @@ function SettingsPageContent() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => setShowStylePicker(true)}
+                  onClick={() => {
+                    console.log("Opening style picker dialog (change)");
+                    setShowStylePicker(true);
+                  }}
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Change Default Style
@@ -1134,7 +1137,10 @@ function SettingsPageContent() {
                   No default style set. New content will use the default &quot;Typography&quot; style.
                 </p>
               </div>
-              <Button onClick={() => setShowStylePicker(true)}>
+              <Button onClick={() => {
+                console.log("Opening style picker dialog");
+                setShowStylePicker(true);
+              }}>
                 <Sparkles className="mr-2 h-4 w-4" />
                 Choose Default Style
               </Button>
@@ -1144,35 +1150,33 @@ function SettingsPageContent() {
       </Card>
 
       {/* Style Picker Dialog */}
-      {showStylePicker && (
-        <StylePickerDialog
-          open={showStylePicker}
-          onOpenChange={setShowStylePicker}
-          brandColors={{
-            primary_color: visualConfig.primary_color,
-            accent_color: visualConfig.accent_color,
-          }}
-          brandName={selectedBrand?.name || "Brand"}
-          onStyleSelected={async (style) => {
-            const defaultStyle = {
-              visualStyle: style.visualStyle,
-              textStyle: style.textStyle,
-              textColor: style.textColor,
-              designSystem: style.designSystem,
-              selectedAt: new Date().toISOString(),
-              sampleImageUsed: style.sampleImage,
-            };
-            const newConfig = { ...visualConfig, defaultStyle };
-            setVisualConfig(newConfig);
-            if (selectedBrand) {
-              await updateBrand(selectedBrand.id, { visual_config: newConfig });
-              setSaveMessage({ type: "success", text: "Default style updated!" });
-              setTimeout(() => setSaveMessage(null), 3000);
-            }
-            setShowStylePicker(false);
-          }}
-        />
-      )}
+      <StylePickerDialog
+        open={showStylePicker}
+        onOpenChange={setShowStylePicker}
+        brandColors={{
+          primary_color: visualConfig.primary_color,
+          accent_color: visualConfig.accent_color,
+        }}
+        brandName={selectedBrand?.name || "Brand"}
+        onStyleSelected={async (style) => {
+          const defaultStyle = {
+            visualStyle: style.visualStyle,
+            textStyle: style.textStyle,
+            textColor: style.textColor,
+            designSystem: style.designSystem,
+            selectedAt: new Date().toISOString(),
+            sampleImageUsed: style.sampleImage,
+          };
+          const newConfig = { ...visualConfig, defaultStyle };
+          setVisualConfig(newConfig);
+          if (selectedBrand) {
+            await updateBrand(selectedBrand.id, { visual_config: newConfig });
+            setSaveMessage({ type: "success", text: "Default style updated!" });
+            setTimeout(() => setSaveMessage(null), 3000);
+          }
+          setShowStylePicker(false);
+        }}
+      />
 
       {/* Connected Accounts */}
       <Card>
