@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import satori from 'satori';
 import sharp from 'sharp';
 import {
@@ -709,8 +709,8 @@ export async function POST(request: NextRequest) {
       console.log(`Compositing slide ${slide.slideNumber}/${totalSlides} (${templateType})`);
 
       try {
-        // Generate composite image
-        const imageUrl = await compositeSlide(
+        // Generate composite image (returns base64 data URL)
+        const compositeDataUrl = await compositeSlide(
           bgImage,
           slideContent,
           design,
@@ -720,13 +720,48 @@ export async function POST(request: NextRequest) {
           height
         );
 
+        // Upload to Supabase Storage for better performance
+        let finalImageUrl = compositeDataUrl;
+        let storagePath: string | null = null;
+
+        try {
+          const adminClient = createAdminClient();
+          const base64Data = compositeDataUrl.split(',')[1];
+          const imageBuffer = Buffer.from(base64Data, 'base64');
+          const filename = `images/${contentId}/slide-${slide.slideNumber}-${Date.now()}.png`;
+
+          const { error: uploadError } = await adminClient.storage
+            .from('images')
+            .upload(filename, imageBuffer, {
+              contentType: 'image/png',
+              upsert: true,
+            });
+
+          if (uploadError) {
+            console.error(`Error uploading slide ${slide.slideNumber} to storage:`, uploadError);
+            // Fall back to data URL if storage upload fails
+          } else {
+            const { data: publicUrlData } = adminClient.storage
+              .from('images')
+              .getPublicUrl(filename);
+
+            finalImageUrl = publicUrlData.publicUrl;
+            storagePath = filename;
+            console.log(`Slide ${slide.slideNumber} uploaded to storage: ${finalImageUrl}`);
+          }
+        } catch (uploadErr) {
+          console.error(`Storage upload error for slide ${slide.slideNumber}:`, uploadErr);
+          // Continue with data URL fallback
+        }
+
         // Save to database
         const { data: savedImage, error: saveError } = await supabase
           .from('images')
           .insert({
             content_id: contentId,
             prompt: `[Slide ${slide.slideNumber}] Composite: ${slide.text.substring(0, 100)}`,
-            url: imageUrl,
+            url: finalImageUrl,
+            storage_path: storagePath,
             is_primary: slide.slideNumber === 1,
             format: 'png',
             dimensions: { width, height, aspectRatio: '4:5', model: 'composite' },
@@ -745,7 +780,7 @@ export async function POST(request: NextRequest) {
 
         generatedImages.push({
           slideNumber: slide.slideNumber,
-          imageUrl,
+          imageUrl: finalImageUrl,
           savedImage: savedImage ? {
             id: savedImage.id,
             url: savedImage.url,

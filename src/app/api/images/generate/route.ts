@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from "@/lib/image-models";
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/video-models";
 import { BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
@@ -236,8 +236,9 @@ export async function POST(request: NextRequest) {
     // Check if we have the Google API key for Nano Banana Pro
     const googleApiKey = process.env.GOOGLE_API_KEY;
 
-    let imageUrl = null;
-    let imageBase64 = null;
+    let imageUrl: string | null = null;
+    let imageBase64: string | null = null;
+    let storagePath: string | null = null;
     let generationStatus = "pending";
     let generationMessage = "";
     let errorCode: string | null = null;
@@ -313,15 +314,42 @@ CRITICAL OUTPUT REQUIREMENTS:
           const parts = data.candidates?.[0]?.content?.parts || [];
           for (const part of parts) {
             if (part.inlineData?.data) {
-              imageBase64 = part.inlineData.data;
+              const base64Data = part.inlineData.data as string;
+              imageBase64 = base64Data;
               const mimeType = part.inlineData.mimeType || "image/png";
+              const extension = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
 
-              // Store as data URL for now - storage caching to be implemented properly later
-              imageUrl = `data:${mimeType};base64,${imageBase64}`;
+              // Upload image to Supabase Storage for better performance and caching
+              const adminClient = createAdminClient();
+              const imageBuffer = Buffer.from(base64Data, "base64");
+              const filename = `images/${contentId}/${Date.now()}.${extension}`;
+
+              const { error: uploadError } = await adminClient.storage
+                .from("images")
+                .upload(filename, imageBuffer, {
+                  contentType: mimeType,
+                  upsert: true,
+                });
+
+              if (uploadError) {
+                console.error("Error uploading image to storage:", uploadError);
+                // Fall back to data URL if storage upload fails
+                imageUrl = `data:${mimeType};base64,${base64Data}`;
+                console.log("Falling back to data URL due to storage error");
+              } else {
+                // Get public URL for the uploaded image
+                const { data: publicUrlData } = adminClient.storage
+                  .from("images")
+                  .getPublicUrl(filename);
+
+                imageUrl = publicUrlData.publicUrl;
+                storagePath = filename;
+                console.log(`Image uploaded to storage: ${imageUrl}`);
+              }
 
               generationStatus = "generated";
               generationMessage = `Image generated with ${modelConfig.name} for ${platform.toUpperCase()} (${imageConfig.width}x${imageConfig.height})`;
-              console.log(`Image generated successfully with ${modelConfig.name}, base64 length: ${imageBase64.length}`);
+              console.log(`Image generated successfully with ${modelConfig.name}, base64 length: ${base64Data.length}`);
               break;
             }
           }
@@ -380,6 +408,7 @@ CRITICAL OUTPUT REQUIREMENTS:
         content_id: contentId,
         prompt: prompt,
         url: imageUrl || `placeholder:${content.platform}`,
+        storage_path: storagePath,
         is_primary: true,
         format: "png",
         dimensions: {
