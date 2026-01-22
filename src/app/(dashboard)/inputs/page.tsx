@@ -111,14 +111,26 @@ export default function InputsPage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // CRITICAL: Only fetch when we have a selected brand to prevent cross-brand contamination
+    if (!selectedBrand?.id) {
+      setRecentInputs([]);
+      setIsLoadingRecent(false);
+      return;
+    }
     fetchRecentInputs();
   }, [selectedBrand?.id]);
 
   const fetchRecentInputs = async () => {
+    // Guard: Don't fetch without a brand ID - prevents cross-brand data leakage
+    if (!selectedBrand?.id) {
+      setRecentInputs([]);
+      return;
+    }
+
     try {
       setIsLoadingRecent(true);
       const params = new URLSearchParams({ limit: "10" });
-      if (selectedBrand?.id) params.set("brandId", selectedBrand.id);
+      params.set("brandId", selectedBrand.id);
       const res = await fetch(`/api/inputs?${params.toString()}`);
       const data = await res.json();
       if (data.success) {

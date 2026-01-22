@@ -145,14 +145,27 @@ export default function CalendarPage() {
 
   // Fetch all scheduled and published content
   useEffect(() => {
+    // CRITICAL: Only fetch when we have a selected brand to prevent cross-brand contamination
+    if (!selectedBrand?.id) {
+      setContent([]);
+      setContentImages({});
+      setIsLoading(false);
+      return;
+    }
     fetchContent();
   }, [selectedBrand?.id]);
 
   const fetchContent = async () => {
+    // Guard: Don't fetch without a brand ID - prevents cross-brand data leakage
+    if (!selectedBrand?.id) {
+      setContent([]);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Fetch scheduled, published, and approved content
-      const params = selectedBrand?.id ? `brandId=${selectedBrand.id}&` : "";
+      // Fetch scheduled, published, and approved content with brand filtering
+      const params = `brandId=${selectedBrand.id}&`;
       const [scheduledRes, publishedRes, approvedRes] = await Promise.all([
         fetch(`/api/content?${params}status=scheduled&limit=100`),
         fetch(`/api/content?${params}status=published&limit=100`),
