@@ -470,22 +470,27 @@ function SettingsPageContent() {
     setShowAccountPicker(null);
     setLoadingAccounts(true);
 
+    const payload = {
+      brandId: selectedBrand.id,
+      lateAccountId: lateAccount.id,
+      platform: lateAccount.platform,
+      username: lateAccount.username,
+    };
+
+    console.log("Linking account with payload:", payload);
+
     try {
       const res = await fetch("/api/social-accounts/link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          brandId: selectedBrand.id,
-          lateAccountId: lateAccount.id,
-          platform: lateAccount.platform,
-          username: lateAccount.username,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
+      console.log("Link response:", res.status, data);
 
       if (data.success) {
-        setSocialAccounts((prev) => [...prev.filter(a => a.platform !== lateAccount.platform), data.account]);
+        setSocialAccounts((prev) => [...prev.filter(a => a.platform?.toLowerCase() !== lateAccount.platform?.toLowerCase()), data.account]);
         setSaveMessage({ type: "success", text: `Connected @${lateAccount.username}` });
       } else {
         setSaveMessage({ type: "error", text: data.error || "Failed to link account" });
