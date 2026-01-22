@@ -259,11 +259,21 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (socialError || !socialAccount?.late_account_id) {
-      console.log(`No connected ${content.platform} account found for brand ${content.brand_id}`);
+      // Get brand name for clearer error message
+      const brandName = content.brands?.name || "Unknown";
+      console.log(`No connected ${content.platform} account found for brand ${content.brand_id} (${brandName})`);
+      console.log(`Query details: brand_id=${content.brand_id}, platform=${content.platform}, socialError=${socialError?.message || 'none'}, late_account_id=${socialAccount?.late_account_id || 'missing'}`);
       return NextResponse.json(
         {
           success: false,
-          error: `No ${content.platform} account connected for this client. Go to Settings → Connected Accounts and sync your Late.dev accounts.`,
+          error: `No ${content.platform} account connected for "${brandName}". Make sure you have the correct client selected, then go to Settings → Connected Accounts and sync your Late.dev accounts.`,
+          debug: {
+            contentBrandId: content.brand_id,
+            brandName,
+            platform: content.platform,
+            hasAccount: !!socialAccount,
+            hasLateAccountId: !!socialAccount?.late_account_id,
+          },
         },
         { status: 400 }
       );
