@@ -688,6 +688,80 @@ export default function ContentPage() {
     }
   };
 
+  // Regenerate only the prompt (without generating an image)
+  const handleRegeneratePromptOnly = async (contentId: string, slide: CarouselSlide) => {
+    const key = `${contentId}-${slide.slideNumber}`;
+    setGeneratingPrompt(key);
+    setImageMessage("Regenerating prompt...");
+
+    try {
+      const contentItem = content.find((c) => c.id === contentId);
+      if (!contentItem) return;
+
+      const currentStyle = selectedVisualStyle[contentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
+
+      // Generate new prompt
+      const promptResponse = await fetch("/api/prompts/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentId,
+          slides: [{ slideNumber: slide.slideNumber, text: slide.text }],
+          visualStyle: currentStyle,
+          mediaType: "image",
+          brandId: selectedBrand?.id,
+        }),
+      });
+
+      const promptData = await promptResponse.json();
+
+      if (!promptData.success) {
+        setImageMessage(`Error: ${promptData.error || "Failed to generate prompt"}`);
+        return;
+      }
+
+      const generatedPrompt = promptData.prompts[0]?.prompt;
+      if (!generatedPrompt) {
+        setImageMessage("Error: No prompt generated");
+        return;
+      }
+
+      // Build the updated slides array
+      const updatedSlides = contentItem.copy_carousel_slides?.map((slideData) => {
+        const s = typeof slideData === 'string' ? JSON.parse(slideData) : slideData;
+        if (s.slideNumber === slide.slideNumber) {
+          return JSON.stringify({ ...s, imagePrompt: generatedPrompt });
+        }
+        return typeof slideData === 'string' ? slideData : JSON.stringify(slideData);
+      }) || [];
+
+      // Persist to database
+      const res = await fetch("/api/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: contentId, copy_carousel_slides: updatedSlides }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        // Update local state
+        setContent((prev) =>
+          prev.map((c) => (c.id === contentId ? { ...c, copy_carousel_slides: updatedSlides } : c))
+        );
+        setImageMessage("Prompt regenerated successfully");
+      } else {
+        setImageMessage("Error saving prompt");
+      }
+
+    } catch (error) {
+      console.error("Error regenerating prompt:", error);
+      setImageMessage("Error regenerating prompt");
+    } finally {
+      setGeneratingPrompt(null);
+      setTimeout(() => setImageMessage(null), 5000);
+    }
+  };
+
   // Generate prompts and images for all slides
   const handleGenerateAllWithPrompts = async (contentId: string, slides: CarouselSlide[]) => {
     setImageMessage("Generating prompts and images for all slides...");
@@ -2303,7 +2377,7 @@ export default function ContentPage() {
                         <Button variant="ghost" size="icon" className="h-5 w-5" title="Edit" onClick={() => { setEditingImagePrompt({ contentId: item.id, slideNumber: slide.slideNumber }); setEditedImagePrompt(slide.imagePrompt || ""); }}>
                           <Pencil className="h-2.5 w-2.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-5 w-5" title="Regenerate" onClick={() => handleGenerateWithPrompt(item.id, slide)} disabled={isGenerating || generatingPrompt === `${item.id}-${slide.slideNumber}`}>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" title="Regenerate Prompt" onClick={() => handleRegeneratePromptOnly(item.id, slide)} disabled={isGenerating || generatingPrompt === `${item.id}-${slide.slideNumber}`}>
                           {generatingPrompt === `${item.id}-${slide.slideNumber}` ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RefreshCw className="h-2.5 w-2.5" />}
                         </Button>
                       </>
@@ -2323,7 +2397,7 @@ export default function ContentPage() {
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] text-muted-foreground">Style Variants</span>
-                  <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => handleGenerateWithPrompt(item.id, slide)} disabled={isGenerating || generatingPrompt !== null}>
+                  <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => slide.imagePrompt ? handleGenerateImage(item.id, slide.imagePrompt, slide.slideNumber) : handleGenerateWithPrompt(item.id, slide)} disabled={isGenerating || generatingPrompt !== null} title={slide.imagePrompt ? "Generate another image with the same prompt" : "Generate prompt and image"}>
                     {isGenerating || generatingPrompt === `${item.id}-${slide.slideNumber}` ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <ImageIcon className="mr-1 h-3 w-3" />}
                     Generate Another
                   </Button>
