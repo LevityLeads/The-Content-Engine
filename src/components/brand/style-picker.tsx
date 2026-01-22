@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Check, RefreshCw, Sparkles, X, Plus } from "lucide-react";
+import { Loader2, Check, RefreshCw, Sparkles, X, Plus, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 // Suggested style tags organized by category
@@ -86,6 +90,9 @@ export function StylePicker({
   // Multi-select for favorite styles
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+
+  // Lightbox for enlarged view
+  const [enlargedSample, setEnlargedSample] = useState<StyleSample | null>(null);
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
@@ -278,7 +285,7 @@ export function StylePicker({
         </div>
 
         {/* Preview placeholders */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
@@ -286,9 +293,13 @@ export function StylePicker({
             >
               <div className="aspect-[4/5] bg-muted/50 flex items-center justify-center">
                 <Loader2
-                  className="h-5 w-5 animate-spin text-muted-foreground"
+                  className="h-6 w-6 animate-spin text-muted-foreground"
                   style={{ animationDelay: `${i * 100}ms` }}
                 />
+              </div>
+              <div className="p-2.5 bg-card">
+                <div className="h-4 bg-muted rounded w-3/4" />
+                <div className="h-3 bg-muted/50 rounded w-1/2 mt-1" />
               </div>
             </div>
           ))}
@@ -322,29 +333,30 @@ export function StylePicker({
         ))}
       </div>
 
-      {/* Style Grid - 4 columns for 8 images */}
-      <div className="grid grid-cols-4 gap-3">
+      {/* Style Grid - 4 columns with larger images */}
+      <div className="grid grid-cols-4 gap-4">
         {samples.map((sample) => (
-          <button
+          <div
             key={sample.id}
-            onClick={() => sample.image && toggleStyleSelection(sample.id)}
-            disabled={!sample.image}
             className={cn(
-              "relative rounded-lg overflow-hidden border-2 transition-all",
-              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
+              "relative rounded-lg overflow-hidden border-2 transition-all group",
               selectedIds.has(sample.id)
                 ? "border-primary ring-2 ring-primary ring-offset-1"
                 : "border-border hover:border-primary/50",
-              !sample.image && "opacity-50 cursor-not-allowed"
+              !sample.image && "opacity-50"
             )}
           >
-            {/* Image Container */}
-            <div className="aspect-[4/5] bg-muted relative">
+            {/* Image Container - larger aspect ratio */}
+            <button
+              onClick={() => sample.image && toggleStyleSelection(sample.id)}
+              disabled={!sample.image}
+              className="w-full aspect-[4/5] bg-muted relative focus:outline-none"
+            >
               {sample.image ? (
                 <>
                   {!loadedImages.has(sample.id) && (
                     <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                   )}
                   <img
@@ -359,23 +371,38 @@ export function StylePicker({
                 </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-[10px] text-muted-foreground">Failed</p>
+                  <p className="text-xs text-muted-foreground">Failed</p>
                 </div>
               )}
 
               {/* Selected Indicator */}
               {selectedIds.has(sample.id) && (
-                <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
-                  <Check className="h-3 w-3" />
+                <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
+                  <Check className="h-4 w-4" />
                 </div>
               )}
-            </div>
+
+              {/* Magnify button - appears on hover */}
+              {sample.image && loadedImages.has(sample.id) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEnlargedSample(sample);
+                  }}
+                  className="absolute bottom-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Enlarge"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </button>
+              )}
+            </button>
 
             {/* Label */}
-            <div className="p-2 bg-card">
-              <p className="font-medium text-xs truncate">{sample.name}</p>
+            <div className="p-2.5 bg-card">
+              <p className="font-medium text-sm truncate">{sample.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{sample.description}</p>
             </div>
-          </button>
+          </div>
         ))}
       </div>
 
@@ -407,6 +434,63 @@ export function StylePicker({
           Use Selected Style{selectedIds.size !== 1 ? "s" : ""}
         </Button>
       </div>
+
+      {/* Lightbox for enlarged view */}
+      <Dialog open={!!enlargedSample} onOpenChange={() => setEnlargedSample(null)}>
+        <DialogContent className="sm:max-w-[600px] p-2">
+          {enlargedSample && enlargedSample.image && (
+            <div className="space-y-3">
+              <div className="rounded-lg overflow-hidden">
+                <img
+                  src={enlargedSample.image}
+                  alt={enlargedSample.name}
+                  className="w-full h-auto"
+                />
+              </div>
+              <div className="px-2 pb-2">
+                <h4 className="font-semibold">{enlargedSample.name}</h4>
+                <p className="text-sm text-muted-foreground">{enlargedSample.description}</p>
+                <div className="flex gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    {enlargedSample.visualStyle}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {enlargedSample.textStyle}
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex gap-2 px-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setEnlargedSample(null)}
+                >
+                  Close
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    toggleStyleSelection(enlargedSample.id);
+                    setEnlargedSample(null);
+                  }}
+                >
+                  {selectedIds.has(enlargedSample.id) ? (
+                    <>
+                      <X className="mr-2 h-4 w-4" />
+                      Deselect
+                    </>
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Select
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
