@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,8 +28,19 @@ export function StylePickerDialog({
   brandName,
   onStyleSelected,
 }: StylePickerDialogProps) {
+  // Key to force remount when dialog opens (triggers fresh generation)
+  const [mountKey, setMountKey] = useState(0);
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+      // Increment key to force fresh generation when opening
+      setMountKey((prev) => prev + 1);
+    }
+    onOpenChange(isOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Choose Default Visual Style</DialogTitle>
@@ -36,12 +48,15 @@ export function StylePickerDialog({
             Select the visual style that will be automatically applied to all new content for {brandName}.
           </DialogDescription>
         </DialogHeader>
-        <StylePicker
-          brandColors={brandColors}
-          brandName={brandName}
-          onStyleSelected={onStyleSelected}
-          onSkip={() => onOpenChange(false)}
-        />
+        {open && (
+          <StylePicker
+            key={mountKey}
+            brandColors={brandColors}
+            brandName={brandName}
+            onStyleSelected={onStyleSelected}
+            onSkip={() => onOpenChange(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

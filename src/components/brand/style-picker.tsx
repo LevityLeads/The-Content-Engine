@@ -252,15 +252,13 @@ export function StylePicker({
         ))}
       </div>
 
-      {/* Regenerate Option */}
-      {successfulSamples.length < 4 && (
-        <div className="text-center">
-          <Button variant="ghost" size="sm" onClick={generateSamples}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Regenerate samples
-          </Button>
-        </div>
-      )}
+      {/* Regenerate Option - Always show */}
+      <div className="text-center">
+        <Button variant="ghost" size="sm" onClick={generateSamples} disabled={isLoading}>
+          <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
+          {successfulSamples.length < 4 ? "Regenerate samples" : "Generate new samples"}
+        </Button>
+      </div>
 
       {/* Actions */}
       <div className="flex justify-between pt-4 border-t">
