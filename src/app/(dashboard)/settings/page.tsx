@@ -423,17 +423,22 @@ function SettingsPageContent() {
       const res = await fetch("/api/social-accounts/available");
       const data = await res.json();
 
+      console.log("Available accounts response:", data);
+
       if (data.success && data.accounts) {
+        // Case-insensitive platform comparison (Late.dev may return "Instagram" vs "instagram")
         const platformAccounts = data.accounts.filter(
-          (a: LateAccount) => a.platform === platform
+          (a: LateAccount) => a.platform?.toLowerCase() === platform.toLowerCase()
         );
+
+        console.log(`Found ${platformAccounts.length} ${platform} accounts:`, platformAccounts);
 
         if (platformAccounts.length === 0) {
           // No accounts for this platform - open Late.dev dashboard
           window.open("https://getlate.dev/dashboard", "_blank");
           setSaveMessage({
             type: "success",
-            text: `No ${platform} accounts found. Connect one in Late.dev, then try again.`
+            text: `No ${platform} accounts found in Late.dev. Connect one there, then click "Sync Accounts".`
           });
           setTimeout(() => setSaveMessage(null), 10000);
         } else if (platformAccounts.length === 1) {
@@ -445,7 +450,8 @@ function SettingsPageContent() {
           setShowAccountPicker(platform);
         }
       } else {
-        setSaveMessage({ type: "error", text: data.error || "Failed to fetch accounts" });
+        console.error("Failed to fetch accounts:", data);
+        setSaveMessage({ type: "error", text: data.error || "Failed to fetch accounts from Late.dev" });
         setTimeout(() => setSaveMessage(null), 5000);
       }
     } catch (err) {
