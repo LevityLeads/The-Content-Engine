@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Calendar, ArrowRight, Video, Play, Save, FolderOpen, MoreVertical } from "lucide-react";
+import { FileText, Send, Clock, RefreshCw, Loader2, Image as ImageIcon, Sparkles, Twitter, Linkedin, Instagram, Copy, Check, Download, Images, CheckCircle2, XCircle, Zap, Brain, ChevronDown, ChevronRight, ChevronLeft, Trash2, Square, CheckSquare, AlertCircle, Eye, Pencil, ChevronUp, Calendar, ArrowRight, Video, Play, Save, FolderOpen, MoreVertical, X } from "lucide-react";
 import { MODEL_OPTIONS, DEFAULT_MODEL, IMAGE_MODELS, type ImageModelKey } from "@/lib/image-models";
 import { VIDEO_MODEL_OPTIONS, DEFAULT_VIDEO_MODEL, VIDEO_MODELS, type VideoModelKey } from "@/lib/video-models";
 import { estimateVideoCost } from "@/lib/video-utils";
@@ -191,6 +191,12 @@ export default function ContentPage() {
   const [editingSlideText, setEditingSlideText] = useState<{ contentId: string; slideNumber: number } | null>(null);
   const [editedSlideText, setEditedSlideText] = useState<string>("");
   const [savingSlideText, setSavingSlideText] = useState(false);
+  // Image/Video prompt editing state
+  const [editingImagePrompt, setEditingImagePrompt] = useState<{ contentId: string; slideNumber: number } | null>(null);
+  const [editedImagePrompt, setEditedImagePrompt] = useState<string>("");
+  const [savingImagePrompt, setSavingImagePrompt] = useState(false);
+  const [editingVideoPrompt, setEditingVideoPrompt] = useState<{ contentId: string; slideNumber: number } | null>(null);
+  const [editedVideoPrompt, setEditedVideoPrompt] = useState<string>("");
   // Visual style state
   const [selectedVisualStyle, setSelectedVisualStyle] = useState<Record<string, string>>({});
   // Design system preset state
@@ -1046,6 +1052,52 @@ export default function ContentPage() {
     }
   };
 
+  // Save edited image prompt
+  const handleSaveImagePrompt = async (contentId: string, slideNumber: number, newPrompt: string) => {
+    setSavingImagePrompt(true);
+    try {
+      // Find the content item
+      const contentItem = content.find((c) => c.id === contentId);
+      if (!contentItem || !contentItem.copy_carousel_slides) return;
+
+      // Update the specific slide's imagePrompt
+      const updatedSlides = contentItem.copy_carousel_slides.map((slideData, idx) => {
+        const slide = typeof slideData === 'string' ? JSON.parse(slideData) : slideData;
+        if (slide.slideNumber === slideNumber || idx + 1 === slideNumber) {
+          return JSON.stringify({ ...slide, imagePrompt: newPrompt });
+        }
+        return typeof slideData === 'string' ? slideData : JSON.stringify(slideData);
+      });
+
+      // Update via API
+      const res = await fetch("/api/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: contentId, copy_carousel_slides: updatedSlides }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Update local state
+        setContent((prev) =>
+          prev.map((c) => (c.id === contentId ? { ...c, copy_carousel_slides: updatedSlides } : c))
+        );
+        setEditingImagePrompt(null);
+        setEditedImagePrompt("");
+      }
+    } catch (err) {
+      console.error("Error saving image prompt:", err);
+    } finally {
+      setSavingImagePrompt(false);
+    }
+  };
+
+  // Save edited video prompt (local state only)
+  const handleSaveVideoPrompt = (contentId: string, slideNumber: number, newPrompt: string) => {
+    const key = `${contentId}-${slideNumber}`;
+    setVideoPrompts((prev) => ({ ...prev, [key]: newPrompt }));
+    setEditingVideoPrompt(null);
+    setEditedVideoPrompt("");
+  };
 
   const handleCopyToClipboard = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);
@@ -2237,17 +2289,34 @@ export default function ContentPage() {
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] text-muted-foreground">Slide Prompt:</span>
                   <div className="flex gap-0.5">
-                    <Button variant="ghost" size="icon" className="h-5 w-5" title="Edit" disabled>
-                      <Pencil className="h-2.5 w-2.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" title="Regenerate" onClick={() => handleGenerateWithPrompt(item.id, slide)} disabled={isGenerating || generatingPrompt === `${item.id}-${slide.slideNumber}`}>
-                      {generatingPrompt === `${item.id}-${slide.slideNumber}` ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RefreshCw className="h-2.5 w-2.5" />}
-                    </Button>
+                    {editingImagePrompt?.contentId === item.id && editingImagePrompt?.slideNumber === slide.slideNumber ? (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" title="Cancel" onClick={() => { setEditingImagePrompt(null); setEditedImagePrompt(""); }}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleSaveImagePrompt(item.id, slide.slideNumber, editedImagePrompt)} disabled={savingImagePrompt}>
+                          {savingImagePrompt ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" title="Edit" onClick={() => { setEditingImagePrompt({ contentId: item.id, slideNumber: slide.slideNumber }); setEditedImagePrompt(slide.imagePrompt || ""); }}>
+                          <Pencil className="h-2.5 w-2.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" title="Regenerate" onClick={() => handleGenerateWithPrompt(item.id, slide)} disabled={isGenerating || generatingPrompt === `${item.id}-${slide.slideNumber}`}>
+                          {generatingPrompt === `${item.id}-${slide.slideNumber}` ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RefreshCw className="h-2.5 w-2.5" />}
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground leading-relaxed min-h-[60px] max-h-[200px] overflow-y-auto resize-y">
-                  {slide.imagePrompt || <span className="italic">Prompt will be generated when you click Generate</span>}
-                </div>
+                {editingImagePrompt?.contentId === item.id && editingImagePrompt?.slideNumber === slide.slideNumber ? (
+                  <Textarea value={editedImagePrompt} onChange={(e) => setEditedImagePrompt(e.target.value)} className="min-h-[60px] max-h-[200px] text-[10px] p-2 resize-y" placeholder="Enter image prompt..." />
+                ) : (
+                  <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground leading-relaxed min-h-[60px] max-h-[200px] overflow-y-auto resize-y">
+                    {slide.imagePrompt || <span className="italic">Prompt will be generated when you click Generate</span>}
+                  </div>
+                )}
               </div>
 
               {/* Style Variants */}
@@ -2479,47 +2548,64 @@ export default function ContentPage() {
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10px] text-muted-foreground">Video Prompt:</span>
                   <div className="flex gap-0.5">
-                    <Button variant="ghost" size="icon" className="h-5 w-5" title="Edit" disabled>
-                      <Pencil className="h-2.5 w-2.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      title="Regenerate"
-                      onClick={async () => {
-                        const key = `${item.id}-${slide.slideNumber}`;
-                        setGeneratingPrompt(key);
-                        try {
-                          const currentStyle = selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle);
-                          const promptResponse = await fetch("/api/prompts/generate", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              contentId: item.id,
-                              slides: [{ slideNumber: slide.slideNumber, text: slide.text }],
-                              visualStyle: currentStyle,
-                              mediaType: "video",
-                              brandId: selectedBrand?.id,
-                            }),
-                          });
-                          const promptData = await promptResponse.json();
-                          if (promptData.success && promptData.prompts[0]) {
-                            setVideoPrompts((prev) => ({ ...prev, [key]: promptData.prompts[0].prompt }));
-                          }
-                        } finally {
-                          setGeneratingPrompt(null);
-                        }
-                      }}
-                      disabled={generatingPrompt === `${item.id}-${slide.slideNumber}`}
-                    >
-                      {generatingPrompt === `${item.id}-${slide.slideNumber}` ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RefreshCw className="h-2.5 w-2.5" />}
-                    </Button>
+                    {editingVideoPrompt?.contentId === item.id && editingVideoPrompt?.slideNumber === slide.slideNumber ? (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" title="Cancel" onClick={() => { setEditingVideoPrompt(null); setEditedVideoPrompt(""); }}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleSaveVideoPrompt(item.id, slide.slideNumber, editedVideoPrompt)}>
+                          <Check className="h-3 w-3" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" title="Edit" onClick={() => { setEditingVideoPrompt({ contentId: item.id, slideNumber: slide.slideNumber }); setEditedVideoPrompt(videoPrompts[`${item.id}-${slide.slideNumber}`] || ""); }}>
+                          <Pencil className="h-2.5 w-2.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          title="Regenerate"
+                          onClick={async () => {
+                            const key = `${item.id}-${slide.slideNumber}`;
+                            setGeneratingPrompt(key);
+                            try {
+                              const currentStyle = selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle);
+                              const promptResponse = await fetch("/api/prompts/generate", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  contentId: item.id,
+                                  slides: [{ slideNumber: slide.slideNumber, text: slide.text }],
+                                  visualStyle: currentStyle,
+                                  mediaType: "video",
+                                  brandId: selectedBrand?.id,
+                                }),
+                              });
+                              const promptData = await promptResponse.json();
+                              if (promptData.success && promptData.prompts[0]) {
+                                setVideoPrompts((prev) => ({ ...prev, [key]: promptData.prompts[0].prompt }));
+                              }
+                            } finally {
+                              setGeneratingPrompt(null);
+                            }
+                          }}
+                          disabled={generatingPrompt === `${item.id}-${slide.slideNumber}`}
+                        >
+                          {generatingPrompt === `${item.id}-${slide.slideNumber}` ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RefreshCw className="h-2.5 w-2.5" />}
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground leading-relaxed min-h-[60px] max-h-[200px] overflow-y-auto resize-y">
-                  {videoPrompts[`${item.id}-${slide.slideNumber}`] || <span className="italic">Video prompt will be generated when you click Generate</span>}
-                </div>
+                {editingVideoPrompt?.contentId === item.id && editingVideoPrompt?.slideNumber === slide.slideNumber ? (
+                  <Textarea value={editedVideoPrompt} onChange={(e) => setEditedVideoPrompt(e.target.value)} className="min-h-[60px] max-h-[200px] text-[10px] p-2 resize-y" placeholder="Enter video prompt..." />
+                ) : (
+                  <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground leading-relaxed min-h-[60px] max-h-[200px] overflow-y-auto resize-y">
+                    {videoPrompts[`${item.id}-${slide.slideNumber}`] || <span className="italic">Video prompt will be generated when you click Generate</span>}
+                  </div>
+                )}
               </div>
 
               {/* Style Variants - shows both images and videos */}
