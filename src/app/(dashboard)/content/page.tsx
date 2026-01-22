@@ -1100,6 +1100,43 @@ export default function ContentPage() {
     }
   };
 
+  const handleRepublish = async (contentId: string) => {
+    setPublishingId(contentId);
+    setPublishMessage(null);
+    try {
+      // Get the selected image IDs based on user's variant selections
+      const selectedImageIds = getSelectedImageIds(contentId);
+      console.log("Republishing with selected images:", selectedImageIds);
+
+      const res = await fetch("/api/content/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId, selectedImageIds, republish: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPublishMessage({ type: "success", text: "Republished successfully!" });
+        // Update local state
+        setContent((prev) =>
+          prev.map((c) =>
+            c.id === contentId ? { ...c, status: data.status || "published" } : c
+          )
+        );
+        // Clear message after 3 seconds
+        setTimeout(() => setPublishMessage(null), 3000);
+      } else {
+        setPublishMessage({ type: "error", text: data.error || "Failed to republish" });
+        setTimeout(() => setPublishMessage(null), 5000);
+      }
+    } catch (err) {
+      console.error("Error republishing:", err);
+      setPublishMessage({ type: "error", text: "Network error - please try again" });
+      setTimeout(() => setPublishMessage(null), 5000);
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
   const handleRetry = async (contentId: string) => {
     // Reset status to approved and try publishing again
     setPublishingId(contentId);
@@ -3591,10 +3628,25 @@ export default function ContentPage() {
                           </div>
                         )}
                         {item.status === "published" && (
-                          <div className="flex items-center gap-2 text-sm text-emerald-400">
-                            <CheckCircle2 className="h-4 w-4" />
-                            <span>Published</span>
-                          </div>
+                          <>
+                            <div className="flex items-center gap-2 text-sm text-emerald-400">
+                              <CheckCircle2 className="h-4 w-4" />
+                              <span>Published{item.published_at ? ` on ${new Date(item.published_at).toLocaleDateString()}` : ""}</span>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRepublish(item.id)}
+                              disabled={publishingId === item.id}
+                            >
+                              {publishingId === item.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                              )}
+                              Republish
+                            </Button>
+                          </>
                         )}
                         {item.status === "failed" && (
                           <>
