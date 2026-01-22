@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import satori from 'satori';
 import sharp from 'sharp';
 import {
@@ -709,8 +709,8 @@ export async function POST(request: NextRequest) {
       console.log(`Compositing slide ${slide.slideNumber}/${totalSlides} (${templateType})`);
 
       try {
-        // Generate composite image
-        const imageUrl = await compositeSlide(
+        // Generate composite image (returns data URL)
+        const compositeDataUrl = await compositeSlide(
           bgImage,
           slideContent,
           design,
@@ -720,6 +720,45 @@ export async function POST(request: NextRequest) {
           height
         );
 
+        // Upload to Supabase Storage for better caching
+        let imageUrl = compositeDataUrl;
+        let storagePath: string | null = null;
+
+        try {
+          // Extract base64 data from data URL
+          const base64Match = compositeDataUrl.match(/^data:image\/png;base64,(.+)$/);
+          if (base64Match) {
+            const adminClient = createAdminClient();
+            const imageBuffer = Buffer.from(base64Match[1], "base64");
+            const filename = `carousel/${contentId}/${slide.slideNumber}-${Date.now()}.png`;
+
+            const { error: uploadError } = await adminClient.storage
+              .from("images")
+              .upload(filename, imageBuffer, {
+                contentType: "image/png",
+                upsert: true,
+                cacheControl: "public, max-age=31536000, immutable", // Cache for 1 year
+              });
+
+            if (uploadError) {
+              console.error(`Error uploading slide ${slide.slideNumber} to storage:`, uploadError);
+              // Fall back to data URL if upload fails
+            } else {
+              // Get public URL
+              const { data: publicUrlData } = adminClient.storage
+                .from("images")
+                .getPublicUrl(filename);
+
+              imageUrl = publicUrlData.publicUrl;
+              storagePath = filename;
+              console.log(`Slide ${slide.slideNumber} uploaded to storage:`, imageUrl);
+            }
+          }
+        } catch (storageError) {
+          console.error(`Storage upload error for slide ${slide.slideNumber}:`, storageError);
+          // Fall back to data URL
+        }
+
         // Save to database
         const { data: savedImage, error: saveError } = await supabase
           .from('images')
@@ -727,6 +766,7 @@ export async function POST(request: NextRequest) {
             content_id: contentId,
             prompt: `[Slide ${slide.slideNumber}] Composite: ${slide.text.substring(0, 100)}`,
             url: imageUrl,
+            storage_path: storagePath,
             is_primary: slide.slideNumber === 1,
             format: 'png',
             dimensions: { width, height, aspectRatio: '4:5', model: 'composite' },

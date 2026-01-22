@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from "@/lib/image-models";
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/video-models";
 import { BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
@@ -315,10 +315,47 @@ CRITICAL OUTPUT REQUIREMENTS:
             if (part.inlineData?.data) {
               imageBase64 = part.inlineData.data;
               const mimeType = part.inlineData.mimeType || "image/png";
-              imageUrl = `data:${mimeType};base64,${imageBase64}`;
+              console.log(`Image generated successfully with ${modelConfig.name}, base64 length: ${imageBase64.length}`);
+
+              // Upload to Supabase Storage instead of storing base64 data URL
+              // This enables browser caching and reduces database size
+              try {
+                const adminClient = createAdminClient();
+                const imageBuffer = Buffer.from(imageBase64, "base64");
+                const ext = mimeType.includes("png") ? "png" : mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : "png";
+                const filename = `generated/${contentId}/${Date.now()}.${ext}`;
+
+                const { error: uploadError } = await adminClient.storage
+                  .from("images")
+                  .upload(filename, imageBuffer, {
+                    contentType: mimeType,
+                    upsert: true,
+                    cacheControl: "public, max-age=31536000, immutable", // Cache for 1 year (immutable content)
+                  });
+
+                if (uploadError) {
+                  console.error("Error uploading image to storage:", uploadError);
+                  // Fall back to data URL if upload fails
+                  imageUrl = `data:${mimeType};base64,${imageBase64}`;
+                } else {
+                  // Get public URL for the uploaded image
+                  const { data: publicUrlData } = adminClient.storage
+                    .from("images")
+                    .getPublicUrl(filename);
+
+                  imageUrl = publicUrlData.publicUrl;
+                  // Store the storage path for potential future cleanup
+                  (content as Record<string, unknown>).__storagePath = filename;
+                  console.log("Image uploaded to storage:", imageUrl);
+                }
+              } catch (storageError) {
+                console.error("Storage upload error:", storageError);
+                // Fall back to data URL if storage fails
+                imageUrl = `data:${mimeType};base64,${imageBase64}`;
+              }
+
               generationStatus = "generated";
               generationMessage = `Image generated with ${modelConfig.name} for ${platform.toUpperCase()} (${imageConfig.width}x${imageConfig.height})`;
-              console.log(`Image generated successfully with ${modelConfig.name}, base64 length: ${imageBase64.length}`);
               break;
             }
           }
@@ -371,12 +408,16 @@ CRITICAL OUTPUT REQUIREMENTS:
       await updateJobStatus(supabase, jobId, { progress: 80, currentStep: 'Saving to database' });
     }
 
+    // Get storage path if image was uploaded to storage
+    const storagePath = (content as Record<string, unknown>).__storagePath as string | undefined;
+
     const { data: savedImage, error: saveError } = await supabase
       .from("images")
       .insert({
         content_id: contentId,
         prompt: prompt,
         url: imageUrl || `placeholder:${content.platform}`,
+        storage_path: storagePath || null,
         is_primary: true,
         format: "png",
         dimensions: {
@@ -494,10 +535,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
+    // Add cache headers - images are immutable once generated
+    // Cache for 1 hour in browser, allow revalidation with stale-while-revalidate
+    const response = NextResponse.json({
       success: true,
       images,
     });
+    response.headers.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+    return response;
   } catch (error) {
     console.error("Error in GET /api/images/generate:", error);
     return NextResponse.json(
