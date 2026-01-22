@@ -20,6 +20,7 @@ const PLATFORMS = [
   { id: "twitter", name: "X (Twitter)", icon: "𝕏" },
   { id: "instagram", name: "Instagram", icon: "📷" },
   { id: "linkedin", name: "LinkedIn", icon: "in" },
+  { id: "facebook", name: "Facebook", icon: "f" },
 ] as const;
 
 interface SocialAccount {
