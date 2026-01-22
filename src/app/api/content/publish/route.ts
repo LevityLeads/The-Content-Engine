@@ -65,10 +65,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check content status - only approved, scheduled, or published (for republish) content can be published
+    // Check content status - allow approved, scheduled, failed (for retry), or published (for republish)
+    // "failed" status allows users to retry scheduling content that previously failed to publish
     const allowedStatuses = republish
-      ? ["approved", "scheduled", "published"]
-      : ["approved", "scheduled"];
+      ? ["approved", "scheduled", "published", "failed"]
+      : ["approved", "scheduled", "failed"];
 
     if (!allowedStatuses.includes(content.status)) {
       const errorMessage = republish
