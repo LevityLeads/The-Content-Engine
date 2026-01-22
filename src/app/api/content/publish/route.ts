@@ -250,6 +250,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // First, let's see ALL accounts for this brand to help debug
+    const { data: allBrandAccounts } = await supabase
+      .from("social_accounts")
+      .select("id, platform, platform_username, late_account_id, is_active")
+      .eq("brand_id", content.brand_id);
+
+    console.log(`All social accounts for brand ${content.brand_id}:`, JSON.stringify(allBrandAccounts, null, 2));
+
     const { data: socialAccount, error: socialError } = await supabase
       .from("social_accounts")
       .select("late_account_id, platform_username")
@@ -262,17 +270,37 @@ export async function POST(request: NextRequest) {
       // Get brand name for clearer error message
       const brandName = content.brands?.name || "Unknown";
       console.log(`No connected ${content.platform} account found for brand ${content.brand_id} (${brandName})`);
-      console.log(`Query details: brand_id=${content.brand_id}, platform=${content.platform}, socialError=${socialError?.message || 'none'}, late_account_id=${socialAccount?.late_account_id || 'missing'}`);
+      console.log(`Query error:`, socialError);
+      console.log(`Social account result:`, socialAccount);
+
+      // Build detailed error message for debugging
+      const platformAccounts = allBrandAccounts?.filter(a => a.platform === content.platform) || [];
+      let debugMessage = `No ${content.platform} account connected for "${brandName}".`;
+
+      if (platformAccounts.length === 0) {
+        debugMessage += ` No ${content.platform} accounts found for this brand at all.`;
+      } else if (platformAccounts.length > 1) {
+        debugMessage += ` Found ${platformAccounts.length} duplicate ${content.platform} accounts - this may cause issues.`;
+      } else {
+        const acc = platformAccounts[0];
+        if (!acc.is_active) {
+          debugMessage += ` Account exists but is_active=false.`;
+        } else if (!acc.late_account_id) {
+          debugMessage += ` Account exists but late_account_id is missing - try clicking "Sync Accounts".`;
+        }
+      }
+
       return NextResponse.json(
         {
           success: false,
-          error: `No ${content.platform} account connected for "${brandName}". Make sure you have the correct client selected, then go to Settings → Connected Accounts and sync your Late.dev accounts.`,
+          error: debugMessage + " Go to Settings → Connected Accounts to fix.",
           debug: {
             contentBrandId: content.brand_id,
             brandName,
             platform: content.platform,
-            hasAccount: !!socialAccount,
-            hasLateAccountId: !!socialAccount?.late_account_id,
+            supabaseError: socialError?.message || null,
+            supabaseCode: socialError?.code || null,
+            allPlatformAccounts: platformAccounts,
           },
         },
         { status: 400 }
