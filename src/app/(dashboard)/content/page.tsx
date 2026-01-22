@@ -2245,7 +2245,7 @@ export default function ContentPage() {
                     </Button>
                   </div>
                 </div>
-                <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground leading-relaxed max-h-[60px] overflow-y-auto">
+                <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground leading-relaxed min-h-[60px] max-h-[200px] overflow-y-auto resize-y">
                   {slide.imagePrompt || <span className="italic">Prompt will be generated when you click Generate</span>}
                 </div>
               </div>
@@ -2517,7 +2517,7 @@ export default function ContentPage() {
                     </Button>
                   </div>
                 </div>
-                <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground leading-relaxed max-h-[80px] overflow-y-auto">
+                <div className="rounded bg-muted/30 p-2 text-[10px] text-muted-foreground leading-relaxed min-h-[60px] max-h-[200px] overflow-y-auto resize-y">
                   {videoPrompts[`${item.id}-${slide.slideNumber}`] || <span className="italic">Video prompt will be generated when you click Generate</span>}
                 </div>
               </div>
