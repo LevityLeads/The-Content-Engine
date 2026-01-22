@@ -37,6 +37,7 @@ interface CarouselSlide {
   slideNumber: number;
   text: string;
   imagePrompt?: string; // Optional - generated on-demand when user clicks Generate
+  visualHint?: string; // Creative direction for image generation (mood, metaphor, story arc position)
 }
 
 // Design system structure stored in content metadata
@@ -1823,6 +1824,7 @@ export default function ContentPage() {
         slideNumber: typeof obj.slideNumber === "number" ? obj.slideNumber : 1,
         text: String(obj.text || ""),
         imagePrompt: obj.imagePrompt ? String(obj.imagePrompt) : undefined,
+        visualHint: obj.visualHint ? String(obj.visualHint) : undefined,
       };
     }
 

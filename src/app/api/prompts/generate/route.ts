@@ -166,7 +166,8 @@ function buildSlidePromptWithDesignSystem(
   slideNumber: number,
   totalSlides: number,
   platform: string,
-  mediaType: "image" | "video"
+  mediaType: "image" | "video",
+  visualHint?: string
 ): string {
   const styleDesc = VISUAL_STYLE_DESCRIPTIONS[visualStyle] || VISUAL_STYLE_DESCRIPTIONS.photorealistic;
 
@@ -184,6 +185,11 @@ ${styleGuidance}
 
 ## THIS SLIDE'S CONTENT
 "${slideText}"
+${visualHint ? `
+## CREATIVE DIRECTION (from content creator)
+${visualHint}
+
+This hint captures the intended EMOTION and visual METAPHOR. Let it guide your scene, camera movement, and atmosphere.` : ""}
 
 ## CRITICAL REQUIREMENTS
 1. Create a UNIQUE 5-8 second video scene that MATCHES THIS SLIDE'S TEXT
@@ -211,6 +217,11 @@ ${styleDesc}
 
 ## THIS SLIDE'S MESSAGE
 "${slideText}"
+${visualHint ? `
+## CREATIVE DIRECTION (from content creator)
+${visualHint}
+
+This hint captures the intended EMOTION and METAPHOR for this slide. Use it to inform your scene choice, lighting, and atmosphere.` : ""}
 
 ## CRITICAL: UNIQUE SCENE PER SLIDE
 Each slide needs a DIFFERENT background scene/imagery that:
@@ -392,7 +403,7 @@ export async function POST(request: NextRequest) {
     const prompts: Array<{ slideNumber: number; prompt: string }> = [];
 
     for (const slide of slides) {
-      const { slideNumber, text } = slide;
+      const { slideNumber, text, visualHint } = slide;
 
       const slidePrompt = buildSlidePromptWithDesignSystem(
         designSystem,
@@ -401,7 +412,8 @@ export async function POST(request: NextRequest) {
         slideNumber,
         slides.length,
         content.platform,
-        effectiveMediaType
+        effectiveMediaType,
+        visualHint // Pass creative direction from content generation
       );
 
       const response = await anthropic.messages.create({
