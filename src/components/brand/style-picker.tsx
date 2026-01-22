@@ -1,9 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Loader2, Check, RefreshCw, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Check, RefreshCw, Sparkles, X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+
+// Suggested style tags organized by category
+const STYLE_TAG_CATEGORIES = [
+  {
+    name: "Visual Style",
+    tags: ["illustration", "photography", "3d", "abstract", "minimalist", "collage"],
+  },
+  {
+    name: "Mood",
+    tags: ["soft", "bold", "playful", "serious", "elegant", "energetic"],
+  },
+  {
+    name: "Color Feel",
+    tags: ["warm", "cool", "vibrant", "muted", "dark", "light"],
+  },
+];
+
+const ALL_SUGGESTED_TAGS = STYLE_TAG_CATEGORIES.flatMap((c) => c.tags);
 
 export interface StyleSample {
   id: string;
@@ -14,6 +34,7 @@ export interface StyleSample {
   description: string;
   image: string | null;
   error?: string;
+  keywords: string[];
   designSystem: {
     background: string;
     primaryColor: string;
@@ -30,6 +51,7 @@ export interface SelectedStyle {
   textColor: string;
   designSystem: StyleSample["designSystem"];
   sampleImage?: string;
+  keywords?: string[];
 }
 
 interface StylePickerProps {
@@ -42,23 +64,52 @@ interface StylePickerProps {
   onSkip?: () => void;
 }
 
+type Step = "select-keywords" | "generating" | "select-styles";
+
 export function StylePicker({
   brandColors,
   brandName,
   onStyleSelected,
   onSkip,
 }: StylePickerProps) {
+  // Step management
+  const [step, setStep] = useState<Step>("select-keywords");
+
+  // Keyword selection
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customKeyword, setCustomKeyword] = useState("");
+
+  // Generated samples
   const [samples, setSamples] = useState<StyleSample[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Multi-select for favorite styles
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
 
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const addCustomKeyword = () => {
+    const keyword = customKeyword.trim().toLowerCase();
+    if (keyword && !selectedTags.includes(keyword)) {
+      setSelectedTags((prev) => [...prev, keyword]);
+      setCustomKeyword("");
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    setSelectedTags((prev) => prev.filter((t) => t !== tag));
+  };
+
   const generateSamples = async () => {
-    setIsLoading(true);
+    setStep("generating");
     setError(null);
     setSamples([]);
-    setSelectedId(null);
+    setSelectedIds(new Set());
     setLoadedImages(new Set());
 
     try {
@@ -68,6 +119,8 @@ export function StylePicker({
         body: JSON.stringify({
           brandColors,
           brandName,
+          keywords: selectedTags,
+          count: 8,
         }),
       });
 
@@ -75,41 +128,42 @@ export function StylePicker({
 
       if (data.success && data.samples) {
         setSamples(data.samples);
-        // Auto-select first successful sample
-        const firstSuccess = data.samples.find((s: StyleSample) => s.image);
-        if (firstSuccess) {
-          setSelectedId(firstSuccess.id);
-        }
+        setStep("select-styles");
       } else {
         setError(data.error || "Failed to generate style samples");
+        setStep("select-keywords");
       }
     } catch (err) {
       console.error("Error generating style samples:", err);
       setError("Network error. Please try again.");
-    } finally {
-      setIsLoading(false);
+      setStep("select-keywords");
     }
   };
 
-  useEffect(() => {
-    generateSamples();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleSelect = (sample: StyleSample) => {
-    if (!sample.image) return;
-    setSelectedId(sample.id);
+  const toggleStyleSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
   const handleConfirm = () => {
-    const selected = samples.find((s) => s.id === selectedId);
-    if (selected) {
+    // Get the first selected sample as the primary default
+    const selectedSamples = samples.filter((s) => selectedIds.has(s.id) && s.image);
+    if (selectedSamples.length > 0) {
+      const primary = selectedSamples[0];
       onStyleSelected({
-        visualStyle: selected.visualStyle,
-        textStyle: selected.textStyle,
-        textColor: selected.textColor,
-        designSystem: selected.designSystem,
-        sampleImage: selected.image || undefined,
+        visualStyle: primary.visualStyle,
+        textStyle: primary.textStyle,
+        textColor: primary.textColor,
+        designSystem: primary.designSystem,
+        sampleImage: primary.image || undefined,
+        keywords: selectedTags,
       });
     }
   };
@@ -118,7 +172,98 @@ export function StylePicker({
     setLoadedImages((prev) => new Set([...prev, id]));
   };
 
-  if (isLoading) {
+  // Step 1: Select Keywords
+  if (step === "select-keywords") {
+    return (
+      <div className="space-y-6">
+        <div className="text-center space-y-1">
+          <h3 className="text-lg font-semibold">What styles fit {brandName}?</h3>
+          <p className="text-sm text-muted-foreground">
+            Select keywords that describe your brand&apos;s visual style. We&apos;ll generate 8 examples.
+          </p>
+        </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
+        {/* Selected tags */}
+        {selectedTags.length > 0 && (
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Selected keywords:</label>
+            <div className="flex flex-wrap gap-2">
+              {selectedTags.map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="default"
+                  className="cursor-pointer pr-1.5"
+                  onClick={() => removeTag(tag)}
+                >
+                  {tag}
+                  <X className="ml-1 h-3 w-3" />
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Suggested tags by category */}
+        <div className="space-y-4">
+          {STYLE_TAG_CATEGORIES.map((category) => (
+            <div key={category.name} className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">{category.name}</label>
+              <div className="flex flex-wrap gap-2">
+                {category.tags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant={selectedTags.includes(tag) ? "default" : "outline"}
+                    className="cursor-pointer transition-colors"
+                    onClick={() => toggleTag(tag)}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Custom keyword input */}
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground">Add custom keyword:</label>
+          <div className="flex gap-2">
+            <Input
+              value={customKeyword}
+              onChange={(e) => setCustomKeyword(e.target.value)}
+              placeholder="e.g., vintage, tech, organic..."
+              onKeyDown={(e) => e.key === "Enter" && addCustomKeyword()}
+              className="flex-1"
+            />
+            <Button variant="outline" size="icon" onClick={addCustomKeyword} disabled={!customKeyword.trim()}>
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-between pt-4 border-t">
+          <Button variant="ghost" onClick={onSkip}>
+            Skip for now
+          </Button>
+          <Button onClick={generateSamples} disabled={selectedTags.length === 0}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Generate {selectedTags.length > 0 ? "8" : ""} Examples
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: Generating
+  if (step === "generating") {
     return (
       <div className="py-8 space-y-6">
         <div className="text-center space-y-2">
@@ -128,81 +273,67 @@ export function StylePicker({
           </div>
           <p className="text-sm font-medium">Generating style examples...</p>
           <p className="text-xs text-muted-foreground">
-            Creating 4 unique visual styles for {brandName}
+            Creating 8 unique styles based on: {selectedTags.join(", ")}
           </p>
         </div>
 
-        {/* Preview placeholders showing what's being generated */}
-        <div className="grid grid-cols-2 gap-4">
-          {["Bold Typography", "Photo Style", "Modern 3D", "Abstract Art"].map((styleName, i) => (
+        {/* Preview placeholders */}
+        <div className="grid grid-cols-4 gap-3">
+          {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
               className="rounded-lg overflow-hidden border-2 border-dashed border-muted animate-pulse"
             >
               <div className="aspect-[4/5] bg-muted/50 flex items-center justify-center">
-                <div className="text-center space-y-2">
-                  <Loader2
-                    className="h-6 w-6 animate-spin text-muted-foreground mx-auto"
-                    style={{ animationDelay: `${i * 150}ms` }}
-                  />
-                  <p className="text-xs text-muted-foreground">{styleName}</p>
-                </div>
-              </div>
-              <div className="p-3 bg-card/50">
-                <div className="h-4 bg-muted rounded w-3/4 mb-1" />
-                <div className="h-3 bg-muted/50 rounded w-1/2" />
+                <Loader2
+                  className="h-5 w-5 animate-spin text-muted-foreground"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                />
               </div>
             </div>
           ))}
         </div>
 
         <p className="text-xs text-center text-muted-foreground">
-          Using high-quality generation - this may take 30-60 seconds...
+          This may take 30-60 seconds...
         </p>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="py-8 text-center space-y-4">
-        <p className="text-sm text-red-400">{error}</p>
-        <div className="flex justify-center gap-2">
-          <Button variant="outline" onClick={onSkip}>
-            Skip for now
-          </Button>
-          <Button onClick={generateSamples}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
+  // Step 3: Select Styles
   const successfulSamples = samples.filter((s) => s.image);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="text-center space-y-1">
-        <h3 className="text-lg font-semibold">Choose Your Brand Style</h3>
+        <h3 className="text-lg font-semibold">Select your favorite styles</h3>
         <p className="text-sm text-muted-foreground">
-          Select the visual style that best fits {brandName}. This will be your default for all content.
+          Click to select the styles that work best for {brandName}. Select at least one.
         </p>
       </div>
 
-      {/* Style Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Keywords used */}
+      <div className="flex flex-wrap gap-1 justify-center">
+        {selectedTags.map((tag) => (
+          <Badge key={tag} variant="secondary" className="text-xs">
+            {tag}
+          </Badge>
+        ))}
+      </div>
+
+      {/* Style Grid - 4 columns for 8 images */}
+      <div className="grid grid-cols-4 gap-3">
         {samples.map((sample) => (
           <button
             key={sample.id}
-            onClick={() => handleSelect(sample)}
+            onClick={() => sample.image && toggleStyleSelection(sample.id)}
             disabled={!sample.image}
             className={cn(
               "relative rounded-lg overflow-hidden border-2 transition-all",
-              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-              selectedId === sample.id
-                ? "border-primary ring-2 ring-primary ring-offset-2"
+              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
+              selectedIds.has(sample.id)
+                ? "border-primary ring-2 ring-primary ring-offset-1"
                 : "border-border hover:border-primary/50",
               !sample.image && "opacity-50 cursor-not-allowed"
             )}
@@ -211,10 +342,9 @@ export function StylePicker({
             <div className="aspect-[4/5] bg-muted relative">
               {sample.image ? (
                 <>
-                  {/* Loading placeholder */}
                   {!loadedImages.has(sample.id) && (
                     <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     </div>
                   )}
                   <img
@@ -229,34 +359,41 @@ export function StylePicker({
                 </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-xs text-muted-foreground">Failed to generate</p>
+                  <p className="text-[10px] text-muted-foreground">Failed</p>
                 </div>
               )}
 
               {/* Selected Indicator */}
-              {selectedId === sample.id && (
-                <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
-                  <Check className="h-4 w-4" />
+              {selectedIds.has(sample.id) && (
+                <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                  <Check className="h-3 w-3" />
                 </div>
               )}
             </div>
 
             {/* Label */}
-            <div className="p-3 bg-card">
-              <p className="font-medium text-sm">{sample.name}</p>
-              <p className="text-xs text-muted-foreground line-clamp-1">
-                {sample.description}
-              </p>
+            <div className="p-2 bg-card">
+              <p className="font-medium text-xs truncate">{sample.name}</p>
             </div>
           </button>
         ))}
       </div>
 
-      {/* Regenerate Option - Always show */}
+      {/* Selection count */}
       <div className="text-center">
-        <Button variant="ghost" size="sm" onClick={generateSamples} disabled={isLoading}>
-          <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
-          {successfulSamples.length < 4 ? "Regenerate samples" : "Generate new samples"}
+        <p className="text-sm text-muted-foreground">
+          {selectedIds.size} style{selectedIds.size !== 1 ? "s" : ""} selected
+        </p>
+      </div>
+
+      {/* Regenerate Option */}
+      <div className="flex justify-center gap-2">
+        <Button variant="ghost" size="sm" onClick={() => setStep("select-keywords")}>
+          ← Change keywords
+        </Button>
+        <Button variant="ghost" size="sm" onClick={generateSamples}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Regenerate
         </Button>
       </div>
 
@@ -265,9 +402,9 @@ export function StylePicker({
         <Button variant="ghost" onClick={onSkip}>
           Skip for now
         </Button>
-        <Button onClick={handleConfirm} disabled={!selectedId}>
+        <Button onClick={handleConfirm} disabled={selectedIds.size === 0}>
           <Check className="mr-2 h-4 w-4" />
-          Use This Style
+          Use Selected Style{selectedIds.size !== 1 ? "s" : ""}
         </Button>
       </div>
     </div>

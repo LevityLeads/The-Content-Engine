@@ -1,60 +1,95 @@
 import { NextRequest, NextResponse } from "next/server";
 import { VISUAL_STYLES, VisualStyle } from "@/lib/prompts/visual-styles";
 import { TEXT_STYLE_PRESETS, TEXT_COLOR_PRESETS } from "@/lib/slide-templates/types";
-import { IMAGE_MODELS, DEFAULT_MODEL } from "@/lib/image-models";
+import { IMAGE_MODELS } from "@/lib/image-models";
 
 /**
  * Style Sample Generation API
  *
- * Generates example images in different visual styles for brand onboarding.
- * Users can pick their favorite to set as the brand's default style.
+ * Generates example images based on user-selected keywords.
+ * Returns varied styles that match the brand's desired aesthetic.
  */
 
-// Sample headline for style demonstration
+// Sample headlines for style demonstration
 const SAMPLE_HEADLINES = [
   "Great things take time",
   "Simple is beautiful",
   "Think different",
   "Less is more",
+  "Dream bigger",
+  "Make it happen",
+  "Stay curious",
+  "Create boldly",
 ];
 
-// Curated style options for onboarding (not all 7, just the most distinct 4)
-const ONBOARDING_STYLES: {
-  visualStyle: VisualStyle;
-  textStyle: string;
-  textColor: string;
-  description: string;
-}[] = [
-  {
-    visualStyle: "typography",
-    textStyle: "bold-editorial",
-    textColor: "white-coral",
-    description: "Bold & Clean - Text-focused with strong typography",
-  },
-  {
-    visualStyle: "photorealistic",
-    textStyle: "clean-modern",
-    textColor: "white-teal",
-    description: "Photo Style - Stunning backgrounds with text overlay",
-  },
-  {
-    visualStyle: "3d-render",
-    textStyle: "dramatic",
-    textColor: "white-blue",
-    description: "Modern 3D - Sleek rendered scenes with depth",
-  },
-  {
-    visualStyle: "abstract-art",
-    textStyle: "statement",
-    textColor: "white-gold",
-    description: "Abstract Art - Bold shapes and artistic compositions",
-  },
+// Visual style mapping based on keywords
+const KEYWORD_TO_VISUAL_STYLE: Record<string, VisualStyle[]> = {
+  // Visual style keywords
+  illustration: ["illustration"],
+  photography: ["photorealistic"],
+  photo: ["photorealistic"],
+  "3d": ["3d-render"],
+  abstract: ["abstract-art"],
+  minimalist: ["typography"],
+  minimal: ["typography"],
+  collage: ["collage"],
+  experimental: ["experimental"],
+
+  // Mood keywords (map to multiple styles)
+  soft: ["photorealistic", "illustration"],
+  bold: ["typography", "abstract-art"],
+  playful: ["illustration", "collage", "3d-render"],
+  serious: ["typography", "photorealistic"],
+  elegant: ["photorealistic", "typography"],
+  energetic: ["abstract-art", "3d-render", "experimental"],
+
+  // Color feel keywords
+  warm: ["illustration", "photorealistic"],
+  cool: ["3d-render", "typography"],
+  vibrant: ["abstract-art", "collage"],
+  muted: ["photorealistic", "typography"],
+  dark: ["typography", "photorealistic"],
+  light: ["illustration", "photorealistic"],
+};
+
+// Text style preferences based on keywords
+const KEYWORD_TO_TEXT_STYLE: Record<string, string[]> = {
+  bold: ["bold-editorial", "statement", "dramatic"],
+  soft: ["minimal", "clean-modern"],
+  elegant: ["clean-modern", "minimal"],
+  playful: ["bold-editorial", "statement"],
+  serious: ["clean-modern", "minimal"],
+  minimalist: ["minimal", "clean-modern"],
+  energetic: ["dramatic", "statement", "bold-editorial"],
+};
+
+// Color presets based on keywords
+const KEYWORD_TO_COLOR: Record<string, string[]> = {
+  warm: ["white-coral", "white-gold"],
+  cool: ["white-teal", "white-blue"],
+  vibrant: ["white-coral", "white-teal"],
+  muted: ["white-gold", "dark-blue"],
+  dark: ["white-coral", "white-teal", "white-blue"],
+  light: ["dark-coral", "dark-blue"],
+  bold: ["white-coral", "white-blue"],
+  soft: ["white-gold", "white-teal"],
+};
+
+// All visual styles for fallback
+const ALL_VISUAL_STYLES: VisualStyle[] = [
+  "typography",
+  "photorealistic",
+  "illustration",
+  "3d-render",
+  "abstract-art",
+  "collage",
+  "experimental",
 ];
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { brandColors, brandName } = body;
+    const { brandColors, brandName, keywords = [], count = 8 } = body;
 
     // Brand colors to incorporate
     const primaryColor = brandColors?.primary_color || "#1a1a1a";
@@ -68,122 +103,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate samples in parallel
-    const samplePromises = ONBOARDING_STYLES.map(async (style, index) => {
-      const headline = SAMPLE_HEADLINES[index % SAMPLE_HEADLINES.length];
-      const styleInfo = VISUAL_STYLES[style.visualStyle];
-      const textStylePreset = TEXT_STYLE_PRESETS[style.textStyle];
-      const textColorPreset = TEXT_COLOR_PRESETS[style.textColor];
+    // Determine which styles to generate based on keywords
+    const styleConfigs = generateStyleConfigs(keywords, count);
 
-      // Build style-specific prompt incorporating brand colors
-      const prompt = buildStylePrompt({
-        style: styleInfo,
-        headline,
-        brandName: brandName || "Your Brand",
-        primaryColor,
-        accentColor,
-        textColorPreset,
-        textStylePreset,
-      });
+    // Generate samples in parallel (in batches to avoid rate limits)
+    const batchSize = 4;
+    const allSamples: StyleSampleResult[] = [];
 
-      try {
-        // Use Nano Banana Pro for highest quality samples
-        const modelConfig = IMAGE_MODELS["gemini-3-pro"];
+    for (let i = 0; i < styleConfigs.length; i += batchSize) {
+      const batch = styleConfigs.slice(i, i + batchSize);
+      const batchPromises = batch.map((config, batchIndex) =>
+        generateSingleSample({
+          config,
+          index: i + batchIndex,
+          brandName: brandName || "Your Brand",
+          primaryColor,
+          accentColor,
+          keywords,
+          googleApiKey,
+        })
+      );
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:generateContent?key=${googleApiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                responseModalities: ["TEXT", "IMAGE"],
-                imageConfig: { aspectRatio: "4:5" },
-              },
-            }),
-          }
-        );
+      const batchResults = await Promise.all(batchPromises);
+      allSamples.push(...batchResults);
+    }
 
-        if (response.ok) {
-          const data = await response.json();
-          const parts = data.candidates?.[0]?.content?.parts || [];
-
-          for (const part of parts) {
-            if (part.inlineData?.data) {
-              const mimeType = part.inlineData.mimeType || "image/png";
-              return {
-                id: `${style.visualStyle}-${style.textStyle}`,
-                visualStyle: style.visualStyle,
-                textStyle: style.textStyle,
-                textColor: style.textColor,
-                name: styleInfo.name,
-                description: style.description,
-                image: `data:${mimeType};base64,${part.inlineData.data}`,
-                designSystem: {
-                  background: getBackgroundDescription(style.visualStyle, primaryColor),
-                  primaryColor: textColorPreset.primaryColor,
-                  accentColor: accentColor,
-                  typography: textStylePreset.aesthetic,
-                  layout: "centered",
-                  mood: styleInfo.description,
-                },
-              };
-            }
-          }
-        }
-
-        // If generation failed, return placeholder
-        console.error(`Style sample generation failed for ${style.visualStyle}:`, await response.text());
-        return {
-          id: `${style.visualStyle}-${style.textStyle}`,
-          visualStyle: style.visualStyle,
-          textStyle: style.textStyle,
-          textColor: style.textColor,
-          name: styleInfo.name,
-          description: style.description,
-          image: null,
-          error: "Generation failed",
-          designSystem: {
-            background: getBackgroundDescription(style.visualStyle, primaryColor),
-            primaryColor: textColorPreset.primaryColor,
-            accentColor: accentColor,
-            typography: textStylePreset.aesthetic,
-            layout: "centered",
-            mood: styleInfo.description,
-          },
-        };
-      } catch (err) {
-        console.error(`Error generating ${style.visualStyle} sample:`, err);
-        return {
-          id: `${style.visualStyle}-${style.textStyle}`,
-          visualStyle: style.visualStyle,
-          textStyle: style.textStyle,
-          textColor: style.textColor,
-          name: styleInfo.name,
-          description: style.description,
-          image: null,
-          error: err instanceof Error ? err.message : "Unknown error",
-          designSystem: {
-            background: getBackgroundDescription(style.visualStyle, primaryColor),
-            primaryColor: TEXT_COLOR_PRESETS[style.textColor].primaryColor,
-            accentColor: accentColor,
-            typography: TEXT_STYLE_PRESETS[style.textStyle].aesthetic,
-            layout: "centered",
-            mood: styleInfo.description,
-          },
-        };
-      }
-    });
-
-    const samples = await Promise.all(samplePromises);
-    const successfulSamples = samples.filter(s => s.image !== null);
+    const successfulSamples = allSamples.filter((s) => s.image !== null);
 
     return NextResponse.json({
       success: true,
-      samples,
+      samples: allSamples,
       generatedCount: successfulSamples.length,
-      totalCount: ONBOARDING_STYLES.length,
+      totalCount: styleConfigs.length,
     });
   } catch (error) {
     console.error("Error in POST /api/brands/style-samples:", error);
@@ -194,6 +145,219 @@ export async function POST(request: NextRequest) {
   }
 }
 
+interface StyleConfig {
+  visualStyle: VisualStyle;
+  textStyle: string;
+  textColor: string;
+  headline: string;
+}
+
+interface StyleSampleResult {
+  id: string;
+  visualStyle: string;
+  textStyle: string;
+  textColor: string;
+  name: string;
+  description: string;
+  image: string | null;
+  error?: string;
+  keywords: string[];
+  designSystem: {
+    background: string;
+    primaryColor: string;
+    accentColor: string;
+    typography: string;
+    layout: string;
+    mood: string;
+  };
+}
+
+function generateStyleConfigs(keywords: string[], count: number): StyleConfig[] {
+  const configs: StyleConfig[] = [];
+  const usedCombinations = new Set<string>();
+
+  // Collect all relevant visual styles from keywords
+  let relevantVisualStyles: VisualStyle[] = [];
+  let relevantTextStyles: string[] = [];
+  let relevantColors: string[] = [];
+
+  for (const keyword of keywords) {
+    const kw = keyword.toLowerCase();
+    if (KEYWORD_TO_VISUAL_STYLE[kw]) {
+      relevantVisualStyles.push(...KEYWORD_TO_VISUAL_STYLE[kw]);
+    }
+    if (KEYWORD_TO_TEXT_STYLE[kw]) {
+      relevantTextStyles.push(...KEYWORD_TO_TEXT_STYLE[kw]);
+    }
+    if (KEYWORD_TO_COLOR[kw]) {
+      relevantColors.push(...KEYWORD_TO_COLOR[kw]);
+    }
+  }
+
+  // Deduplicate
+  relevantVisualStyles = [...new Set(relevantVisualStyles)];
+  relevantTextStyles = [...new Set(relevantTextStyles)];
+  relevantColors = [...new Set(relevantColors)];
+
+  // Fallbacks if no matches
+  if (relevantVisualStyles.length === 0) {
+    relevantVisualStyles = ALL_VISUAL_STYLES.slice(0, 4);
+  }
+  if (relevantTextStyles.length === 0) {
+    relevantTextStyles = Object.keys(TEXT_STYLE_PRESETS);
+  }
+  if (relevantColors.length === 0) {
+    relevantColors = Object.keys(TEXT_COLOR_PRESETS);
+  }
+
+  // Generate combinations
+  let attempts = 0;
+  const maxAttempts = count * 3;
+
+  while (configs.length < count && attempts < maxAttempts) {
+    attempts++;
+
+    const visualStyle = relevantVisualStyles[Math.floor(Math.random() * relevantVisualStyles.length)];
+    const textStyle = relevantTextStyles[Math.floor(Math.random() * relevantTextStyles.length)];
+    const textColor = relevantColors[Math.floor(Math.random() * relevantColors.length)];
+    const headline = SAMPLE_HEADLINES[configs.length % SAMPLE_HEADLINES.length];
+
+    const combo = `${visualStyle}-${textStyle}-${textColor}`;
+    if (!usedCombinations.has(combo)) {
+      usedCombinations.add(combo);
+      configs.push({ visualStyle, textStyle, textColor, headline });
+    }
+  }
+
+  // If we couldn't get enough unique combinations, fill with any remaining
+  while (configs.length < count) {
+    const visualStyle = ALL_VISUAL_STYLES[configs.length % ALL_VISUAL_STYLES.length];
+    const textStyle = Object.keys(TEXT_STYLE_PRESETS)[configs.length % Object.keys(TEXT_STYLE_PRESETS).length];
+    const textColor = Object.keys(TEXT_COLOR_PRESETS)[configs.length % Object.keys(TEXT_COLOR_PRESETS).length];
+    const headline = SAMPLE_HEADLINES[configs.length % SAMPLE_HEADLINES.length];
+    configs.push({ visualStyle, textStyle, textColor, headline });
+  }
+
+  return configs;
+}
+
+async function generateSingleSample({
+  config,
+  index,
+  brandName,
+  primaryColor,
+  accentColor,
+  keywords,
+  googleApiKey,
+}: {
+  config: StyleConfig;
+  index: number;
+  brandName: string;
+  primaryColor: string;
+  accentColor: string;
+  keywords: string[];
+  googleApiKey: string;
+}): Promise<StyleSampleResult> {
+  const styleInfo = VISUAL_STYLES[config.visualStyle];
+  const textStylePreset = TEXT_STYLE_PRESETS[config.textStyle];
+  const textColorPreset = TEXT_COLOR_PRESETS[config.textColor];
+
+  if (!styleInfo || !textStylePreset || !textColorPreset) {
+    return createErrorResult(config, keywords, "Invalid style configuration");
+  }
+
+  const prompt = buildStylePrompt({
+    style: styleInfo,
+    headline: config.headline,
+    brandName,
+    primaryColor,
+    accentColor,
+    textColorPreset,
+    textStylePreset,
+    keywords,
+  });
+
+  try {
+    const modelConfig = IMAGE_MODELS["gemini-3-pro"];
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:generateContent?key=${googleApiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseModalities: ["TEXT", "IMAGE"],
+            imageConfig: { aspectRatio: "4:5" },
+          },
+        }),
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      const parts = data.candidates?.[0]?.content?.parts || [];
+
+      for (const part of parts) {
+        if (part.inlineData?.data) {
+          const mimeType = part.inlineData.mimeType || "image/png";
+          return {
+            id: `${config.visualStyle}-${config.textStyle}-${index}`,
+            visualStyle: config.visualStyle,
+            textStyle: config.textStyle,
+            textColor: config.textColor,
+            name: styleInfo.name,
+            description: getStyleDescription(config.visualStyle, keywords),
+            image: `data:${mimeType};base64,${part.inlineData.data}`,
+            keywords,
+            designSystem: {
+              background: getBackgroundDescription(config.visualStyle, primaryColor),
+              primaryColor: textColorPreset.primaryColor,
+              accentColor: accentColor,
+              typography: textStylePreset.aesthetic,
+              layout: "centered",
+              mood: styleInfo.description,
+            },
+          };
+        }
+      }
+    }
+
+    console.error(`Style sample generation failed for ${config.visualStyle}:`, await response.text());
+    return createErrorResult(config, keywords, "Generation failed");
+  } catch (err) {
+    console.error(`Error generating ${config.visualStyle} sample:`, err);
+    return createErrorResult(config, keywords, err instanceof Error ? err.message : "Unknown error");
+  }
+}
+
+function createErrorResult(config: StyleConfig, keywords: string[], error: string): StyleSampleResult {
+  const styleInfo = VISUAL_STYLES[config.visualStyle];
+  const textStylePreset = TEXT_STYLE_PRESETS[config.textStyle];
+  const textColorPreset = TEXT_COLOR_PRESETS[config.textColor];
+
+  return {
+    id: `${config.visualStyle}-${config.textStyle}-error`,
+    visualStyle: config.visualStyle,
+    textStyle: config.textStyle,
+    textColor: config.textColor,
+    name: styleInfo?.name || config.visualStyle,
+    description: getStyleDescription(config.visualStyle, keywords),
+    image: null,
+    error,
+    keywords,
+    designSystem: {
+      background: getBackgroundDescription(config.visualStyle, "#1a1a1a"),
+      primaryColor: textColorPreset?.primaryColor || "#ffffff",
+      accentColor: "#ff6b6b",
+      typography: textStylePreset?.aesthetic || "clean",
+      layout: "centered",
+      mood: styleInfo?.description || "",
+    },
+  };
+}
+
 function buildStylePrompt({
   style,
   headline,
@@ -202,21 +366,27 @@ function buildStylePrompt({
   accentColor,
   textColorPreset,
   textStylePreset,
+  keywords,
 }: {
-  style: typeof VISUAL_STYLES[VisualStyle];
+  style: (typeof VISUAL_STYLES)[VisualStyle];
   headline: string;
   brandName: string;
   primaryColor: string;
   accentColor: string;
-  textColorPreset: typeof TEXT_COLOR_PRESETS[string];
-  textStylePreset: typeof TEXT_STYLE_PRESETS[string];
+  textColorPreset: (typeof TEXT_COLOR_PRESETS)[string];
+  textStylePreset: (typeof TEXT_STYLE_PRESETS)[string];
+  keywords: string[];
 }): string {
-  const basePrompt = `Create a ${style.name.toLowerCase()} style social media graphic.
+  const keywordGuidance = keywords.length > 0
+    ? `\n\nKEYWORD GUIDANCE:\nIncorporate these aesthetic qualities: ${keywords.join(", ")}`
+    : "";
+
+  return `Create a ${style.name.toLowerCase()} style social media graphic.
 
 HEADLINE TEXT TO DISPLAY: "${headline}"
 
 STYLE GUIDANCE:
-${style.promptGuidance}
+${style.promptGuidance}${keywordGuidance}
 
 COLOR SCHEME:
 - Brand primary color: ${primaryColor}
@@ -238,8 +408,6 @@ CRITICAL REQUIREMENTS:
 - NO phone mockups, NO app interfaces, NO social media UI elements
 - Create a clean, editorial design that could be a poster or magazine ad
 - Professional quality, suitable for a brand called "${brandName}"`;
-
-  return basePrompt;
 }
 
 function getBackgroundDescription(visualStyle: VisualStyle, brandColor: string): string {
@@ -260,5 +428,28 @@ function getBackgroundDescription(visualStyle: VisualStyle, brandColor: string):
       return "Avant-garde surreal composition";
     default:
       return "Clean minimal background";
+  }
+}
+
+function getStyleDescription(visualStyle: VisualStyle, keywords: string[]): string {
+  const keywordStr = keywords.length > 0 ? ` • ${keywords.slice(0, 2).join(", ")}` : "";
+
+  switch (visualStyle) {
+    case "typography":
+      return `Bold text-focused design${keywordStr}`;
+    case "photorealistic":
+      return `Photo-quality backgrounds${keywordStr}`;
+    case "3d-render":
+      return `Modern 3D rendered scenes${keywordStr}`;
+    case "abstract-art":
+      return `Bold shapes & gradients${keywordStr}`;
+    case "illustration":
+      return `Hand-drawn illustration style${keywordStr}`;
+    case "collage":
+      return `Mixed media layers${keywordStr}`;
+    case "experimental":
+      return `Avant-garde visuals${keywordStr}`;
+    default:
+      return `Custom style${keywordStr}`;
   }
 }
