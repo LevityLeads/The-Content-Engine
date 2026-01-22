@@ -27,6 +27,44 @@ import { useBrand, VoiceConfig, VisualConfig, BrandDefaultStyle, ApprovedStyle }
 import { StrictnessSlider } from "./strictness-slider";
 import { StylePicker, SelectedStylesResult } from "./style-picker";
 
+/**
+ * Recursively strips base64 data from an object to prevent large payloads.
+ * Base64 images can be 1-5MB each, causing 413 errors.
+ */
+function stripBase64Data<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (typeof obj === 'string') {
+    // Check if it's a base64 data URI
+    if (obj.startsWith('data:')) {
+      return undefined as T;
+    }
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj
+      .map(item => stripBase64Data(item))
+      .filter(item => item !== undefined) as T;
+  }
+
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const stripped = stripBase64Data(value);
+      // Skip undefined values (stripped base64)
+      if (stripped !== undefined) {
+        result[key] = stripped;
+      }
+    }
+    return result as T;
+  }
+
+  return obj;
+}
+
 interface BrandAnalysis {
   voice: {
     tone_keywords: string[];
@@ -238,12 +276,25 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
       approvedStyles,
     };
 
-    const result = await createBrand({
+    // Build the brand data
+    const brandData = {
       name: name.trim(),
       description: description.trim() || analysis.summary,
       voice_config: voiceConfig,
       visual_config: visualConfig,
-    });
+    };
+
+    // Strip any remaining base64 data to prevent 413 errors
+    const cleanedBrandData = stripBase64Data(brandData);
+
+    // Debug: Log payload size (remove after fixing)
+    const payloadSize = JSON.stringify(cleanedBrandData).length;
+    console.log(`[Brand Creation] Payload size: ${(payloadSize / 1024).toFixed(2)} KB`);
+    if (payloadSize > 500000) {
+      console.warn(`[Brand Creation] Payload is large (${(payloadSize / 1024 / 1024).toFixed(2)} MB), may cause 413 error`);
+    }
+
+    const result = await createBrand(cleanedBrandData);
 
     if (result) {
       handleClose();
