@@ -130,7 +130,22 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       setError(null);
-      const res = await fetch("/api/brands");
+
+      // Add timeout to prevent hanging forever
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+      let res: Response;
+      try {
+        res = await fetch("/api/brands", { signal: controller.signal });
+      } catch (fetchErr) {
+        clearTimeout(timeoutId);
+        if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+          throw new Error('Request timed out. Please check your connection.');
+        }
+        throw fetchErr;
+      }
+      clearTimeout(timeoutId);
 
       // Check for HTTP errors first
       if (!res.ok) {
