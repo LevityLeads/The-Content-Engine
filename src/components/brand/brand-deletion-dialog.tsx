@@ -51,28 +51,48 @@ export function BrandDeletionDialog({
   const [error, setError] = useState<string | null>(null);
 
   // Fetch deletion preview when dialog opens
+  // Reset and fetch pattern - standard for dialogs that need fresh data
   useEffect(() => {
-    if (open && brandId) {
-      setStep("loading");
-      setConfirmText("");
-      setError(null);
+    if (!open || !brandId) return;
 
-      fetch(`/api/brands/delete-preview?id=${brandId}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success) {
-            setPreview(data);
-            setStep("confirm");
-          } else {
-            setError(data.error || "Failed to load deletion preview");
-            setStep("error");
-          }
-        })
-        .catch(() => {
-          setError("Network error. Please try again.");
-          setStep("error");
+    const controller = new AbortController();
+
+    // Reset state when dialog opens - legitimate sync pattern for dialogs
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Legitimate: reset dialog state when opening
+    setStep("loading");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Legitimate: reset dialog state when opening
+    setConfirmText("");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Legitimate: reset dialog state when opening
+    setError(null);
+
+    const fetchPreview = async () => {
+      try {
+        const res = await fetch(`/api/brands/delete-preview?id=${brandId}`, {
+          signal: controller.signal,
         });
-    }
+        const data = await res.json();
+
+        if (controller.signal.aborted) return;
+
+        if (data.success) {
+          setPreview(data);
+          setStep("confirm");
+        } else {
+          setError(data.error || "Failed to load deletion preview");
+          setStep("error");
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setError("Network error. Please try again.");
+        setStep("error");
+      }
+    };
+
+    fetchPreview();
+
+    return () => {
+      controller.abort();
+    };
   }, [open, brandId]);
 
   const handleFirstConfirm = () => {

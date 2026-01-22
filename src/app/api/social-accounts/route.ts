@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Optionally sync with Late.dev to get latest account info
-    let lateAccounts: Record<string, { username: string; profileImageUrl?: string }> = {};
+    const lateAccounts: Record<string, { username: string; profileImageUrl?: string }> = {};
 
     if (process.env.LATE_API_KEY) {
       try {

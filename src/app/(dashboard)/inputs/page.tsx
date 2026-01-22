@@ -444,7 +444,7 @@ export default function InputsPage() {
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Enter a URL to an article, blog post, or webpage. We'll
+                  Enter a URL to an article, blog post, or webpage. We&apos;ll
                   extract the content for idea generation.
                 </p>
               </div>
