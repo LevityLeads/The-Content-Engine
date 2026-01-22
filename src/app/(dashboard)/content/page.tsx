@@ -2867,70 +2867,157 @@ export default function ContentPage() {
 
             return (
               <Card key={item.id} className="overflow-hidden">
-                {/* Collapsed Header Row - Enhanced with quick actions */}
+                {/* Collapsed Header - Two Row Layout (matching Ideas cards) */}
                 <div
-                  className="flex items-center gap-4 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => toggleCard(item.id)}
                 >
-                  {/* Selection Checkbox */}
-                  <button
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleSelectItem(item.id);
-                    }}
-                  >
-                    {selectedItems.has(item.id) ? (
-                      <CheckSquare className="h-5 w-5 text-primary" />
-                    ) : (
-                      <Square className="h-5 w-5" />
-                    )}
-                  </button>
+                  {/* Row 1: Main title row */}
+                  <div className="flex items-center gap-3">
+                    {/* Selection Checkbox */}
+                    <button
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelectItem(item.id);
+                      }}
+                    >
+                      {selectedItems.has(item.id) ? (
+                        <CheckSquare className="h-5 w-5 text-primary" />
+                      ) : (
+                        <Square className="h-5 w-5" />
+                      )}
+                    </button>
 
-                  {/* Expand Icon */}
-                  <div className="text-muted-foreground">
-                    {isExpanded ? (
-                      <ChevronDown className="h-5 w-5" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5" />
-                    )}
-                  </div>
-
-                  {/* Platform Icon */}
-                  <div className={`p-2 rounded-lg ${platformColors[item.platform] || "bg-gray-500"}`}>
-                    {platformIcons[item.platform] || <FileText className="h-4 w-4 text-white" />}
-                  </div>
-
-                  {/* Image thumbnail preview */}
-                  {hasImages && (
-                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                      <img
-                        src={allImages[0]?.url}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
+                    {/* Expand Icon */}
+                    <div className="text-muted-foreground">
+                      {isExpanded ? (
+                        <ChevronDown className="h-5 w-5" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5" />
+                      )}
                     </div>
-                  )}
 
-                  {/* Title/Concept */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">
-                      {String(item.ideas?.concept || item.copy_primary?.slice(0, 60) || "")}...
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {String(item.copy_primary?.slice(0, 100) || "")}...
-                    </p>
+                    {/* Platform Icon */}
+                    <div className={`p-2 rounded-lg ${platformColors[item.platform] || "bg-gray-500"}`}>
+                      {platformIcons[item.platform] || <FileText className="h-4 w-4 text-white" />}
+                    </div>
+
+                    {/* Image thumbnail preview */}
+                    {hasImages && (
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                        <img
+                          src={allImages[0]?.url}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+
+                    {/* Title/Concept - Now with more room */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium leading-snug">
+                        {String(item.ideas?.concept || item.copy_primary?.slice(0, 80) || "")}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">
+                        {String(item.copy_primary?.slice(0, 120) || "")}
+                      </p>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {/* Quick Approve (only for drafts) */}
+                      {item.status === "draft" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/20"
+                          onClick={() => handleApprove(item.id)}
+                          title="Quick Approve"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleCopyToClipboard(
+                          `${item.copy_primary}\n\n${item.copy_hashtags?.map(h => `#${h}`).join(" ") || ""}`,
+                          item.id
+                        )}
+                        title="Copy to clipboard"
+                      >
+                        {copiedId === item.id ? (
+                          <Check className="h-4 w-4 text-emerald-500" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                      {deleteConfirmId === item.id ? (
+                        <div className="flex items-center gap-1 rounded-lg border border-red-500/50 bg-red-500/10 px-2">
+                          <span className="text-xs text-red-400">Delete?</span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-500/20"
+                            onClick={() => handleDelete(item.id)}
+                            disabled={isDeleting}
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Check className="h-3 w-3" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-white"
+                            onClick={() => setDeleteConfirmId(null)}
+                          >
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-red-500"
+                          onClick={() => setDeleteConfirmId(item.id)}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Post Type Badge */}
-                  <Badge variant="outline" className="text-xs shrink-0">
-                    {hasCarousel && <Images className="mr-1 h-3 w-3" />}
-                    {postType}
-                    {hasCarousel && ` (${totalSlides})`}
-                  </Badge>
+                  {/* Row 2: Metadata row */}
+                  <div className="flex items-center gap-3 mt-3 ml-[52px] flex-wrap">
+                    {/* Theme Badge */}
+                    {item.ideas?.angle && typeof item.ideas.angle === 'string' && (
+                      <Badge variant="secondary" className="capitalize">
+                        {item.ideas?.angle}
+                      </Badge>
+                    )}
 
-                  {/* Image status indicator */}
-                  <div className="flex-shrink-0">
+                    {/* Platform indicator */}
+                    <div className={cn(
+                      "p-1.5 rounded",
+                      platformColors[item.platform] || "bg-muted/50"
+                    )}>
+                      {platformIcons[item.platform]}
+                    </div>
+
+                    {/* Post Type Badge */}
+                    <Badge variant="outline" className="text-xs">
+                      {hasCarousel && <Images className="mr-1 h-3 w-3" />}
+                      {postType}
+                      {hasCarousel && ` (${totalSlides})`}
+                    </Badge>
+
+                    {/* Image status indicator */}
                     {hasImages ? (
                       <Badge variant="secondary" className="text-xs bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
                         <ImageIcon className="mr-1 h-3 w-3" />
@@ -2942,120 +3029,45 @@ export default function ContentPage() {
                         0
                       </Badge>
                     )}
-                  </div>
 
-                  {/* Generation Status (compact) */}
-                  <GenerationStatus
-                    job={getLatestJob(item.id)}
-                    compact
-                    onRetry={() => {
-                      const job = getLatestJob(item.id);
-                      if (job) {
-                        clearJob(job.id);
-                        // Re-trigger generation based on type
-                        if (job.type === 'video' && carouselSlides) {
-                          handleGenerateAllVideos(item.id, carouselSlides);
-                        } else if (carouselSlides) {
-                          handleGenerateAllWithPrompts(item.id, carouselSlides);
-                        } else if (item.metadata?.imagePrompt) {
-                          handleGenerateImage(item.id, item.metadata?.imagePrompt || "");
+                    {/* Video Style Badge */}
+                    {(item.metadata?.visualStyle === "video" || item.metadata?.visualStyle === "mixed-carousel") && (
+                      <Badge variant="outline" className="text-xs border-violet-500/50 text-violet-400 bg-violet-500/10">
+                        <Video className="h-3 w-3 mr-1" />
+                        {item.metadata.visualStyle === "mixed-carousel" ? "Video+Images" : "Video"}
+                      </Badge>
+                    )}
+
+                    {/* Generation Status (compact) */}
+                    <GenerationStatus
+                      job={getLatestJob(item.id)}
+                      compact
+                      onRetry={() => {
+                        const job = getLatestJob(item.id);
+                        if (job) {
+                          clearJob(job.id);
+                          // Re-trigger generation based on type
+                          if (job.type === 'video' && carouselSlides) {
+                            handleGenerateAllVideos(item.id, carouselSlides);
+                          } else if (carouselSlides) {
+                            handleGenerateAllWithPrompts(item.id, carouselSlides);
+                          } else if (item.metadata?.imagePrompt) {
+                            handleGenerateImage(item.id, item.metadata?.imagePrompt || "");
+                          }
                         }
-                      }
-                    }}
-                  />
+                      }}
+                    />
 
-                  {/* Timestamp */}
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatRelativeTime(item.created_at)}</span>
-                  </div>
+                    {/* Timestamp */}
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>{formatRelativeTime(item.created_at)}</span>
+                    </div>
 
-                  {/* Theme Badge */}
-                  {item.ideas?.angle && typeof item.ideas.angle === 'string' && (
-                    <Badge variant="secondary" className="text-xs capitalize shrink-0">
-                      {item.ideas?.angle}
+                    {/* Status Badge */}
+                    <Badge className={cn("text-xs capitalize", statusColors[item.status] || "")}>
+                      {item.status}
                     </Badge>
-                  )}
-
-                  {/* Video Style Badge */}
-                  {(item.metadata?.visualStyle === "video" || item.metadata?.visualStyle === "mixed-carousel") && (
-                    <Badge variant="outline" className="text-xs shrink-0 border-violet-500/50 text-violet-400 bg-violet-500/10">
-                      <Video className="h-3 w-3 mr-1" />
-                      {item.metadata.visualStyle === "mixed-carousel" ? "Video+Images" : "Video"}
-                    </Badge>
-                  )}
-
-                  {/* Status Badge */}
-                  <Badge className={cn("text-xs capitalize shrink-0", statusColors[item.status] || "")}>
-                    {item.status}
-                  </Badge>
-
-                  {/* Quick Actions */}
-                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                    {/* Quick Approve (only for drafts) */}
-                    {item.status === "draft" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/20"
-                        onClick={() => handleApprove(item.id)}
-                        title="Quick Approve"
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleCopyToClipboard(
-                        `${item.copy_primary}\n\n${item.copy_hashtags?.map(h => `#${h}`).join(" ") || ""}`,
-                        item.id
-                      )}
-                      title="Copy to clipboard"
-                    >
-                      {copiedId === item.id ? (
-                        <Check className="h-4 w-4 text-emerald-500" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                    {deleteConfirmId === item.id ? (
-                      <div className="flex items-center gap-1 rounded-lg border border-red-500/50 bg-red-500/10 px-2">
-                        <span className="text-xs text-red-400">Delete?</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-red-500 hover:text-red-400 hover:bg-red-500/20"
-                          onClick={() => handleDelete(item.id)}
-                          disabled={isDeleting}
-                        >
-                          {isDeleting ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Check className="h-3 w-3" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-white"
-                          onClick={() => setDeleteConfirmId(null)}
-                        >
-                          <XCircle className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                        onClick={() => setDeleteConfirmId(item.id)}
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
                   </div>
                 </div>
 
