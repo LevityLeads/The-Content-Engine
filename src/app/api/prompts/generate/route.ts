@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { contentId, slides, visualStyle, mediaType, brandId, forceRegenerate } = body;
-    const effectiveStyle = visualStyle || "photorealistic";
+    const effectiveStyle = visualStyle || "typography";
     const effectiveMediaType = (mediaType || "image") as "image" | "video";
 
     if (!contentId || !slides || !Array.isArray(slides) || slides.length === 0) {

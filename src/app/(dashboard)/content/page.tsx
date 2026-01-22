@@ -560,7 +560,7 @@ export default function ContentPage() {
     try {
       // First generate prompts for all slides
       const contentItem = content.find((c) => c.id === contentId);
-      const currentStyle = selectedVisualStyle[contentId] || contentItem?.metadata?.carouselStyle || "photorealistic";
+      const currentStyle = selectedVisualStyle[contentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
 
       const promptResponse = await fetch("/api/prompts/generate", {
         method: "POST",
@@ -622,7 +622,7 @@ export default function ContentPage() {
 
     try {
       const contentItem = content.find((c) => c.id === contentId);
-      const currentStyle = selectedVisualStyle[contentId] || contentItem?.metadata?.carouselStyle || "photorealistic";
+      const currentStyle = selectedVisualStyle[contentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
 
       // Generate prompt
       const promptResponse = await fetch("/api/prompts/generate", {
@@ -689,7 +689,7 @@ export default function ContentPage() {
 
     try {
       const contentItem = content.find((c) => c.id === contentId);
-      const currentStyle = selectedVisualStyle[contentId] || contentItem?.metadata?.carouselStyle || "photorealistic";
+      const currentStyle = selectedVisualStyle[contentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
 
       // First generate prompts for all slides
       const promptResponse = await fetch("/api/prompts/generate", {
@@ -752,7 +752,7 @@ export default function ContentPage() {
 
   const handleRegenerateStyle = async (contentId: string, slides: CarouselSlide[], andGenerateImages: boolean = false) => {
     const contentItem = content.find((c) => c.id === contentId);
-    const currentStyle = selectedVisualStyle[contentId] || contentItem?.metadata?.carouselStyle || "photorealistic";
+    const currentStyle = selectedVisualStyle[contentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
 
     setRegeneratingStyle(contentId);
     setImageMessage(`Regenerating ${currentStyle} style design system...`);
@@ -833,8 +833,8 @@ export default function ContentPage() {
     setSavingPreset(true);
     try {
       const contentItem = content.find((c) => c.id === savePresetContentId);
-      const currentStyle = selectedVisualStyle[savePresetContentId] || contentItem?.metadata?.carouselStyle || "photorealistic";
-      const effectiveStyle = typeof currentStyle === "string" ? currentStyle : (currentStyle as { visualStyle?: string }).visualStyle || "photorealistic";
+      const currentStyle = selectedVisualStyle[savePresetContentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
+      const effectiveStyle = typeof currentStyle === "string" ? currentStyle : (currentStyle as { visualStyle?: string }).visualStyle || "typography";
 
       // Get the design system from content metadata
       const designSystem = contentItem?.metadata?.designSystems?.[effectiveStyle];
@@ -2051,7 +2051,7 @@ export default function ContentPage() {
                           size="sm"
                           className="w-full justify-start h-7 text-xs"
                           onClick={() => openSavePresetDialog(item.id)}
-                          disabled={!item.metadata?.designSystems?.[selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle) || "photorealistic"]}
+                          disabled={!item.metadata?.designSystems?.[selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)]}
                         >
                           <Save className="h-3 w-3 mr-2" />
                           Save current style
@@ -2255,7 +2255,7 @@ export default function ContentPage() {
                           size="sm"
                           className="w-full justify-start h-7 text-xs"
                           onClick={() => openSavePresetDialog(item.id)}
-                          disabled={!item.metadata?.designSystems?.[selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle) || "photorealistic"]}
+                          disabled={!item.metadata?.designSystems?.[selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle)]}
                         >
                           <Save className="h-3 w-3 mr-2" />
                           Save current style
@@ -2409,7 +2409,7 @@ export default function ContentPage() {
                         const key = `${item.id}-${slide.slideNumber}`;
                         setGeneratingPrompt(key);
                         try {
-                          const currentStyle = selectedVisualStyle[item.id] || item.metadata?.carouselStyle || "photorealistic";
+                          const currentStyle = selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle);
                           const promptResponse = await fetch("/api/prompts/generate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -2457,7 +2457,7 @@ export default function ContentPage() {
                         // Generate prompt first, then video
                         setGeneratingPrompt(key);
                         try {
-                          const currentStyle = selectedVisualStyle[item.id] || item.metadata?.carouselStyle || "photorealistic";
+                          const currentStyle = selectedVisualStyle[item.id] || getCarouselStyleId(item.metadata?.carouselStyle);
                           const promptResponse = await fetch("/api/prompts/generate", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -3647,8 +3647,8 @@ export default function ContentPage() {
                 <div className="text-xs font-medium text-muted-foreground mb-2">Design System Preview</div>
                 {(() => {
                   const contentItem = content.find((c) => c.id === savePresetContentId);
-                  const currentStyle = selectedVisualStyle[savePresetContentId!] || contentItem?.metadata?.carouselStyle || "photorealistic";
-                  const effectiveStyle = typeof currentStyle === "string" ? currentStyle : "photorealistic";
+                  const currentStyle = selectedVisualStyle[savePresetContentId!] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
+                  const effectiveStyle = typeof currentStyle === "string" ? currentStyle : "typography";
                   const ds = contentItem?.metadata?.designSystems?.[effectiveStyle];
                   if (!ds) return <div className="text-xs text-muted-foreground">No design system found</div>;
                   return (
