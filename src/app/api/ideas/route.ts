@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("ideas")
-      .select("*, inputs(*), brands(*)")
+      .select("*, inputs(raw_content, type)")
       .order("created_at", { ascending: false })
       .limit(limit);
 
