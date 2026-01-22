@@ -66,6 +66,84 @@ You respond:
 
 ---
 
+## CRITICAL: Testing Requirements (Test Before Commit)
+
+**Every task MUST follow this test-driven workflow:**
+
+### 1. Define Tests During Planning
+
+Before writing any code, explicitly document:
+- **What tests are needed** to verify the code works correctly
+- **Expected outcomes** for each test
+- **Edge cases** that should be covered
+
+Example format:
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🧪 TEST PLAN                                            │
+│                                                         │
+│ Feature: [What you're building]                         │
+│                                                         │
+│ Tests Required:                                         │
+│ 1. [Test description] → Expected: [outcome]             │
+│ 2. [Test description] → Expected: [outcome]             │
+│ 3. [Edge case]        → Expected: [outcome]             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 2. Implement the Code
+
+Write the feature/fix as planned.
+
+### 3. Run All Tests Before Commit
+
+Execute the defined tests:
+```bash
+npm run build          # Must pass
+npm run lint           # Must pass
+# + Any feature-specific tests defined in step 1
+```
+
+### 4. Commit ONLY When All Tests Pass
+
+**DO NOT COMMIT if any test fails.** The workflow is:
+
+```
+Tests Pass? ──YES──→ Commit & Push
+     │
+     NO
+     │
+     ↓
+Fix the errors
+     │
+     ↓
+Re-run tests ──────→ (loop until all pass)
+```
+
+### 5. Test Categories by Task Type
+
+| Task Type | Required Tests |
+|-----------|----------------|
+| **UI Component** | Visual renders correctly, interactions work, responsive design |
+| **API Endpoint** | Returns correct data, handles errors, validates input |
+| **Database Change** | Migrations run, queries work, data integrity maintained |
+| **Bug Fix** | Original bug no longer occurs, no regressions introduced |
+| **Refactor** | All existing functionality still works identically |
+
+### Test Failure Protocol
+
+If tests fail after implementation:
+1. **DO NOT** commit broken code
+2. **Identify** the failing test(s)
+3. **Fix** the underlying issue
+4. **Re-run** all tests
+5. **Repeat** until all tests pass
+6. **Only then** commit the changes
+
+This ensures rock-solid code quality and prevents broken deployments.
+
+---
+
 ## Quick Reference
 
 ```bash
