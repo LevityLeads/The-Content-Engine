@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, Check, X, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Clock, ChevronDown, ChevronRight, Square, CheckSquare, Trash2, AlertCircle, CheckCircle2, XCircle, MessageSquarePlus } from "lucide-react";
+import { Lightbulb, Check, X, Loader2, RefreshCw, Sparkles, Twitter, Linkedin, Instagram, Facebook, Clock, ChevronDown, ChevronRight, Square, CheckSquare, Trash2, AlertCircle, CheckCircle2, XCircle, MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +28,7 @@ interface Idea {
   };
 }
 
-const ALL_PLATFORMS = ["twitter", "instagram", "linkedin"] as const;
+const ALL_PLATFORMS = ["twitter", "instagram", "linkedin", "facebook"] as const;
 
 const formatRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
@@ -64,6 +64,12 @@ const platformConfig: Record<string, { icon: React.ReactNode; label: string; col
     label: "LinkedIn",
     color: "border-blue-500/30 text-blue-400",
     activeColor: "bg-blue-600 text-white border-blue-600",
+  },
+  facebook: {
+    icon: <Facebook className="h-4 w-4" />,
+    label: "Facebook",
+    color: "border-blue-600/30 text-blue-500",
+    activeColor: "bg-blue-700 text-white border-blue-700",
   },
 };
 
