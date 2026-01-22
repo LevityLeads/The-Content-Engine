@@ -6,16 +6,16 @@
  */
 
 import { MARKETER_PERSONA, MARKETER_CONTEXT } from "./marketer-persona";
-import { HOOK_PATTERNS, HOOK_GUIDELINES } from "./hook-library";
-import { CONTENT_PILLARS, CONTENT_ANGLES, PILLAR_BALANCE_GUIDE, ANGLE_GUIDELINES } from "./content-pillars";
+import { HOOK_GUIDELINES } from "./hook-library";
+import { CONTENT_ANGLES, PILLAR_BALANCE_GUIDE, ANGLE_GUIDELINES } from "./content-pillars";
 
 export const IDEATION_SYSTEM_PROMPT = `${MARKETER_PERSONA}
 
 ---
 
-# YOUR TASK: Generate High-Performing Content Ideas
+# YOUR TASK: Generate Content Ideas
 
-You are transforming raw input material into content ideas that will ACTUALLY perform on social media. Not generic content—content engineered for engagement, saves, and shares.
+Turn this source material into content ideas worth posting. Focus on what's genuinely interesting or useful - not what "performs."
 
 ${PILLAR_BALANCE_GUIDE}
 
@@ -27,23 +27,11 @@ ${Object.entries(CONTENT_ANGLES)
   .map(([key, angle]) => `### ${angle.name}\n${angle.description}\n**Trigger**: ${angle.trigger}\n**Example**: "${angle.example}"`)
   .join("\n\n")}
 
-## Hook Pattern Library
-
-Use these proven patterns as inspiration (adapt, don't copy):
-
-### Contrarian Hooks
-${HOOK_PATTERNS.contrarian.slice(0, 4).map((h) => `- "${h}"`).join("\n")}
-
-### Curiosity Hooks
-${HOOK_PATTERNS.curiosity.slice(0, 4).map((h) => `- "${h}"`).join("\n")}
-
-### Number Hooks
-${HOOK_PATTERNS.numbers.slice(0, 4).map((h) => `- "${h}"`).join("\n")}
-
-### Story Hooks
-${HOOK_PATTERNS.story.slice(0, 4).map((h) => `- "${h}"`).join("\n")}
+## Writing Openings
 
 ${HOOK_GUIDELINES}
+
+Avoid template-style hooks like "Most people think X. They're wrong." or "Hot take:" - these are now so common they signal inauthenticity.
 
 ---
 
@@ -105,17 +93,11 @@ Rate your confidence with breakdown:
 
 ---
 
-## Quality Gates
+## Quality Check
 
-Before including any idea, verify:
+Before including an idea, ask: Is this genuinely interesting? Would you want to read this?
 
-1. **The Scroll-Stop Test**: Would this make YOU stop scrolling?
-2. **The Save Test**: Would someone bookmark this?
-3. **The Share Test**: Would someone send this to a friend?
-4. **The Specificity Test**: Is this idea specific enough to be interesting?
-5. **The "So What" Test**: Does this matter to the target audience?
-
-If an idea fails ANY of these tests, improve it or discard it.
+Skip ideas that are generic, obvious, or feel like filler. Only include ideas that have something real to say.
 
 ---
 
@@ -169,9 +151,7 @@ Do NOT generate variations of the same idea. Generate DISTINCT ideas that approa
 
 ---
 
-${MARKETER_CONTEXT}
-
-Remember: Generic ideas are worthless. Every idea must have a clear reason to exist and a clear path to engagement. Be ruthless about quality.`;
+${MARKETER_CONTEXT}`;
 
 export const buildIdeationUserPrompt = (
   inputContent: string,
