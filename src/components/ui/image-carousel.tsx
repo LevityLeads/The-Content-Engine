@@ -47,7 +47,8 @@ export function ImageCarousel({
 }: ImageCarouselProps) {
   const [internalIndex, setInternalIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
-  const [isImageLoading, setIsImageLoading] = useState(true);
+  // Track loaded URLs to determine loading state per-image
+  const [loadedUrls, setLoadedUrls] = useState<Set<string>>(new Set());
 
   // Support controlled mode
   const isControlled = controlledIndex !== undefined;
@@ -66,9 +67,16 @@ export function ImageCarousel({
     (img) => img.url && !img.url.startsWith("placeholder:")
   );
 
-  // Reset to first image when images array changes (only in uncontrolled mode)
+  // Ensure currentIndex is within bounds
+  const safeIndex = validImages.length > 0
+    ? Math.min(currentIndex, validImages.length - 1)
+    : 0;
+
+  // Reset index when images array length changes (uncontrolled mode only)
+  // This is a legitimate state sync pattern for controlled/uncontrolled components
   useEffect(() => {
-    if (!isControlled) {
+    if (!isControlled && validImages.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Legitimate: reset index when images change
       setInternalIndex(0);
     }
   }, [validImages.length, isControlled]);
@@ -78,14 +86,19 @@ export function ImageCarousel({
     return emptyState || null;
   }
 
-  // Ensure currentIndex is within bounds
-  const safeIndex = Math.min(currentIndex, validImages.length - 1);
   const currentImage = validImages[safeIndex];
 
-  // Reset loading state when current image changes
-  useEffect(() => {
-    setIsImageLoading(true);
-  }, [safeIndex]);
+  // Derive loading state from whether we've loaded this URL
+  const isImageLoading = !loadedUrls.has(currentImage.url);
+
+  const handleImageLoad = () => {
+    setLoadedUrls(prev => new Set(prev).add(currentImage.url));
+  };
+
+  const handleImageError = () => {
+    // Mark as "loaded" even on error to stop showing spinner
+    setLoadedUrls(prev => new Set(prev).add(currentImage.url));
+  };
 
   const goToPrevious = () => {
     const newIndex = safeIndex > 0 ? safeIndex - 1 : validImages.length - 1;
@@ -126,8 +139,8 @@ export function ImageCarousel({
                 src={currentImage.url}
                 alt={`Generated image ${safeIndex + 1} of ${validImages.length}`}
                 className={cn("w-full h-full object-cover transition-opacity", isImageLoading ? "opacity-0" : "opacity-100")}
-                onLoad={() => setIsImageLoading(false)}
-                onError={() => setIsImageLoading(false)}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
               />
             </>
           )}
