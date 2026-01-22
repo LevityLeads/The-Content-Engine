@@ -194,21 +194,30 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
         textColor: primary.textColor,
         designSystem: primary.designSystem,
         selectedAt: new Date().toISOString(),
-        sampleImageUsed: primary.sampleImage,
+        // Don't store base64 sampleImage - it makes the payload too large (413 error)
+        // The style config is what matters for content generation
+        sampleImageUsed: undefined,
       };
 
       // Build approved styles palette from all selected styles
+      // Exclude sampleImage (base64) to keep payload size manageable
       approvedStyles = stylesToUse.styles.map((style) => ({
         id: style.id,
         visualStyle: style.visualStyle,
         textStyle: style.textStyle,
         textColor: style.textColor,
         name: style.name,
-        sampleImage: style.sampleImage,
+        // sampleImage excluded - base64 images are too large for API payload
         designSystem: style.designSystem,
         addedAt: new Date().toISOString(),
       }));
     }
+
+    // Filter out base64 images from extracted_images to keep payload small
+    // Only keep URL-based images (not base64 data URIs)
+    const filteredExtractedImages = (analysis.visual.sample_images || []).filter(
+      (img) => img && !img.startsWith("data:")
+    );
 
     const visualConfig: VisualConfig = {
       primary_color: editedPrimaryColor,
@@ -216,7 +225,8 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
       accent_color: editedAccentColor,
       image_style: analysis.visual.image_style,
       color_palette: analysis.visual.color_palette,
-      extracted_images: analysis.visual.sample_images,
+      // Only store URL-based images, not base64 (too large for API payload)
+      extracted_images: filteredExtractedImages.length > 0 ? filteredExtractedImages : undefined,
       // Include fonts (user-edited or detected) for use in content generation
       fonts: (editedHeadingFont || editedBodyFont) ? {
         heading: editedHeadingFont,
