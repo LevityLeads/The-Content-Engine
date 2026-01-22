@@ -551,8 +551,10 @@ function SettingsPageContent() {
   };
 
   // Helper to check if a platform is connected
+  // Must have platform match, is_active=true, AND a valid late_account_id
+  // (without late_account_id, publishing will fail even if UI shows "connected")
   const getConnectedAccount = (platformId: string) => {
-    return socialAccounts.find((a) => a.platform === platformId && a.is_active);
+    return socialAccounts.find((a) => a.platform === platformId && a.is_active && a.late_account_id);
   };
 
   if (brandLoading) {
