@@ -20,7 +20,7 @@ import { ContentGridSkeleton } from "@/components/ui/skeleton";
 import { useGenerationJobs } from "@/hooks/use-generation-jobs";
 import { useContent } from '@/hooks/use-swr-hooks';
 import { cn } from "@/lib/utils";
-import { useBrand, type SavedDesignSystemPreset } from "@/contexts/brand-context";
+import { useBrand, type SavedDesignSystemPreset, type ApprovedStyle } from "@/contexts/brand-context";
 
 interface ContentImage {
   id: string;
@@ -1933,6 +1933,17 @@ export default function ContentPage() {
     return "typography";
   };
 
+  // Helper to update content metadata locally (for immediate UI feedback)
+  const updateContentMetadata = (contentId: string, metadataUpdates: Partial<Content["metadata"]>) => {
+    setContent((prev) =>
+      prev.map((c) =>
+        c.id === contentId
+          ? { ...c, metadata: { ...c.metadata, ...metadataUpdates } }
+          : c
+      )
+    );
+  };
+
   const truncateText = (text: string | null | undefined, maxLength: number) => {
     if (!text) return "";
     if (text.length <= maxLength) return text;
@@ -2270,8 +2281,53 @@ export default function ContentPage() {
                         <MoreVertical className="h-3 w-3" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-56 p-2" align="end">
+                    <PopoverContent className="w-64 p-2" align="end">
                       <div className="space-y-2">
+                        {/* Brand Style Palette - Quick picks from onboarding */}
+                        {selectedBrand?.visual_config?.approvedStyles && selectedBrand.visual_config.approvedStyles.length > 0 && (
+                          <>
+                            <div className="text-xs font-medium text-muted-foreground px-1">Brand Style Palette</div>
+                            <div className="grid grid-cols-3 gap-1">
+                              {selectedBrand.visual_config.approvedStyles.map((style: ApprovedStyle) => (
+                                <button
+                                  key={style.id}
+                                  className={cn(
+                                    "relative rounded-md overflow-hidden border-2 transition-all aspect-[4/5]",
+                                    getEffectiveStyle(item.id, item.metadata) === style.visualStyle
+                                      ? "border-primary ring-1 ring-primary"
+                                      : "border-muted hover:border-primary/50"
+                                  )}
+                                  onClick={() => {
+                                    setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: style.visualStyle }));
+                                    if (style.designSystem) {
+                                      // Apply the design system from the approved style
+                                      const newDesignSystems = {
+                                        ...(item.metadata?.designSystems || {}),
+                                        [style.visualStyle]: style.designSystem,
+                                      };
+                                      updateContentMetadata(item.id, { designSystems: newDesignSystems });
+                                    }
+                                  }}
+                                  title={style.name}
+                                >
+                                  {style.sampleImage ? (
+                                    <img
+                                      src={style.sampleImage}
+                                      alt={style.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                                      <span className="text-[8px] text-muted-foreground text-center px-1">{style.name}</span>
+                                    </div>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="border-t border-muted my-1" />
+                          </>
+                        )}
+
                         <div className="text-xs font-medium text-muted-foreground px-1">Style Presets</div>
                         {/* Save current design system */}
                         <Button
@@ -2496,8 +2552,53 @@ export default function ContentPage() {
                         <MoreVertical className="h-3 w-3" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-56 p-2" align="end">
+                    <PopoverContent className="w-64 p-2" align="end">
                       <div className="space-y-2">
+                        {/* Brand Style Palette - Quick picks from onboarding */}
+                        {selectedBrand?.visual_config?.approvedStyles && selectedBrand.visual_config.approvedStyles.length > 0 && (
+                          <>
+                            <div className="text-xs font-medium text-muted-foreground px-1">Brand Style Palette</div>
+                            <div className="grid grid-cols-3 gap-1">
+                              {selectedBrand.visual_config.approvedStyles.map((style: ApprovedStyle) => (
+                                <button
+                                  key={style.id}
+                                  className={cn(
+                                    "relative rounded-md overflow-hidden border-2 transition-all aspect-[4/5]",
+                                    getEffectiveStyle(item.id, item.metadata) === style.visualStyle
+                                      ? "border-primary ring-1 ring-primary"
+                                      : "border-muted hover:border-primary/50"
+                                  )}
+                                  onClick={() => {
+                                    setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: style.visualStyle }));
+                                    if (style.designSystem) {
+                                      // Apply the design system from the approved style
+                                      const newDesignSystems = {
+                                        ...(item.metadata?.designSystems || {}),
+                                        [style.visualStyle]: style.designSystem,
+                                      };
+                                      updateContentMetadata(item.id, { designSystems: newDesignSystems });
+                                    }
+                                  }}
+                                  title={style.name}
+                                >
+                                  {style.sampleImage ? (
+                                    <img
+                                      src={style.sampleImage}
+                                      alt={style.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                                      <span className="text-[8px] text-muted-foreground text-center px-1">{style.name}</span>
+                                    </div>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="border-t border-muted my-1" />
+                          </>
+                        )}
+
                         <div className="text-xs font-medium text-muted-foreground px-1">Style Presets</div>
                         {/* Save current design system */}
                         <Button

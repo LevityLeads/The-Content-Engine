@@ -23,9 +23,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { useBrand, VoiceConfig, VisualConfig, BrandDefaultStyle } from "@/contexts/brand-context";
+import { useBrand, VoiceConfig, VisualConfig, BrandDefaultStyle, ApprovedStyle } from "@/contexts/brand-context";
 import { StrictnessSlider } from "./strictness-slider";
-import { StylePicker, SelectedStyle } from "./style-picker";
+import { StylePicker, SelectedStylesResult } from "./style-picker";
 
 interface BrandAnalysis {
   voice: {
@@ -74,8 +74,8 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
   const [editedHeadingFont, setEditedHeadingFont] = useState("");
   const [editedBodyFont, setEditedBodyFont] = useState("");
 
-  // Selected default style from style picker
-  const [selectedStyle, setSelectedStyle] = useState<SelectedStyle | null>(null);
+  // Selected styles from style picker (style palette)
+  const [selectedStylesResult, setSelectedStylesResult] = useState<SelectedStylesResult | null>(null);
 
   const resetDialog = () => {
     setStep("input");
@@ -90,7 +90,7 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
     setEditedAccentColor("");
     setEditedHeadingFont("");
     setEditedBodyFont("");
-    setSelectedStyle(null);
+    setSelectedStylesResult(null);
   };
 
   const handleClose = () => {
@@ -161,14 +161,14 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
     }
   };
 
-  const handleCreate = async (styleOverride?: SelectedStyle | null) => {
+  const handleCreate = async (stylesOverride?: SelectedStylesResult | null) => {
     if (!analysis) return;
 
     setStep("creating");
     setError(null);
 
     // Use override if provided, otherwise use state
-    const styleToUse = styleOverride !== undefined ? styleOverride : selectedStyle;
+    const stylesToUse = stylesOverride !== undefined ? stylesOverride : selectedStylesResult;
 
     const voiceConfig: VoiceConfig = {
       tone_keywords: editedToneKeywords,
@@ -182,17 +182,32 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
       },
     };
 
-    // Build default style if user selected one during onboarding
+    // Build default style from the first selected style
     let defaultStyle: BrandDefaultStyle | undefined;
-    if (styleToUse) {
+    let approvedStyles: ApprovedStyle[] | undefined;
+
+    if (stylesToUse && stylesToUse.styles.length > 0) {
+      const primary = stylesToUse.styles[0];
       defaultStyle = {
-        visualStyle: styleToUse.visualStyle,
-        textStyle: styleToUse.textStyle,
-        textColor: styleToUse.textColor,
-        designSystem: styleToUse.designSystem,
+        visualStyle: primary.visualStyle,
+        textStyle: primary.textStyle,
+        textColor: primary.textColor,
+        designSystem: primary.designSystem,
         selectedAt: new Date().toISOString(),
-        sampleImageUsed: styleToUse.sampleImage,
+        sampleImageUsed: primary.sampleImage,
       };
+
+      // Build approved styles palette from all selected styles
+      approvedStyles = stylesToUse.styles.map((style) => ({
+        id: style.id,
+        visualStyle: style.visualStyle,
+        textStyle: style.textStyle,
+        textColor: style.textColor,
+        name: style.name,
+        sampleImage: style.sampleImage,
+        designSystem: style.designSystem,
+        addedAt: new Date().toISOString(),
+      }));
     }
 
     const visualConfig: VisualConfig = {
@@ -209,6 +224,8 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
       } : undefined,
       // Include default style selected during onboarding
       defaultStyle,
+      // Include full style palette
+      approvedStyles,
     };
 
     const result = await createBrand({
@@ -530,12 +547,12 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
                 accent_color: editedAccentColor,
               }}
               brandName={name}
-              onStyleSelected={(style) => {
-                setSelectedStyle(style);
-                handleCreate(style);
+              onStyleSelected={(result) => {
+                setSelectedStylesResult(result);
+                handleCreate(result);
               }}
               onSkip={() => {
-                setSelectedStyle(null);
+                setSelectedStylesResult(null);
                 handleCreate(null);
               }}
             />

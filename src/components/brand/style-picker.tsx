@@ -50,12 +50,19 @@ export interface StyleSample {
 }
 
 export interface SelectedStyle {
+  id: string;
   visualStyle: string;
   textStyle: string;
   textColor: string;
+  name: string;
   designSystem: StyleSample["designSystem"];
   sampleImage?: string;
   keywords?: string[];
+}
+
+export interface SelectedStylesResult {
+  styles: SelectedStyle[];
+  keywords: string[];
 }
 
 interface StylePickerProps {
@@ -64,7 +71,7 @@ interface StylePickerProps {
     accent_color?: string;
   };
   brandName: string;
-  onStyleSelected: (style: SelectedStyle) => void;
+  onStyleSelected: (result: SelectedStylesResult) => void;
   onSkip?: () => void;
 }
 
@@ -160,16 +167,20 @@ export function StylePicker({
   };
 
   const handleConfirm = () => {
-    // Get the first selected sample as the primary default
+    // Get all selected samples for the style palette
     const selectedSamples = samples.filter((s) => selectedIds.has(s.id) && s.image);
     if (selectedSamples.length > 0) {
-      const primary = selectedSamples[0];
+      const styles: SelectedStyle[] = selectedSamples.map((sample) => ({
+        id: sample.id,
+        visualStyle: sample.visualStyle,
+        textStyle: sample.textStyle,
+        textColor: sample.textColor,
+        name: sample.name,
+        designSystem: sample.designSystem,
+        sampleImage: sample.image || undefined,
+      }));
       onStyleSelected({
-        visualStyle: primary.visualStyle,
-        textStyle: primary.textStyle,
-        textColor: primary.textColor,
-        designSystem: primary.designSystem,
-        sampleImage: primary.image || undefined,
+        styles,
         keywords: selectedTags,
       });
     }
@@ -318,9 +329,12 @@ export function StylePicker({
   return (
     <div className="space-y-4">
       <div className="text-center space-y-1">
-        <h3 className="text-lg font-semibold">Select your favorite styles</h3>
+        <h3 className="text-lg font-semibold">Build your style palette</h3>
         <p className="text-sm text-muted-foreground">
-          Click to select the styles that work best for {brandName}. Select at least one.
+          Select the styles that work for {brandName}. These become your quick-pick options when creating content.
+        </p>
+        <p className="text-xs text-muted-foreground/70">
+          You can add or change styles anytime in Settings.
         </p>
       </div>
 
