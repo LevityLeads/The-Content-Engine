@@ -194,17 +194,17 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
         textColor: primary.textColor,
         designSystem: primary.designSystem,
         selectedAt: new Date().toISOString(),
-        sampleImageUsed: primary.sampleImage,
+        // Note: sampleImageUsed omitted - base64 images are too large for DB storage
       };
 
       // Build approved styles palette from all selected styles
+      // Note: sampleImage omitted - base64 images are too large for DB storage
       approvedStyles = stylesToUse.styles.map((style) => ({
         id: style.id,
         visualStyle: style.visualStyle,
         textStyle: style.textStyle,
         textColor: style.textColor,
         name: style.name,
-        sampleImage: style.sampleImage,
         designSystem: style.designSystem,
         addedAt: new Date().toISOString(),
       }));

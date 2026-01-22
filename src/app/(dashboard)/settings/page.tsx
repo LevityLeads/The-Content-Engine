@@ -1101,7 +1101,6 @@ function SettingsPageContent() {
                           textColor: newApprovedStyles[0].textColor,
                           designSystem: newApprovedStyles[0].designSystem,
                           selectedAt: new Date().toISOString(),
-                          sampleImageUsed: newApprovedStyles[0].sampleImage,
                         } : undefined;
                         const newConfig = {
                           ...visualConfig,
@@ -1229,13 +1228,13 @@ function SettingsPageContent() {
         brandName={selectedBrand?.name || "Brand"}
         onStyleSelected={async (result) => {
           // Build approved styles from selection
+          // Note: sampleImage omitted - base64 images are too large for DB storage
           const newApprovedStyles: ApprovedStyle[] = result.styles.map((style) => ({
             id: style.id,
             visualStyle: style.visualStyle,
             textStyle: style.textStyle,
             textColor: style.textColor,
             name: style.name,
-            sampleImage: style.sampleImage,
             designSystem: style.designSystem,
             addedAt: new Date().toISOString(),
           }));
@@ -1256,7 +1255,6 @@ function SettingsPageContent() {
             textColor: mergedStyles[0].textColor,
             designSystem: mergedStyles[0].designSystem,
             selectedAt: new Date().toISOString(),
-            sampleImageUsed: mergedStyles[0].sampleImage,
           } : undefined;
 
           const newConfig = { ...visualConfig, approvedStyles: mergedStyles, defaultStyle };
