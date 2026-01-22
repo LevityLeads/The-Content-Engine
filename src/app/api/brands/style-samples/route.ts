@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { VISUAL_STYLES, VisualStyle } from "@/lib/prompts/visual-styles";
 import { TEXT_STYLE_PRESETS, TEXT_COLOR_PRESETS } from "@/lib/slide-templates/types";
+import { IMAGE_MODELS, DEFAULT_MODEL } from "@/lib/image-models";
 
 /**
  * Style Sample Generation API
@@ -86,8 +87,11 @@ export async function POST(request: NextRequest) {
       });
 
       try {
+        // Use Nano Banana Pro for highest quality samples
+        const modelConfig = IMAGE_MODELS["gemini-3-pro"];
+
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${googleApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:generateContent?key=${googleApiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
