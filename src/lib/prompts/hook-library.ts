@@ -1,151 +1,91 @@
 /**
- * Hook Library
+ * Hook Principles
  *
- * Proven hook patterns that stop the scroll and create engagement.
- * These are frameworks to adapt, not templates to copy verbatim.
+ * Guidelines for writing good opening lines - principles, not templates.
+ * Templates are recognizable and feel manufactured. Principles guide authentic writing.
  */
 
 export const HOOK_PATTERNS = {
-  // Contrarian hooks challenge conventional wisdom
+  // These are EXAMPLES of approaches, not templates to fill in
+  // The goal is understanding WHY these work, not copying the format
+
   contrarian: [
-    "Most people think [common belief]. They're wrong.",
-    "Unpopular opinion: [contrarian take]",
-    "[Common advice] is terrible advice. Here's why:",
-    "Stop [common action]. It's killing your [result].",
-    "Everyone's doing [thing]. Almost everyone's wrong.",
-    "The [industry] industry lied to you about [topic].",
-    "[Number]% of [group] get this wrong:",
-    "I used to believe [common belief]. Then I learned [insight].",
+    // Works because: challenges something the reader believes
+    // Don't use: "Most people think X. They're wrong." (overused)
+    // Do: Find a genuine belief you disagree with and explain why naturally
   ],
 
-  // Curiosity hooks create open loops that must be closed
   curiosity: [
-    "I spent [time] studying [topic]. Here's what nobody talks about:",
-    "There's a reason [successful people] all do [thing].",
-    "The real reason [unexpected thing] works:",
-    "What [expert/company] knows that you don't:",
-    "I analyzed [number] [things]. The pattern was shocking.",
-    "The [thing] that changed everything for me:",
-    "Here's what happens when you [action]:",
-    "The secret behind [impressive result]:",
+    // Works because: creates a gap between what reader knows and wants to know
+    // Don't use: "The secret to..." "What nobody tells you about..."
+    // Do: Share something genuinely surprising or counterintuitive
   ],
 
-  // Number hooks promise specific, scannable value
   numbers: [
-    "[Number] [things] that will [benefit] (backed by [proof]):",
-    "[Number] signs you're [problem]:",
-    "[Number] [things] I wish I knew [time period] ago:",
-    "[Number] mistakes killing your [goal]:",
-    "[Number]-step framework for [result]:",
-    "I've [done thing] [number] times. Here's what works:",
-    "[Number] [things] separating [top performers] from everyone else:",
-    "The [number]-second rule for [topic]:",
+    // Works because: specific = credible, and promises scannable value
+    // Don't use: "7 ways to..." (generic)
+    // Do: Use numbers when you actually have that many distinct points
   ],
 
-  // Story hooks use narrative tension
   story: [
-    "Last [time period], I [unexpected action]. Here's what happened:",
-    "I almost [dramatic thing]. Then [turning point].",
-    "My biggest failure taught me [lesson]:",
-    "[Time] ago, I was [relatable struggle]. Today, [transformation].",
-    "Someone asked me [question]. My answer surprised them:",
-    "I got this advice from [credible source]: [advice]",
-    "The moment I realized [insight]:",
-    "I was wrong about [topic]. Here's my new take:",
+    // Works because: humans are wired for narrative
+    // Don't use: Obviously manufactured stories with perfect arcs
+    // Do: Share real moments, including the messy parts
   ],
 
-  // Question hooks trigger self-reflection
   question: [
-    "Why do [successful people] always [action]?",
-    "What if [assumption] was completely backwards?",
-    "Ever wonder why [observation]?",
-    "What's the difference between [good] and [great]?",
-    "Why does [counterintuitive thing] actually work?",
-    "Are you making this [topic] mistake?",
-    "What would change if you [hypothetical]?",
-    "How do [top performers] [achieve result] so consistently?",
+    // Works because: triggers self-reflection
+    // Don't use: Rhetorical questions with obvious answers
+    // Do: Ask something the reader will genuinely want to think about
   ],
 
-  // Direct value hooks promise immediate benefit
   directValue: [
-    "Steal this [thing] I use for [benefit]:",
-    "The exact [framework/template/process] I use to [result]:",
-    "How to [achieve result] in [timeframe]:",
-    "A simple way to [benefit] (that actually works):",
-    "The [thing] that [percentage]% improvement in [metric]:",
-    "Copy this [thing] for better [result]:",
-    "The fastest way to [achieve goal]:",
-    "If you [struggle], read this:",
+    // Works because: clear benefit, no mystery
+    // Don't use: Over-promising ("This will change everything")
+    // Do: Be specific about what they'll learn and deliver on it
   ],
 
-  // Challenge hooks provoke engagement
   challenge: [
-    "Hot take: [bold statement]",
-    "This might be controversial, but [opinion]:",
-    "I'll probably get hate for this, but [truth bomb]:",
-    "Agree or disagree: [debatable statement]",
-    "[Common thing] is overrated. [Alternative] is underrated.",
-    "The uncomfortable truth about [topic]:",
-    "Nobody wants to admit this about [topic]:",
-    "Why [popular thing] might be hurting you:",
+    // Works because: stakes a position people can react to
+    // Don't use: "Hot take:" "Unpopular opinion:" (these are cliches now)
+    // Do: Just state your opinion directly without the preamble
   ],
 
-  // Credibility hooks leverage proof and authority
   credibility: [
-    "After [impressive experience], here's what I've learned:",
-    "I've [relevant achievement]. Here's the playbook:",
-    "[Impressive number] later, here's what actually matters:",
-    "Working with [impressive clients/companies] taught me:",
-    "The strategy that got me from [before] to [after]:",
-    "What [number] [years/projects/clients] taught me about [topic]:",
-    "I've seen this work [number] times:",
-    "This is what [success metric] looks like:",
+    // Works because: proof creates trust
+    // Don't use: Humble brags ("After my 7-figure exit...")
+    // Do: Share relevant experience when it genuinely adds context
   ],
 };
 
-export const HOOK_GUIDELINES = `## Hook Creation Guidelines
+export const HOOK_GUIDELINES = `## Writing Good Openings
 
-### The 3-Word Rule
-The first 3 words must accomplish one of these:
-1. Create immediate curiosity ("I was wrong...")
-2. Challenge a belief ("Stop doing X...")
-3. Promise specific value ("7 frameworks that...")
-4. Trigger self-identification ("If you struggle...")
+### What Makes People Keep Reading
 
-### Hook Quality Checklist
-- [ ] Would this make YOU stop scrolling?
-- [ ] Does it create an open loop that demands closure?
-- [ ] Is it specific enough to be believable?
-- [ ] Does it avoid clickbait clichés?
-- [ ] Would someone feel compelled to read on?
+**Specificity.** "I lost $50,000 on a bad hire" is more compelling than "Hiring mistakes are expensive."
 
-### Platform-Specific Hook Adaptations
+**Surprise.** Something unexpected or counterintuitive. Not manufactured controversy - genuine insight.
 
-**Twitter/X:**
-- Front-load the hook (no build-up)
-- Use line breaks for emphasis
-- Can be more provocative
-- Questions work well as quote-tweet bait
+**Relevance.** It connects to something the reader cares about or struggles with.
 
-**LinkedIn:**
-- Story hooks perform best
-- Credibility signals matter more
-- Avoid being too casual
-- The hook must appear before "see more"
+**Confidence.** You sound like you have something worth saying, not like you're trying to get attention.
 
-**Instagram:**
-- Hook goes in the caption AND slide 1
-- Visual hook on slide 1 can be text-based
-- Carousel slide 1 should create curiosity about slide 2
-- Never put value on slide 1—only tension
+### What Doesn't Work Anymore
 
-### Anti-Patterns to Avoid
-- "I'm so excited to announce..." (nobody cares about your emotions)
-- "Did you know..." (overused, weak)
-- Starting with a hashtag (kills engagement)
-- Generic affirmations ("Believe in yourself!")
-- Anything that sounds AI-generated or templated
-- Excessive punctuation or emojis in hooks (!!!! or multiple emojis)`;
+These patterns are so common they now signal "this is content":
+- "Most people think X. They're wrong."
+- "Hot take:" / "Unpopular opinion:"
+- "I'm so excited to announce..."
+- "Did you know..."
+- "[Number] things that will change your [outcome]"
+- "Stop doing X. Start doing Y."
+- Any opening with multiple exclamation points or emojis
+
+### The Real Test
+
+Read your opening line. Does it sound like something a real person would say? Or does it sound like a content template?
+
+If it sounds like a template, write it differently. Say what you actually want to say, the way you'd actually say it.`;
 
 export const getHooksByType = (type: keyof typeof HOOK_PATTERNS): string[] => {
   return HOOK_PATTERNS[type] || [];

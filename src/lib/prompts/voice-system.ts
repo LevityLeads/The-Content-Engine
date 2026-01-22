@@ -382,14 +382,10 @@ export const buildBrandPrompt = (voiceConfig: VoiceConfig | null, visualConfig?:
   return buildVoicePrompt(voiceConfig, visualConfig);
 };
 
-export const VOICE_QUALITY_CHECK = `## Voice Consistency Check
+export const VOICE_QUALITY_CHECK = `## Voice Check
 
-Before finalizing content, verify:
-1. Does this sound like the brand, not generic AI?
-2. Would a follower immediately recognize this voice?
-3. Are the vocabulary choices consistent with brand guidelines?
-4. Is the tone appropriate for this platform AND this brand?
-5. Does this avoid all prohibited words/phrases?
-6. Would the brand owner be proud to post this?`;
+Read it back. Does this sound like a person with a consistent personality? Or does it sound like generic content?
+
+The goal isn't perfect adherence to rules - it's sounding authentically like this brand's voice.`;
 
 export const DEFAULT_VOICE_PROMPT = buildVoicePrompt(null);
