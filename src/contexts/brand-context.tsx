@@ -51,6 +51,25 @@ export interface BrandDefaultStyle {
   sampleImageUsed?: string; // The sample image that was selected during onboarding
 }
 
+// Approved style in the brand's style palette
+export interface ApprovedStyle {
+  id: string;
+  visualStyle: string;
+  textStyle: string;
+  textColor: string;
+  name: string; // Display name like "Bold Typography"
+  sampleImage?: string; // Preview image from when it was selected
+  designSystem?: {
+    background: string;
+    primaryColor: string;
+    accentColor: string;
+    typography: string;
+    layout: string;
+    mood: string;
+  };
+  addedAt: string; // ISO timestamp
+}
+
 export interface VisualConfig {
   primary_color?: string;
   secondary_color?: string;
@@ -66,6 +85,7 @@ export interface VisualConfig {
   master_brand_prompt?: string; // AI-generated visual brand description from example posts
   savedDesignSystems?: SavedDesignSystemPreset[]; // Saved design system presets
   defaultStyle?: BrandDefaultStyle; // Default style selected during onboarding
+  approvedStyles?: ApprovedStyle[]; // Style palette - all approved styles for this brand
 }
 
 export interface BrandWithConfig extends Omit<Brand, "voice_config" | "visual_config"> {

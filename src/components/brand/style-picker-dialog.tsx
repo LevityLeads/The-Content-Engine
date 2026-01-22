@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { StylePicker, SelectedStyle } from "./style-picker";
+import { StylePicker, SelectedStylesResult } from "./style-picker";
 
 interface StylePickerDialogProps {
   open: boolean;
@@ -18,7 +18,7 @@ interface StylePickerDialogProps {
     accent_color?: string;
   };
   brandName: string;
-  onStyleSelected: (style: SelectedStyle) => void;
+  onStyleSelected: (result: SelectedStylesResult) => void;
 }
 
 export function StylePickerDialog({
@@ -43,9 +43,9 @@ export function StylePickerDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[1000px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Choose Default Visual Style</DialogTitle>
+          <DialogTitle>Build Your Style Palette</DialogTitle>
           <DialogDescription>
-            Select the visual style that will be automatically applied to all new content for {brandName}.
+            Select the visual styles that work for {brandName}. These become your quick-pick options when creating content.
           </DialogDescription>
         </DialogHeader>
         <StylePicker

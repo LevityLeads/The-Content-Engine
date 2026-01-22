@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { useBrand, VoiceConfig, VisualConfig, BrandDefaultStyle } from "@/contexts/brand-context";
+import { useBrand, VoiceConfig, VisualConfig, BrandDefaultStyle, ApprovedStyle } from "@/contexts/brand-context";
 import { StrictnessSlider } from "@/components/brand/strictness-slider";
 import { BrandDeletionDialog } from "@/components/brand/brand-deletion-dialog";
 import { StylePickerDialog } from "@/components/brand/style-picker-dialog";
@@ -1061,19 +1061,115 @@ function SettingsPageContent() {
         </CardContent>
       </Card>
 
-      {/* Default Visual Style */}
+      {/* Brand Style Palette */}
       <Card className="border-primary/20 bg-primary/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Default Visual Style
+            Brand Style Palette
           </CardTitle>
           <CardDescription>
-            This style will be automatically applied to all new content for this brand
+            Your curated visual styles for this brand. The first style is used as the default for new content.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {visualConfig.defaultStyle ? (
+          {visualConfig.approvedStyles && visualConfig.approvedStyles.length > 0 ? (
+            <div className="space-y-4">
+              {/* Style Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {visualConfig.approvedStyles.map((style: ApprovedStyle, index: number) => (
+                  <div
+                    key={style.id}
+                    className={`relative rounded-lg overflow-hidden border-2 transition-all ${
+                      index === 0 ? "border-primary ring-2 ring-primary/30" : "border-muted"
+                    }`}
+                  >
+                    {/* Default Badge */}
+                    {index === 0 && (
+                      <div className="absolute top-1 left-1 z-10">
+                        <Badge className="text-[10px] px-1.5 py-0">Default</Badge>
+                      </div>
+                    )}
+                    {/* Remove Button */}
+                    <button
+                      className="absolute top-1 right-1 z-10 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 opacity-0 hover:opacity-100 transition-opacity group-hover:opacity-100"
+                      onClick={async () => {
+                        const newApprovedStyles = visualConfig.approvedStyles?.filter((s: ApprovedStyle) => s.id !== style.id);
+                        const newDefaultStyle = newApprovedStyles && newApprovedStyles.length > 0 ? {
+                          visualStyle: newApprovedStyles[0].visualStyle,
+                          textStyle: newApprovedStyles[0].textStyle,
+                          textColor: newApprovedStyles[0].textColor,
+                          designSystem: newApprovedStyles[0].designSystem,
+                          selectedAt: new Date().toISOString(),
+                          sampleImageUsed: newApprovedStyles[0].sampleImage,
+                        } : undefined;
+                        const newConfig = {
+                          ...visualConfig,
+                          approvedStyles: newApprovedStyles,
+                          defaultStyle: newDefaultStyle
+                        };
+                        setVisualConfig(newConfig);
+                        if (selectedBrand) {
+                          await updateBrand(selectedBrand.id, { visual_config: newConfig });
+                          setSaveMessage({ type: "success", text: "Style removed from palette" });
+                          setTimeout(() => setSaveMessage(null), 3000);
+                        }
+                      }}
+                      title="Remove from palette"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                    {/* Image */}
+                    <div className="aspect-[4/5] bg-muted group">
+                      {style.sampleImage ? (
+                        <img
+                          src={style.sampleImage}
+                          alt={style.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Palette className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    {/* Label */}
+                    <div className="p-2 bg-card">
+                      <p className="font-medium text-xs truncate">{style.name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{style.visualStyle}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowStylePicker(true)}
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Add More Styles
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={async () => {
+                    const newConfig = { ...visualConfig };
+                    delete newConfig.approvedStyles;
+                    delete newConfig.defaultStyle;
+                    setVisualConfig(newConfig);
+                    if (selectedBrand) {
+                      await updateBrand(selectedBrand.id, { visual_config: newConfig });
+                      setSaveMessage({ type: "success", text: "Style palette cleared" });
+                      setTimeout(() => setSaveMessage(null), 3000);
+                    }
+                  }}
+                  className="text-muted-foreground"
+                >
+                  Clear Palette
+                </Button>
+              </div>
+            </div>
+          ) : visualConfig.defaultStyle ? (
+            // Legacy: show single default style if no palette yet
             <div className="space-y-4">
               <div className="flex items-start gap-4 p-4 rounded-lg border bg-card">
                 {visualConfig.defaultStyle.sampleImageUsed && (
@@ -1095,54 +1191,27 @@ function SettingsPageContent() {
                   <p className="text-sm text-muted-foreground">
                     {visualConfig.defaultStyle.designSystem?.mood || "Custom design system"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    Selected on {new Date(visualConfig.defaultStyle.selectedAt).toLocaleDateString()}
-                  </p>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    console.log("Opening style picker dialog (change)");
-                    setShowStylePicker(true);
-                  }}
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Change Default Style
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={async () => {
-                    const newConfig = { ...visualConfig };
-                    delete newConfig.defaultStyle;
-                    setVisualConfig(newConfig);
-                    if (selectedBrand) {
-                      await updateBrand(selectedBrand.id, { visual_config: newConfig });
-                      setSaveMessage({ type: "success", text: "Default style removed" });
-                      setTimeout(() => setSaveMessage(null), 3000);
-                    }
-                  }}
-                  className="text-muted-foreground"
-                >
-                  Remove Default
-                </Button>
-              </div>
+              <Button onClick={() => setShowStylePicker(true)}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Build Style Palette
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="p-6 rounded-lg border border-dashed text-center">
                 <Palette className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  No default style set. New content will use the default &quot;Typography&quot; style.
+                  No styles configured yet. Create a style palette to maintain visual consistency.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  You can add or change styles anytime.
                 </p>
               </div>
-              <Button onClick={() => {
-                console.log("Opening style picker dialog");
-                setShowStylePicker(true);
-              }}>
+              <Button onClick={() => setShowStylePicker(true)}>
                 <Sparkles className="mr-2 h-4 w-4" />
-                Choose Default Style
+                Create Style Palette
               </Button>
             </div>
           )}
@@ -1158,20 +1227,43 @@ function SettingsPageContent() {
           accent_color: visualConfig.accent_color,
         }}
         brandName={selectedBrand?.name || "Brand"}
-        onStyleSelected={async (style) => {
-          const defaultStyle = {
+        onStyleSelected={async (result) => {
+          // Build approved styles from selection
+          const newApprovedStyles: ApprovedStyle[] = result.styles.map((style) => ({
+            id: style.id,
             visualStyle: style.visualStyle,
             textStyle: style.textStyle,
             textColor: style.textColor,
+            name: style.name,
+            sampleImage: style.sampleImage,
             designSystem: style.designSystem,
+            addedAt: new Date().toISOString(),
+          }));
+
+          // Merge with existing approved styles (avoid duplicates by id)
+          const existingStyles = visualConfig.approvedStyles || [];
+          const mergedStyles = [...existingStyles];
+          for (const newStyle of newApprovedStyles) {
+            if (!mergedStyles.find((s: ApprovedStyle) => s.id === newStyle.id)) {
+              mergedStyles.push(newStyle);
+            }
+          }
+
+          // Set first style as default
+          const defaultStyle: BrandDefaultStyle | undefined = mergedStyles.length > 0 ? {
+            visualStyle: mergedStyles[0].visualStyle,
+            textStyle: mergedStyles[0].textStyle,
+            textColor: mergedStyles[0].textColor,
+            designSystem: mergedStyles[0].designSystem,
             selectedAt: new Date().toISOString(),
-            sampleImageUsed: style.sampleImage,
-          };
-          const newConfig = { ...visualConfig, defaultStyle };
+            sampleImageUsed: mergedStyles[0].sampleImage,
+          } : undefined;
+
+          const newConfig = { ...visualConfig, approvedStyles: mergedStyles, defaultStyle };
           setVisualConfig(newConfig);
           if (selectedBrand) {
             await updateBrand(selectedBrand.id, { visual_config: newConfig });
-            setSaveMessage({ type: "success", text: "Default style updated!" });
+            setSaveMessage({ type: "success", text: `Added ${newApprovedStyles.length} style${newApprovedStyles.length > 1 ? "s" : ""} to palette!` });
             setTimeout(() => setSaveMessage(null), 3000);
           }
           setShowStylePicker(false);
