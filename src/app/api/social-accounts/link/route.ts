@@ -23,10 +23,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { brandId, lateAccountId, platform, username, profileImageUrl } = body;
 
+    console.log("Link route received:", { brandId, lateAccountId, platform, username, profileImageUrl });
+
     // Validate required fields
     if (!brandId || !lateAccountId || !platform || !username) {
+      const missing = [];
+      if (!brandId) missing.push("brandId");
+      if (!lateAccountId) missing.push("lateAccountId");
+      if (!platform) missing.push("platform");
+      if (!username) missing.push("username");
+      console.error("Missing required fields:", missing);
       return NextResponse.json(
-        { success: false, error: "brandId, lateAccountId, platform, and username are required" },
+        { success: false, error: `Missing required fields: ${missing.join(", ")}` },
         { status: 400 }
       );
     }
