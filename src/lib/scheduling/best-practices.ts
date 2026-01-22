@@ -3,10 +3,11 @@
  *
  * This module defines optimal posting times and frequencies for various social media platforms.
  * The data is based on aggregated research from multiple sources including:
- * - Sprout Social's 2024 Best Times to Post Report
- * - Hootsuite's Global Social Media Trends
- * - Buffer's State of Social Media Report
- * - HubSpot's Social Media Marketing Research
+ * - Sprout Social's 2025-2026 Best Times to Post Report (2.7B+ engagements analyzed)
+ * - Hootsuite's 2026 Global Social Media Trends
+ * - Buffer's 2025 State of Social Media Report
+ * - SocialPilot's 2026 Best Times Research
+ * - Research.com 2026 Social Media Statistics
  *
  * Note: These are general guidelines. Actual optimal times may vary based on:
  * - Target audience demographics and timezone
@@ -117,109 +118,114 @@ export type PlatformId = 'twitter' | 'linkedin' | 'instagram' | 'facebook' | 'ti
 export const PLATFORM_BEST_PRACTICES: Record<PlatformId, PlatformBestPractices> = {
   twitter: {
     name: 'Twitter/X',
-    description: 'Best times are weekdays 8-10 AM and 12-1 PM. Tuesday-Thursday perform best.',
+    description: 'Best times are weekdays 7-10 AM and 12-1 PM. Tuesday-Wednesday perform best.',
     audienceType: 'General / News-focused',
     days: {
       0: { isOptimal: false, optimalHours: [10, 11, 12], dayPriority: 7 }, // Sunday
-      1: { isOptimal: true, optimalHours: [8, 9, 10, 12], dayPriority: 4 }, // Monday
-      2: { isOptimal: true, optimalHours: [8, 9, 10, 12, 13], dayPriority: 1 }, // Tuesday
-      3: { isOptimal: true, optimalHours: [8, 9, 10, 12, 13], dayPriority: 2 }, // Wednesday
-      4: { isOptimal: true, optimalHours: [8, 9, 10, 12, 13], dayPriority: 3 }, // Thursday
-      5: { isOptimal: true, optimalHours: [8, 9, 10, 12], dayPriority: 5 }, // Friday
+      1: { isOptimal: true, optimalHours: [7, 8, 9, 10, 13, 19], dayPriority: 3 }, // Monday
+      2: { isOptimal: true, optimalHours: [7, 8, 9, 10, 13, 17, 19], dayPriority: 1 }, // Tuesday - BEST DAY
+      3: { isOptimal: true, optimalHours: [7, 8, 9, 10, 11, 13], dayPriority: 2 }, // Wednesday
+      4: { isOptimal: true, optimalHours: [9, 10, 11, 13], dayPriority: 4 }, // Thursday
+      5: { isOptimal: true, optimalHours: [9, 10, 12], dayPriority: 5 }, // Friday
       6: { isOptimal: false, optimalHours: [10, 11], dayPriority: 6 }, // Saturday
     },
     notes: [
-      'Morning commute (8-10 AM) catches professionals starting their day',
+      'Early morning (7-10 AM) catches professionals starting their day',
       'Lunch hour (12-1 PM) is a secondary peak for engagement',
-      'Tuesday-Thursday see highest engagement rates',
+      'Tuesday and Wednesday see highest engagement rates',
+      '10 AM on Wednesday is the overall best time to post',
       'Weekend engagement is lower but can work for casual/entertainment content',
     ],
   },
 
   linkedin: {
     name: 'LinkedIn',
-    description: 'Best times are Tuesday-Thursday 7-8 AM, 12 PM, and 5-6 PM. B2B focused.',
+    description: 'Best times are Tuesday-Thursday 7-8 AM, 10 AM, 12 PM, and 5-6 PM. B2B focused.',
     audienceType: 'B2B / Professional',
     days: {
       0: { isOptimal: false, optimalHours: [], dayPriority: 7 }, // Sunday
-      1: { isOptimal: true, optimalHours: [7, 8, 12, 17, 18], dayPriority: 4 }, // Monday
-      2: { isOptimal: true, optimalHours: [7, 8, 12, 17, 18], dayPriority: 1 }, // Tuesday
-      3: { isOptimal: true, optimalHours: [7, 8, 12, 17, 18], dayPriority: 2 }, // Wednesday
-      4: { isOptimal: true, optimalHours: [7, 8, 12, 17, 18], dayPriority: 3 }, // Thursday
+      1: { isOptimal: true, optimalHours: [7, 8, 10, 12, 17, 18, 19], dayPriority: 4 }, // Monday
+      2: { isOptimal: true, optimalHours: [7, 8, 10, 12, 17, 18], dayPriority: 1 }, // Tuesday - 10 AM is peak
+      3: { isOptimal: true, optimalHours: [7, 8, 10, 12, 17, 18], dayPriority: 3 }, // Wednesday
+      4: { isOptimal: true, optimalHours: [7, 8, 10, 12, 17, 18], dayPriority: 2 }, // Thursday - 2nd best day
       5: { isOptimal: false, optimalHours: [7, 8, 12], dayPriority: 5 }, // Friday
       6: { isOptimal: false, optimalHours: [], dayPriority: 6 }, // Saturday
     },
     notes: [
+      '10 AM on Tuesday is the single best time to post',
       'Early morning (7-8 AM) catches professionals before meetings',
       'Lunch break (12 PM) is prime time for content consumption',
       'End of workday (5-6 PM) is good for thought leadership content',
       'Avoid weekends - professional engagement drops significantly',
-      'Tuesday-Thursday are the strongest days for B2B content',
+      'Thursday is the top performing day, followed by Wednesday and Tuesday',
     ],
   },
 
   instagram: {
     name: 'Instagram',
-    description: 'Best times are weekdays 11 AM-1 PM and 7-9 PM. Monday and Thursday perform best.',
+    description: 'Best times are weekdays 9 AM-1 PM and 7-9 PM. Friday is the best day.',
     audienceType: 'Visual / Lifestyle',
     days: {
-      0: { isOptimal: false, optimalHours: [10, 11, 19, 20], dayPriority: 5 }, // Sunday
-      1: { isOptimal: true, optimalHours: [11, 12, 13, 19, 20, 21], dayPriority: 1 }, // Monday
-      2: { isOptimal: true, optimalHours: [11, 12, 13, 19, 20, 21], dayPriority: 3 }, // Tuesday
-      3: { isOptimal: true, optimalHours: [11, 12, 13, 19, 20, 21], dayPriority: 4 }, // Wednesday
-      4: { isOptimal: true, optimalHours: [11, 12, 13, 19, 20, 21], dayPriority: 2 }, // Thursday
-      5: { isOptimal: true, optimalHours: [11, 12, 13, 19, 20], dayPriority: 5 }, // Friday
-      6: { isOptimal: false, optimalHours: [10, 11, 19, 20], dayPriority: 6 }, // Saturday
+      0: { isOptimal: false, optimalHours: [10, 11, 19, 20], dayPriority: 6 }, // Sunday
+      1: { isOptimal: true, optimalHours: [7, 9, 10, 11, 12, 13, 15, 16, 17], dayPriority: 4 }, // Monday
+      2: { isOptimal: true, optimalHours: [7, 9, 10, 11, 12, 13, 15, 16, 17, 19], dayPriority: 3 }, // Tuesday
+      3: { isOptimal: true, optimalHours: [7, 9, 10, 11, 12, 13, 15, 16, 17, 19], dayPriority: 4 }, // Wednesday
+      4: { isOptimal: true, optimalHours: [7, 9, 10, 11, 12, 13, 15, 16, 17, 19], dayPriority: 2 }, // Thursday
+      5: { isOptimal: true, optimalHours: [7, 9, 10, 11, 12, 13, 15, 16, 17], dayPriority: 1 }, // Friday - BEST DAY
+      6: { isOptimal: false, optimalHours: [10, 11, 19, 20], dayPriority: 5 }, // Saturday
     },
     notes: [
-      'Lunch break (11 AM-1 PM) is peak scroll time',
+      'Engagement peaks from 9 AM to 1 PM especially on Tuesdays, Wednesdays, and Fridays',
+      'Safest times: Weekdays 7 AM - 5 PM',
+      'Friday is the best day for Instagram engagement',
       'Evening hours (7-9 PM) see high engagement as users unwind',
-      'Monday is great as users catch up after the weekend',
-      'Thursday shows consistently high engagement rates',
       'Visual quality matters more than timing for Instagram',
+      'Also consider posting 3-5 PM for afternoon engagement',
     ],
   },
 
   facebook: {
     name: 'Facebook',
-    description: 'Best times are Tuesday-Thursday 1-4 PM.',
+    description: 'Best times are 7-9 AM, 1-3 PM, and 7-9 PM. Wednesday and Thursday perform best.',
     audienceType: 'General / Community',
     days: {
       0: { isOptimal: false, optimalHours: [12, 13, 14], dayPriority: 6 }, // Sunday
-      1: { isOptimal: true, optimalHours: [13, 14, 15, 16], dayPriority: 4 }, // Monday
-      2: { isOptimal: true, optimalHours: [13, 14, 15, 16], dayPriority: 1 }, // Tuesday
-      3: { isOptimal: true, optimalHours: [13, 14, 15, 16], dayPriority: 2 }, // Wednesday
-      4: { isOptimal: true, optimalHours: [13, 14, 15, 16], dayPriority: 3 }, // Thursday
+      1: { isOptimal: true, optimalHours: [7, 8, 9, 10, 11, 12, 13, 14, 15, 19, 20, 21], dayPriority: 4 }, // Monday
+      2: { isOptimal: true, optimalHours: [7, 8, 9, 10, 11, 12, 13, 14, 15, 19, 20, 21], dayPriority: 3 }, // Tuesday
+      3: { isOptimal: true, optimalHours: [7, 8, 9, 10, 11, 12, 13, 14, 15, 19, 20, 21], dayPriority: 1 }, // Wednesday - BEST
+      4: { isOptimal: true, optimalHours: [7, 8, 9, 10, 11, 12, 13, 14, 15, 19, 20, 21], dayPriority: 2 }, // Thursday
       5: { isOptimal: false, optimalHours: [13, 14, 15], dayPriority: 5 }, // Friday
       6: { isOptimal: false, optimalHours: [12, 13], dayPriority: 7 }, // Saturday
     },
     notes: [
-      'Afternoon hours (1-4 PM) see highest engagement',
-      'Users often check Facebook during work breaks',
-      'Tuesday-Thursday are optimal for business pages',
-      'Weekend engagement is lower but varies by audience',
+      'Best times: 7-9 AM, 1-3 PM, and 7-9 PM',
+      'Posts perform best 10 AM - 12 PM on weekdays, especially Wednesday',
+      'Wednesday and Thursday are optimal for business pages',
+      'Users often check Facebook during morning commute, lunch, and evening',
       'Video content can perform well outside peak hours',
     ],
   },
 
   tiktok: {
     name: 'TikTok',
-    description: 'Best times are Tuesday-Thursday 2-6 PM.',
+    description: 'Best times are Tuesday-Thursday 2-6 PM or 7-10 PM. Tuesday and Thursday perform best.',
     audienceType: 'Young / Entertainment',
     days: {
-      0: { isOptimal: false, optimalHours: [14, 15, 16, 17], dayPriority: 5 }, // Sunday
-      1: { isOptimal: true, optimalHours: [14, 15, 16, 17, 18], dayPriority: 4 }, // Monday
-      2: { isOptimal: true, optimalHours: [14, 15, 16, 17, 18], dayPriority: 1 }, // Tuesday
-      3: { isOptimal: true, optimalHours: [14, 15, 16, 17, 18], dayPriority: 2 }, // Wednesday
-      4: { isOptimal: true, optimalHours: [14, 15, 16, 17, 18], dayPriority: 3 }, // Thursday
-      5: { isOptimal: true, optimalHours: [14, 15, 16, 17], dayPriority: 5 }, // Friday
-      6: { isOptimal: false, optimalHours: [14, 15, 16], dayPriority: 6 }, // Saturday
+      0: { isOptimal: false, optimalHours: [14, 15, 16, 17, 19, 20, 21], dayPriority: 5 }, // Sunday
+      1: { isOptimal: true, optimalHours: [10, 12, 14, 15, 16, 17, 18, 19, 20, 21], dayPriority: 4 }, // Monday
+      2: { isOptimal: true, optimalHours: [10, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22], dayPriority: 1 }, // Tuesday - BEST
+      3: { isOptimal: true, optimalHours: [10, 12, 14, 15, 16, 17, 18, 19, 20, 21], dayPriority: 3 }, // Wednesday
+      4: { isOptimal: true, optimalHours: [10, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22], dayPriority: 2 }, // Thursday
+      5: { isOptimal: true, optimalHours: [14, 15, 16, 17, 19, 20, 21], dayPriority: 5 }, // Friday
+      6: { isOptimal: false, optimalHours: [14, 15, 16, 17], dayPriority: 6 }, // Saturday
     },
     notes: [
-      'Afternoon/evening (2-6 PM) catches users after school/work',
-      'Young audience is most active in late afternoon',
+      'Best times: Tuesday-Thursday 2-6 PM or 7-10 PM',
+      'Also good: 10 AM and 12 PM',
+      'Tuesday and Thursday are the best performing days',
+      'Young audience is most active afternoon and evening',
+      'The algorithm thrives on engagement and user behavior',
       'Consistency matters more than perfect timing on TikTok',
-      'The algorithm can surface content hours after posting',
       'Trending sounds and hashtags can outweigh timing considerations',
     ],
   },
