@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { useBrand, VoiceConfig, VisualConfig } from "@/contexts/brand-context";
+import { useBrand, VoiceConfig, VisualConfig, BrandDefaultStyle } from "@/contexts/brand-context";
 import { StrictnessSlider } from "@/components/brand/strictness-slider";
 import { BrandDeletionDialog } from "@/components/brand/brand-deletion-dialog";
+import { StylePickerDialog } from "@/components/brand/style-picker-dialog";
 import { type BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
 import { VIDEO_MODELS, type VideoModelKey } from "@/lib/video-models";
 import { formatCost } from "@/lib/video-utils";
@@ -94,6 +95,9 @@ function SettingsPageContent() {
   // Example posts state
   const [examplePosts, setExamplePosts] = useState<string[]>([]);
   const [isAnalyzingVisuals, setIsAnalyzingVisuals] = useState(false);
+
+  // Style picker state
+  const [showStylePicker, setShowStylePicker] = useState(false);
 
   // Handle OAuth callback messages from URL params
   useEffect(() => {
@@ -1056,6 +1060,119 @@ function SettingsPageContent() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Default Visual Style */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Default Visual Style
+          </CardTitle>
+          <CardDescription>
+            This style will be automatically applied to all new content for this brand
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {visualConfig.defaultStyle ? (
+            <div className="space-y-4">
+              <div className="flex items-start gap-4 p-4 rounded-lg border bg-card">
+                {visualConfig.defaultStyle.sampleImageUsed && (
+                  <img
+                    src={visualConfig.defaultStyle.sampleImageUsed}
+                    alt="Selected style"
+                    className="h-24 w-20 rounded-lg object-cover"
+                  />
+                )}
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="capitalize">
+                      {visualConfig.defaultStyle.visualStyle}
+                    </Badge>
+                    <Badge variant="outline" className="capitalize">
+                      {visualConfig.defaultStyle.textStyle}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {visualConfig.defaultStyle.designSystem?.mood || "Custom design system"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Selected on {new Date(visualConfig.defaultStyle.selectedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowStylePicker(true)}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Change Default Style
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={async () => {
+                    const newConfig = { ...visualConfig };
+                    delete newConfig.defaultStyle;
+                    setVisualConfig(newConfig);
+                    if (selectedBrand) {
+                      await updateBrand(selectedBrand.id, { visual_config: newConfig });
+                      setSaveMessage({ type: "success", text: "Default style removed" });
+                      setTimeout(() => setSaveMessage(null), 3000);
+                    }
+                  }}
+                  className="text-muted-foreground"
+                >
+                  Remove Default
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-6 rounded-lg border border-dashed text-center">
+                <Palette className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  No default style set. New content will use the default &quot;Typography&quot; style.
+                </p>
+              </div>
+              <Button onClick={() => setShowStylePicker(true)}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Choose Default Style
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Style Picker Dialog */}
+      {showStylePicker && (
+        <StylePickerDialog
+          open={showStylePicker}
+          onOpenChange={setShowStylePicker}
+          brandColors={{
+            primary_color: visualConfig.primary_color,
+            accent_color: visualConfig.accent_color,
+          }}
+          brandName={selectedBrand?.name || "Brand"}
+          onStyleSelected={async (style) => {
+            const defaultStyle = {
+              visualStyle: style.visualStyle,
+              textStyle: style.textStyle,
+              textColor: style.textColor,
+              designSystem: style.designSystem,
+              selectedAt: new Date().toISOString(),
+              sampleImageUsed: style.sampleImage,
+            };
+            const newConfig = { ...visualConfig, defaultStyle };
+            setVisualConfig(newConfig);
+            if (selectedBrand) {
+              await updateBrand(selectedBrand.id, { visual_config: newConfig });
+              setSaveMessage({ type: "success", text: "Default style updated!" });
+              setTimeout(() => setSaveMessage(null), 3000);
+            }
+            setShowStylePicker(false);
+          }}
+        />
+      )}
 
       {/* Connected Accounts */}
       <Card>

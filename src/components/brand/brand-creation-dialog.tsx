@@ -23,8 +23,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { useBrand, VoiceConfig, VisualConfig } from "@/contexts/brand-context";
+import { useBrand, VoiceConfig, VisualConfig, BrandDefaultStyle } from "@/contexts/brand-context";
 import { StrictnessSlider } from "./strictness-slider";
+import { StylePicker, SelectedStyle } from "./style-picker";
 
 interface BrandAnalysis {
   voice: {
@@ -54,7 +55,7 @@ interface BrandCreationDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = "input" | "analyzing" | "preview" | "creating";
+type Step = "input" | "analyzing" | "preview" | "style-selection" | "creating";
 
 export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogProps) {
   const { createBrand } = useBrand();
@@ -73,6 +74,9 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
   const [editedHeadingFont, setEditedHeadingFont] = useState("");
   const [editedBodyFont, setEditedBodyFont] = useState("");
 
+  // Selected default style from style picker
+  const [selectedStyle, setSelectedStyle] = useState<SelectedStyle | null>(null);
+
   const resetDialog = () => {
     setStep("input");
     setName("");
@@ -86,6 +90,7 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
     setEditedAccentColor("");
     setEditedHeadingFont("");
     setEditedBodyFont("");
+    setSelectedStyle(null);
   };
 
   const handleClose = () => {
@@ -156,11 +161,14 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
     }
   };
 
-  const handleCreate = async () => {
+  const handleCreate = async (styleOverride?: SelectedStyle | null) => {
     if (!analysis) return;
 
     setStep("creating");
     setError(null);
+
+    // Use override if provided, otherwise use state
+    const styleToUse = styleOverride !== undefined ? styleOverride : selectedStyle;
 
     const voiceConfig: VoiceConfig = {
       tone_keywords: editedToneKeywords,
@@ -174,6 +182,19 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
       },
     };
 
+    // Build default style if user selected one during onboarding
+    let defaultStyle: BrandDefaultStyle | undefined;
+    if (styleToUse) {
+      defaultStyle = {
+        visualStyle: styleToUse.visualStyle,
+        textStyle: styleToUse.textStyle,
+        textColor: styleToUse.textColor,
+        designSystem: styleToUse.designSystem,
+        selectedAt: new Date().toISOString(),
+        sampleImageUsed: styleToUse.sampleImage,
+      };
+    }
+
     const visualConfig: VisualConfig = {
       primary_color: editedPrimaryColor,
       secondary_color: analysis.visual.secondary_color,
@@ -186,6 +207,8 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
         heading: editedHeadingFont,
         body: editedBodyFont,
       } : undefined,
+      // Include default style selected during onboarding
+      defaultStyle,
     };
 
     const result = await createBrand({
@@ -199,7 +222,7 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
       handleClose();
     } else {
       setError("Failed to create client. Please try again.");
-      setStep("preview");
+      setStep("style-selection");
     }
   };
 
@@ -221,12 +244,14 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
             {step === "input" && "Add New Client"}
             {step === "analyzing" && "Analyzing Brand..."}
             {step === "preview" && "Review Style Guide"}
+            {step === "style-selection" && "Choose Your Visual Style"}
             {step === "creating" && "Creating Client..."}
           </DialogTitle>
           <DialogDescription>
             {step === "input" && "Enter client details and optional website URL for automatic brand analysis."}
             {step === "analyzing" && "Extracting brand voice, colors, and visual style from the website."}
             {step === "preview" && "Review and customize the extracted brand guidelines."}
+            {step === "style-selection" && "Pick the visual style that best represents this brand."}
             {step === "creating" && "Setting up the client workspace..."}
           </DialogDescription>
         </DialogHeader>
@@ -487,11 +512,33 @@ export function BrandCreationDialog({ open, onOpenChange }: BrandCreationDialogP
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <Button onClick={handleCreate}>
-                <Check className="mr-2 h-4 w-4" />
-                Create Client
+              <Button onClick={() => setStep("style-selection")}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Choose Visual Style
+                <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
+          </div>
+        )}
+
+        {/* Step 4: Style Selection */}
+        {step === "style-selection" && analysis && (
+          <div className="py-4">
+            <StylePicker
+              brandColors={{
+                primary_color: editedPrimaryColor,
+                accent_color: editedAccentColor,
+              }}
+              brandName={name}
+              onStyleSelected={(style) => {
+                setSelectedStyle(style);
+                handleCreate(style);
+              }}
+              onSkip={() => {
+                setSelectedStyle(null);
+                handleCreate(null);
+              }}
+            />
           </div>
         )}
 
