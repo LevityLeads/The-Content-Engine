@@ -114,11 +114,13 @@ export async function POST(request: NextRequest) {
       } else {
         // Not yet linked to this brand - insert new record
         // (Each brand gets its own social_accounts record, even if same Late.dev account)
+        // Normalize platform to lowercase for consistent querying
+        const normalizedPlatform = (lateAccount.platform || "").toLowerCase();
         const { data: inserted, error: insertError } = await supabase
           .from("social_accounts")
           .insert({
             brand_id: brandId,
-            platform: lateAccount.platform,
+            platform: normalizedPlatform,
             platform_user_id: `${lateAccount.id}_${brandId}`, // Make unique per brand
             platform_username: lateAccount.username,
             access_token_encrypted: "managed_by_late",

@@ -31,6 +31,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize platform to lowercase for consistent querying
+    const normalizedPlatform = platform.toLowerCase();
+
     const supabase = await createClient();
 
     // Check if there's already an account for this brand+platform
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
       .from("social_accounts")
       .select("*")
       .eq("brand_id", brandId)
-      .eq("platform", platform)
+      .eq("platform", normalizedPlatform)
       .single();
 
     let result;
@@ -67,14 +70,14 @@ export async function POST(request: NextRequest) {
       }
 
       result = updated;
-      console.log(`Updated ${platform} account for brand ${brandId}: @${username}`);
+      console.log(`Updated ${normalizedPlatform} account for brand ${brandId}: @${username}`);
     } else {
       // Create a new record
       const { data: inserted, error: insertError } = await supabase
         .from("social_accounts")
         .insert({
           brand_id: brandId,
-          platform,
+          platform: normalizedPlatform,
           platform_user_id: `${lateAccountId}_${brandId}`,
           platform_username: username,
           access_token_encrypted: "managed_by_late",
@@ -93,7 +96,7 @@ export async function POST(request: NextRequest) {
       }
 
       result = inserted;
-      console.log(`Linked ${platform} account @${username} to brand ${brandId}`);
+      console.log(`Linked ${normalizedPlatform} account @${username} to brand ${brandId}`);
     }
 
     return NextResponse.json({
