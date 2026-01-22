@@ -131,6 +131,17 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(null);
       const res = await fetch("/api/brands");
+
+      // Check for HTTP errors first
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("Error fetching brands - HTTP", res.status, errorData);
+        setError(errorData.error || `Failed to load brands (${res.status})`);
+        setBrands([]);
+        setSelectedBrand(null);
+        return;
+      }
+
       const data = await res.json();
 
       if (data.success && data.brands) {
@@ -150,11 +161,21 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
         } else if (brandsWithConfig.length > 0) {
           setSelectedBrand(brandsWithConfig[0]);
           localStorage.setItem(SELECTED_BRAND_KEY, brandsWithConfig[0].id);
+        } else {
+          setSelectedBrand(null);
         }
+      } else {
+        // API returned but without success - handle gracefully
+        console.error("Error fetching brands - API error:", data.error || "Unknown error");
+        setError(data.error || "Failed to load brands");
+        setBrands([]);
+        setSelectedBrand(null);
       }
     } catch (err) {
       console.error("Error fetching brands:", err);
-      setError("Failed to load brands");
+      setError("Failed to load brands. Please check your connection.");
+      setBrands([]);
+      setSelectedBrand(null);
     } finally {
       setIsLoading(false);
     }
