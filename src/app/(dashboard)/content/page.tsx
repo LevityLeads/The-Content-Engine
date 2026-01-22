@@ -1150,6 +1150,8 @@ export default function ContentPage() {
     try {
       // Convert local datetime to ISO string
       const scheduledFor = new Date(scheduledDateTime).toISOString();
+      // Get selected images for this content
+      const selectedImageIds = getSelectedImageIds(schedulingContentId);
 
       const res = await fetch("/api/content/publish", {
         method: "POST",
@@ -1157,6 +1159,7 @@ export default function ContentPage() {
         body: JSON.stringify({
           contentId: schedulingContentId,
           scheduledFor,
+          selectedImageIds,
         }),
       });
       const data = await res.json();
@@ -1263,12 +1266,16 @@ export default function ContentPage() {
     setIsScheduling(true);
     setPublishMessage(null);
     try {
+      // Get selected images for this content
+      const selectedImageIds = getSelectedImageIds(magicScheduleContentId);
+
       const res = await fetch("/api/content/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contentId: magicScheduleContentId,
           scheduledFor: selectedMagicTime,
+          selectedImageIds,
         }),
       });
       const data = await res.json();
@@ -1366,12 +1373,16 @@ export default function ContentPage() {
       setBulkScheduleProgress({ current: i + 1, total: bulkSuggestions.length });
 
       try {
+        // Get selected images for this content
+        const selectedImageIds = getSelectedImageIds(suggestion.contentId);
+
         const res = await fetch("/api/content/publish", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contentId: suggestion.contentId,
             scheduledFor: suggestion.suggestedTime,
+            selectedImageIds,
           }),
         });
         const data = await res.json();
