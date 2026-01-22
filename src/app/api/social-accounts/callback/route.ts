@@ -79,7 +79,8 @@ export async function GET(request: NextRequest) {
         requestedBrandId: brandId,
       });
       const redirectUrl = new URL(settingsUrl);
-      const brandName = (existingInOtherBrand.brands as { name: string } | null)?.name || "another client";
+      const brandsData = existingInOtherBrand.brands;
+      const brandName = (Array.isArray(brandsData) ? brandsData[0]?.name : (brandsData as { name: string } | null)?.name) || "another client";
       redirectUrl.searchParams.set(
         "error",
         `This ${platform} account is already connected to ${brandName}. Disconnect it there first.`

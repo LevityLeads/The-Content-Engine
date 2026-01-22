@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create a map of Late.dev accounts for quick lookup
-    const lateAccountMap = new Map<string, LateAccount>(lateAccounts.map((a) => [a.id, a]));
+    const lateAccountMap = new Map<string, LateAccount>(lateAccounts.map((a: LateAccount) => [a.id, a]));
 
     // Update ONLY accounts that belong to this brand
     const allAccounts = [];
