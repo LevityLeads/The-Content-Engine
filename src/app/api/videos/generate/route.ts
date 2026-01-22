@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL, type VideoModelKey, getAspectRatioForPlatform } from "@/lib/video-models";
 import { estimateVideoCost, checkBudgetLimits, calculateActualCost } from "@/lib/video-utils";
 import { type BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
@@ -403,21 +403,56 @@ CRITICAL RULES:
 
       // Update job progress
       if (jobId) {
-        await updateJobStatus(supabase, jobId, { progress: 90, currentStep: "Saving video" });
+        await updateJobStatus(supabase, jobId, { progress: 90, currentStep: "Uploading video to storage" });
       }
 
       // Calculate actual cost
       const actualCost = calculateActualCost(modelKey, duration, includeAudio);
 
-      // Save video to images table (with media_type = 'video')
-      const videoUrl = `data:video/mp4;base64,${videoBase64}`;
+      // Upload video to Supabase Storage instead of storing base64 directly
+      // This avoids database size limits for large video files
+      const adminClient = createAdminClient();
+      const videoBuffer = Buffer.from(videoBase64, "base64");
+      const filename = `videos/${contentId}/${Date.now()}.mp4`;
 
+      const { error: uploadError } = await adminClient.storage
+        .from("images")
+        .upload(filename, videoBuffer, {
+          contentType: "video/mp4",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Error uploading video to storage:", uploadError);
+        if (jobId) {
+          await updateJobStatus(supabase, jobId, {
+            status: "failed",
+            errorMessage: `Failed to upload video: ${uploadError.message}`,
+            errorCode: "STORAGE_ERROR",
+          });
+        }
+        return NextResponse.json(
+          { error: `Failed to upload video: ${uploadError.message}`, jobId },
+          { status: 500 }
+        );
+      }
+
+      // Get public URL for the uploaded video
+      const { data: publicUrlData } = adminClient.storage
+        .from("images")
+        .getPublicUrl(filename);
+
+      const videoUrl = publicUrlData.publicUrl;
+      console.log("Video uploaded to storage:", videoUrl);
+
+      // Save video to images table (with media_type = 'video')
       const { data: savedMedia, error: saveError } = await supabase
         .from("images")
         .insert({
           content_id: contentId,
           prompt,
           url: videoUrl,
+          storage_path: filename,
           media_type: "video",
           duration_seconds: duration,
           has_audio: includeAudio,
@@ -426,6 +461,7 @@ CRITICAL RULES:
           slide_number: slideNumber || null,
           is_primary: !slideNumber,
           format: "mp4",
+          file_size_bytes: videoBuffer.length,
           dimensions: {
             aspectRatio,
             model: modelKey,
