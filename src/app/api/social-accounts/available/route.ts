@@ -70,20 +70,30 @@ export async function GET(request: Request) {
       );
     }
 
-    // Map to a consistent format
-    const accounts = lateAccounts.map((acc: {
-      id: string;
-      platform: string;
-      username?: string;
-      profileImageUrl?: string;
-      isActive?: boolean;
-    }) => ({
-      id: acc.id,
-      platform: acc.platform,
-      username: acc.username || acc.id,
-      profileImageUrl: acc.profileImageUrl,
-      isActive: acc.isActive !== false,
-    }));
+    // Log raw account structure to help debug field names
+    if (lateAccounts.length > 0) {
+      console.log("Sample Late.dev account structure:", JSON.stringify(lateAccounts[0], null, 2));
+      console.log("Available fields:", Object.keys(lateAccounts[0]));
+    }
+
+    // Map to a consistent format - handle various field names Late.dev might use
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const accounts = lateAccounts.map((acc: any) => {
+      // Try various possible ID field names
+      const accountId = acc.id || acc.accountId || acc.account_id || acc._id || acc.ID;
+
+      if (!accountId) {
+        console.warn("Account missing ID field:", acc);
+      }
+
+      return {
+        id: accountId,
+        platform: acc.platform,
+        username: acc.username || acc.name || acc.handle || accountId,
+        profileImageUrl: acc.profileImageUrl || acc.profile_image_url || acc.avatar,
+        isActive: acc.isActive !== false && acc.is_active !== false,
+      };
+    });
 
     return NextResponse.json({
       success: true,
