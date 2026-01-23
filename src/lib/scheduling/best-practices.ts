@@ -99,7 +99,7 @@ export type PlatformId = 'twitter' | 'linkedin' | 'instagram' | 'facebook' | 'ti
  * Optimal posting times and strategies for each social media platform.
  *
  * Research basis:
- * - Twitter/X: High engagement during commute times and lunch breaks.
+ * - X: High engagement during commute times and lunch breaks.
  *   Business users check during work hours; general audience peaks mid-week.
  *
  * - LinkedIn: Professional network with peak activity during business hours.
@@ -117,7 +117,7 @@ export type PlatformId = 'twitter' | 'linkedin' | 'instagram' | 'facebook' | 'ti
  */
 export const PLATFORM_BEST_PRACTICES: Record<PlatformId, PlatformBestPractices> = {
   twitter: {
-    name: 'Twitter/X',
+    name: 'X',
     description: 'Best times are weekdays 7-10 AM and 12-1 PM. Tuesday-Wednesday perform best.',
     audienceType: 'General / News-focused',
     days: {
@@ -239,7 +239,7 @@ export const PLATFORM_BEST_PRACTICES: Record<PlatformId, PlatformBestPractices> 
  * Recommended posting frequency for each platform.
  *
  * Research basis:
- * - Twitter: Fast-moving feed benefits from higher frequency. 2-hour gaps
+ * - X: Fast-moving feed benefits from higher frequency. 2-hour gaps
  *   prevent overwhelming followers while maintaining visibility.
  *
  * - LinkedIn: Professional content needs time to gain traction. Algorithm

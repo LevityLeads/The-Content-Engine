@@ -56,7 +56,7 @@ const formatRelativeTime = (dateString: string): string => {
 const platformConfig: Record<string, { icon: React.ReactNode; label: string; color: string; activeColor: string }> = {
   twitter: {
     icon: <Twitter className="h-4 w-4" />,
-    label: "Twitter",
+    label: "X",
     color: "border-sky-500/30 text-sky-400",
     activeColor: "bg-sky-500 text-white border-sky-500",
   },

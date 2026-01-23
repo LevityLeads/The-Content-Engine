@@ -8,8 +8,8 @@ interface PlatformMockupProps {
   className?: string;
 }
 
-// Twitter/X Post Mockup
-export function TwitterMockup({ children, className }: PlatformMockupProps) {
+// X Post Mockup
+export function XMockup({ children, className }: PlatformMockupProps) {
   return (
     <div className={cn("bg-black rounded-xl border border-zinc-800 overflow-hidden", className)}>
       {/* Header */}
@@ -165,7 +165,7 @@ interface PlatformPostMockupProps {
 export function PlatformPostMockup({ platform, children, className }: PlatformPostMockupProps) {
   switch (platform.toLowerCase()) {
     case "twitter":
-      return <TwitterMockup className={className}>{children}</TwitterMockup>;
+      return <XMockup className={className}>{children}</XMockup>;
     case "instagram":
       return <InstagramMockup className={className}>{children}</InstagramMockup>;
     case "linkedin":
