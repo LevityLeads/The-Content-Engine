@@ -5,28 +5,15 @@
  * are programmatically applied to every slide via Satori.
  */
 
-export interface CarouselDesignSystem {
-  // Colors
-  backgroundColor: string; // hex code e.g., "#1a1a1a"
-  primaryColor: string;    // main text color e.g., "#ffffff"
-  accentColor: string;     // highlight color e.g., "#ff6b6b"
+import type { DesignContext } from '@/lib/design';
 
-  // Typography
-  fontFamily: string;      // e.g., "Inter"
-  headlineFontWeight: number; // e.g., 700
-  bodyFontWeight: number;  // e.g., 400
-
-  // Sizing (relative to canvas)
-  headlineFontSize: number; // in pixels
-  bodyFontSize: number;     // in pixels
-
-  // Layout
-  paddingX: number;        // horizontal padding in pixels
-  paddingY: number;        // vertical padding in pixels
-
-  // Aesthetic description (for logging/debugging)
-  aesthetic: string;       // e.g., "bold, editorial, premium"
-}
+/**
+ * @deprecated Use DesignContext from @/lib/design instead.
+ * CarouselDesignSystem is kept for backwards compatibility during migration.
+ * It maps to a subset of DesignContext (excluding visualStyle and masterBrandPrompt).
+ * TODO: Remove after all usages migrate to DesignContext
+ */
+export type CarouselDesignSystem = Omit<DesignContext, 'visualStyle' | 'masterBrandPrompt'>;
 
 export interface SlideContent {
   slideNumber: number;
@@ -43,8 +30,8 @@ export interface CompositeImageRequest {
   // Slide content
   content: SlideContent;
 
-  // Design system to apply
-  designSystem: CarouselDesignSystem;
+  // Design context to apply (single source of truth for visual decisions)
+  designContext: DesignContext;
 
   // Output dimensions
   width: number;
@@ -68,6 +55,10 @@ export interface TextStylePreset {
   aesthetic: string;
 }
 
+/**
+ * @deprecated Use computeDesignContext() from @/lib/design instead.
+ * These presets are kept for backwards compatibility during migration.
+ */
 export const TEXT_STYLE_PRESETS: Record<string, TextStylePreset> = {
   'bold-editorial': {
     id: 'bold-editorial',
@@ -119,6 +110,9 @@ export const TEXT_STYLE_PRESETS: Record<string, TextStylePreset> = {
 /**
  * Text Color Presets
  * Controls primary text color and accent color
+ *
+ * @deprecated Use computeDesignContext() from @/lib/design instead.
+ * These presets are kept for backwards compatibility during migration.
  */
 export interface TextColorPreset {
   id: string;
@@ -128,6 +122,10 @@ export interface TextColorPreset {
   forDarkBg: boolean; // hint for pairing with backgrounds
 }
 
+/**
+ * @deprecated Use computeDesignContext() from @/lib/design instead.
+ * These presets are kept for backwards compatibility during migration.
+ */
 export const TEXT_COLOR_PRESETS: Record<string, TextColorPreset> = {
   'white-coral': {
     id: 'white-coral',
@@ -174,7 +172,8 @@ export const TEXT_COLOR_PRESETS: Record<string, TextColorPreset> = {
 };
 
 /**
- * Build a design system from style + color presets
+ * @deprecated Use computeDesignContext() from @/lib/design instead.
+ * This function is kept for backwards compatibility during migration.
  */
 export function buildDesignSystem(
   stylePreset: TextStylePreset,
@@ -196,7 +195,10 @@ export function buildDesignSystem(
   };
 }
 
-// Legacy preset design systems (for backwards compatibility)
+/**
+ * @deprecated Use computeDesignContext() from @/lib/design instead.
+ * These presets are kept for backwards compatibility during migration.
+ */
 export const PRESET_DESIGN_SYSTEMS: Record<string, CarouselDesignSystem> = {
   'dark-coral': buildDesignSystem(
     TEXT_STYLE_PRESETS['bold-editorial'],
