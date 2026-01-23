@@ -25,7 +25,7 @@ Real people don't use marketing frameworks. They don't think about "engagement t
 
 ## Platform Context
 
-### Twitter/X
+### X
 - Short, direct, conversational
 - Threads are fine when you have more to say - not to hit a formula
 - Skip hashtags (they hurt more than help now)

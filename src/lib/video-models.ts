@@ -70,7 +70,7 @@ export const PLATFORM_VIDEO_CONFIG = {
     maxDuration: 8,
     recommendedDuration: 5,
     supportsAudio: true,
-    supportsMixedCarousel: false, // Twitter doesn't support mixed carousels
+    supportsMixedCarousel: false, // X doesn't support mixed carousels
   },
 } as const;
 

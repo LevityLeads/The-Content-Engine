@@ -19,7 +19,7 @@ import type { GenerationJob } from "@/hooks/use-generation-jobs";
 const platformConfig: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
   twitter: {
     icon: <Twitter className="h-4 w-4" />,
-    label: "Twitter",
+    label: "X",
     color: "bg-sky-500/20 text-sky-400 border-sky-500/30",
   },
   instagram: {

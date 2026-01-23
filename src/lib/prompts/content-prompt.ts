@@ -32,7 +32,7 @@ Write content that sounds like a real person sharing something valuable. Not "co
 
 ## Platform Guidelines
 
-### Twitter/X
+### X
 
 **Basics**: 280 characters max. Hashtags hurt reach - skip them or use one max.
 
@@ -399,7 +399,7 @@ The visualHint bridges your content strategy to visual execution. Think about:
 - What EMOTION does this slide evoke?
 - What visual METAPHOR would reinforce the message?
 - Where is this in the STORY ARC (hook/build/climax/resolution)?` : ""}
-${platforms.includes("twitter") ? "For Twitter: If the idea warrants depth, create a thread. Otherwise, a powerful single tweet." : ""}
+${platforms.includes("twitter") ? "For X: If the idea warrants depth, create a thread. Otherwise, a powerful single post." : ""}
 
 ---
 

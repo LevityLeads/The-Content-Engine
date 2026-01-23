@@ -114,7 +114,7 @@ The best content often combines pillars:
 
 ### Platform Pillar Preferences
 
-**Twitter/X:**
+**X:**
 - Entertain and Engage perform best
 - Educational threads for deep value
 - Establish through consistent hot takes

@@ -58,13 +58,13 @@ The core idea expressed clearly. What is this content about?
 
 ### 4. Target Platforms
 Select based on where this content naturally fits:
-- **twitter**: Short-form, provocative, thread-worthy
+- **twitter**: Short-form, provocative, thread-worthy (X)
 - **linkedin**: Professional insights, career/business focus
 - **instagram**: Visual-friendly, carousel-worthy, lifestyle adjacent
 
 ### 5. Suggested Format
 - **single-post**: Standalone post (any platform)
-- **thread**: Multi-tweet thread (Twitter)
+- **thread**: Multi-post thread (X)
 - **carousel**: Multi-slide visual content (Instagram primarily)
 - **story**: Ephemeral content (Instagram)
 
