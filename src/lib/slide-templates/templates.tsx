@@ -16,11 +16,27 @@
  */
 
 import React from 'react';
-import type { CarouselDesignSystem, SlideContent } from './types';
+import type { DesignContext } from '@/lib/design';
+import type { SlideContent, CarouselDesignSystem } from './types';
+
+/**
+ * Design input type that accepts either DesignContext (preferred) or
+ * CarouselDesignSystem (legacy, for backwards compatibility).
+ *
+ * Both types share the same core properties used by templates:
+ * - primaryColor, accentColor, backgroundColor
+ * - fontFamily, headlineFontSize, bodyFontSize
+ * - headlineFontWeight, bodyFontWeight
+ * - paddingX, paddingY, aesthetic
+ *
+ * DesignContext adds: visualStyle, masterBrandPrompt (optional)
+ * Templates use only the shared properties, so both types work.
+ */
+type DesignInput = DesignContext | CarouselDesignSystem;
 
 interface TemplateProps {
   content: SlideContent;
-  design: CarouselDesignSystem;
+  design: DesignInput;
   width: number;
   height: number;
   hasBackground?: boolean; // If true, makes background transparent for compositing
@@ -29,16 +45,17 @@ interface TemplateProps {
 /**
  * Text container with semi-transparent backing
  * Used across all templates for consistent readability over photos
+ *
+ * NOTE: This component uses DesignContext properties EXACTLY as provided.
+ * It does NOT make any design decisions - it only renders.
  */
 function TextContainer({
   children,
-  design,
   hasBackground,
   centered = true,
   maxWidth = '90%',
 }: {
   children: React.ReactNode;
-  design: CarouselDesignSystem;
   hasBackground: boolean;
   centered?: boolean;
   maxWidth?: string;
@@ -66,6 +83,16 @@ function TextContainer({
  *
  * Large, bold statement centered on the slide.
  * Designed to stop the scroll.
+ *
+ * Uses DesignContext properties EXACTLY as provided:
+ * - design.primaryColor for headline text
+ * - design.accentColor for accent text and decorative line
+ * - design.headlineFontSize for headline
+ * - design.bodyFontSize for accent text (with multiplier)
+ * - design.headlineFontWeight for all text weights
+ * - design.paddingX, design.paddingY for layout
+ * - design.fontFamily for typography
+ * - design.backgroundColor for fallback background
  */
 export function HookSlideTemplate({
   content,
@@ -88,7 +115,7 @@ export function HookSlideTemplate({
         fontFamily: design.fontFamily,
       }}
     >
-      <TextContainer design={design} hasBackground={hasBackground} centered={true}>
+      <TextContainer hasBackground={hasBackground} centered={true}>
         {content.headline && (
           <span
             style={{
@@ -139,6 +166,16 @@ export function HookSlideTemplate({
  *
  * Centered text with headline and body.
  * Good for delivering value points.
+ *
+ * Uses DesignContext properties EXACTLY as provided:
+ * - design.primaryColor for headline and body text
+ * - design.accentColor for accent/highlighted text
+ * - design.headlineFontSize for headline (with 0.85 multiplier for content slides)
+ * - design.bodyFontSize for body text
+ * - design.headlineFontWeight, design.bodyFontWeight for weights
+ * - design.paddingX, design.paddingY for layout
+ * - design.fontFamily for typography
+ * - design.backgroundColor for fallback background
  */
 export function ContentSlideTemplate({
   content,
@@ -161,7 +198,7 @@ export function ContentSlideTemplate({
         fontFamily: design.fontFamily,
       }}
     >
-      <TextContainer design={design} hasBackground={hasBackground} centered={true} maxWidth="85%">
+      <TextContainer hasBackground={hasBackground} centered={true} maxWidth="85%">
         {/* Headline */}
         {content.headline && (
           <span
@@ -219,6 +256,16 @@ export function ContentSlideTemplate({
  *
  * Large number + title + description, all centered.
  * Great for listicles and step-by-step content.
+ *
+ * Uses DesignContext properties EXACTLY as provided:
+ * - design.accentColor for the large slide number
+ * - design.primaryColor for headline and body text
+ * - design.headlineFontSize for number (with 1.3 multiplier) and headline (with 0.75 multiplier)
+ * - design.bodyFontSize for body text
+ * - design.headlineFontWeight, design.bodyFontWeight for weights
+ * - design.paddingX, design.paddingY for layout
+ * - design.fontFamily for typography
+ * - design.backgroundColor for fallback background
  */
 export function NumberedSlideTemplate({
   content,
@@ -241,7 +288,7 @@ export function NumberedSlideTemplate({
         fontFamily: design.fontFamily,
       }}
     >
-      <TextContainer design={design} hasBackground={hasBackground} centered={true} maxWidth="85%">
+      <TextContainer hasBackground={hasBackground} centered={true} maxWidth="85%">
         {/* Large slide number */}
         <span
           style={{
@@ -296,6 +343,16 @@ export function NumberedSlideTemplate({
  *
  * Summary/takeaway with call to action button.
  * Designed to drive engagement.
+ *
+ * Uses DesignContext properties EXACTLY as provided:
+ * - design.primaryColor for headline and secondary text
+ * - design.accentColor for CTA button background
+ * - design.headlineFontSize for headline (with 0.8 multiplier)
+ * - design.bodyFontSize for CTA text and secondary text
+ * - design.headlineFontWeight, design.bodyFontWeight for weights
+ * - design.paddingX, design.paddingY for layout
+ * - design.fontFamily for typography
+ * - design.backgroundColor for fallback background
  */
 export function CTASlideTemplate({
   content,
@@ -318,7 +375,7 @@ export function CTASlideTemplate({
         fontFamily: design.fontFamily,
       }}
     >
-      <TextContainer design={design} hasBackground={hasBackground} centered={true} maxWidth="85%">
+      <TextContainer hasBackground={hasBackground} centered={true} maxWidth="85%">
         {/* Headline (summary/takeaway) */}
         {content.headline && (
           <span
@@ -381,11 +438,30 @@ export function CTASlideTemplate({
 }
 
 /**
- * Template selector function
+ * Returns a template component for the given slide type.
+ *
+ * IMPORTANT: Templates are AUTHORITATIVE on layout. They use DesignContext
+ * properties EXACTLY as provided. No interpretation or adjustment.
+ *
+ * This is a pure function - same inputs always produce same output.
+ *
+ * Accepts either DesignContext (preferred) or CarouselDesignSystem (legacy)
+ * for backwards compatibility during migration. Both types share the core
+ * properties that templates use.
+ *
+ * @param templateType - The type of slide template to render
+ * @param props - Template props including content, design context, dimensions, and background flag
+ * @returns React element for the slide template
  */
 export function getSlideTemplate(
   templateType: 'hook' | 'content' | 'cta' | 'numbered',
-  props: TemplateProps
+  props: {
+    content: SlideContent;
+    design: DesignInput;
+    width: number;
+    height: number;
+    hasBackground: boolean;
+  }
 ): React.ReactElement {
   switch (templateType) {
     case 'hook':
@@ -400,3 +476,6 @@ export function getSlideTemplate(
       return <ContentSlideTemplate {...props} />;
   }
 }
+
+// Export the DesignInput type for consumers that need type flexibility
+export type { DesignInput };
