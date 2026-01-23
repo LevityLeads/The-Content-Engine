@@ -10,7 +10,7 @@
 
 **Core Value:** Consistent, trustworthy content generation that enables hands-off automation.
 
-**Current Focus:** Roadmap complete. Ready to begin Phase 1 planning.
+**Current Focus:** Phase 1 in progress. Plan 01-01 complete.
 
 **Quality Bar:** 9/10 outputs good enough to post without editing.
 
@@ -19,13 +19,15 @@
 ## Current Position
 
 ```
-Phase:    [1] Pipeline Coherence
-Plan:     Not started
-Status:   Awaiting plan creation
-Progress: [..........] 0%
+Phase:    [1] of [6] (Pipeline Coherence)
+Plan:     [1] of [5] complete
+Status:   In progress
+Progress: [##........] 20%
 ```
 
-**Next Action:** Run `/gsd:plan-phase 1` to create execution plans for Pipeline Coherence phase.
+**Last Activity:** 2026-01-23 - Completed 01-01-PLAN.md (Design Context Provider)
+
+**Next Action:** Execute plans 01-02 and 01-03 (Wave 2, parallel)
 
 ---
 
@@ -33,7 +35,7 @@ Progress: [..........] 0%
 
 | Phase | Name | Status | Progress |
 |-------|------|--------|----------|
-| 1 | Pipeline Coherence | Not Started | 0% |
+| 1 | Pipeline Coherence | In Progress | 20% |
 | 2 | Quality Gates | Not Started | 0% |
 | 3 | Human Checkpoints | Not Started | 0% |
 | 4 | Prompts and Voice Hardening | Not Started | 0% |
@@ -63,10 +65,16 @@ Progress: [..........] 0%
 | 6-phase structure | 2026-01-23 | Requirements map cleanly to research-suggested phases; standard depth |
 | Automation last | 2026-01-23 | Must earn trust through demonstrated reliability in Phases 1-5 |
 | Voice hardening before automation | 2026-01-23 | Brand drift is long-term killer; harden prompts early |
+| Brand primary as accent color | 2026-01-23 | Brands want their color as highlights, not replacing all text |
+| Fixed padding (60x80) | 2026-01-23 | Template constraint for visual consistency across carousels |
+| Inter font only | 2026-01-23 | Satori rendering requires loaded fonts; Inter provides readability |
 
 ### Technical Findings
 
-*None yet - will accumulate during implementation*
+- Design Context Provider module created at `src/lib/design/`
+- computeDesignContext is a pure function with no side effects
+- DesignContext interface has 13 fields matching research spec
+- TEXT_STYLE_PRESETS from slide-templates integrated successfully
 
 ### Open Questions
 
@@ -88,27 +96,36 @@ Progress: [..........] 0%
 
 ### What Was Just Completed
 
-- Roadmap created with 6 phases
-- All 13 v1 requirements mapped to phases
-- Success criteria derived for each phase (2-5 observable behaviors)
-- STATE.md initialized
-- REQUIREMENTS.md traceability updated
+- Plan 01-01: Design Context Provider (Wave 1)
+  - Created `src/lib/design/types.ts` with DesignContext interface
+  - Created `src/lib/design/context-provider.ts` with computeDesignContext function
+  - Created `src/lib/design/index.ts` barrel export
+  - Commits: c6b3f11, 41e3f91, 3d3ae5b
 
 ### What Comes Next
 
-1. `/gsd:plan-phase 1` - Create execution plans for Pipeline Coherence
-2. Implement PIPE-01, PIPE-02, PIPE-03
-3. Verify Phase 1 success criteria with test carousels
+1. Execute Plan 01-02 (Carousel Prompts) - Wave 2
+2. Execute Plan 01-03 (Template Enforcement) - Wave 2 (parallel with 01-02)
+3. Execute Plan 01-04 (API Route Wiring) - Wave 3
+4. Execute Plan 01-05 (End-to-end Verification) - Wave 4
 
 ### Context for Next Session
 
-The roadmap follows research guidance closely. Key insight: "the models are already good enough; the problem is architectural." Phase 1 focuses on coherence architecture (Design Context Provider, all-at-once generation, template enforcement). This is the critical foundation - nothing else matters if slides don't look cohesive.
+Plan 01-01 established the Design Context Provider - the single source of truth for visual decisions. Key export:
 
-Research identified these as non-negotiable patterns:
-- Design context computed ONCE, not per-slide
-- All slides generated in ONE Claude call for narrative coherence
-- Templates constrain design; AI handles content only
-- Programmatic composition (Satori + Sharp), not AI-driven
+```typescript
+import { computeDesignContext, type DesignContext } from '@/lib/design';
+```
+
+Plans 01-02 and 01-03 will use this context to:
+- Generate all slide content in one Claude call (01-02)
+- Enforce template constraints during composition (01-03)
+
+Research patterns being implemented:
+- Design context computed ONCE, not per-slide (01-01 DONE)
+- All slides generated in ONE Claude call for narrative coherence (01-02 next)
+- Templates constrain design; AI handles content only (01-03 next)
+- Programmatic composition (Satori + Sharp), not AI-driven (01-03 next)
 
 ---
 
