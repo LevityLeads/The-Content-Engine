@@ -82,19 +82,19 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PIPE-01 | TBD | Pending |
-| PIPE-02 | TBD | Pending |
-| PIPE-03 | TBD | Pending |
-| QUAL-01 | TBD | Pending |
-| QUAL-02 | TBD | Pending |
-| QUAL-03 | TBD | Pending |
-| CHECK-01 | TBD | Pending |
-| AUTO-01 | TBD | Pending |
-| AUTO-02 | TBD | Pending |
-| VOICE-01 | TBD | Pending |
-| VOICE-02 | TBD | Pending |
-| LEARN-01 | TBD | Pending |
-| LEARN-02 | TBD | Pending |
+| PIPE-01 | Phase 1: Pipeline Coherence | Pending |
+| PIPE-02 | Phase 1: Pipeline Coherence | Pending |
+| PIPE-03 | Phase 1: Pipeline Coherence | Pending |
+| QUAL-01 | Phase 2: Quality Gates | Pending |
+| QUAL-02 | Phase 2: Quality Gates | Pending |
+| QUAL-03 | Phase 2: Quality Gates | Pending |
+| CHECK-01 | Phase 3: Human Checkpoints | Pending |
+| VOICE-01 | Phase 4: Prompts and Voice Hardening | Pending |
+| VOICE-02 | Phase 4: Prompts and Voice Hardening | Pending |
+| LEARN-01 | Phase 5: Learning and Feedback | Pending |
+| LEARN-02 | Phase 5: Learning and Feedback | Pending |
+| AUTO-01 | Phase 6: Graduated Automation | Pending |
+| AUTO-02 | Phase 6: Graduated Automation | Pending |
 
 ---
 
@@ -109,3 +109,4 @@
 ---
 
 *Requirements defined: 2026-01-23*
+*Traceability updated: 2026-01-23*
