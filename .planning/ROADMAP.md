@@ -34,6 +34,15 @@ This roadmap transforms the content generation pipeline into a trustworthy autom
 
 **Rationale:** Nothing else matters if carousel slides don't look cohesive. This architectural foundation is prerequisite for all downstream quality systems.
 
+**Plans:** 5 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Design Context Provider types and implementation
+- [ ] 01-02-PLAN.md — All-at-once carousel prompt system
+- [ ] 01-03-PLAN.md — Template-first enforcement updates
+- [ ] 01-04-PLAN.md — Wire pipeline (API routes integration)
+- [ ] 01-05-PLAN.md — End-to-end verification
+
 ---
 
 ### Phase 2: Quality Gates
@@ -55,6 +64,8 @@ This roadmap transforms the content generation pipeline into a trustworthy autom
 
 **Rationale:** Cannot enable any automation without quality scoring to route content. This phase builds the trust infrastructure that informs all downstream routing decisions.
 
+**Plans:** (created by /gsd:plan-phase)
+
 ---
 
 ### Phase 3: Human Checkpoints
@@ -72,6 +83,8 @@ This roadmap transforms the content generation pipeline into a trustworthy autom
 3. User can override routing and move content between tiers manually
 
 **Rationale:** Establishes quality baseline and demonstrates system reliability before automation. Shadow mode where AI generates but humans approve everything.
+
+**Plans:** (created by /gsd:plan-phase)
 
 ---
 
@@ -93,6 +106,8 @@ This roadmap transforms the content generation pipeline into a trustworthy autom
 
 **Rationale:** Brand voice drift is the long-term quality killer. Must harden prompts before enabling automation to prevent gradual degradation.
 
+**Plans:** (created by /gsd:plan-phase)
+
 ---
 
 ### Phase 5: Learning and Feedback
@@ -112,6 +127,8 @@ This roadmap transforms the content generation pipeline into a trustworthy autom
 4. User receives early warning when quality metrics drop below thresholds
 
 **Rationale:** Without learning from failures, the system will degrade over time. Feedback loops are foundation for sustainable automation, not enhancement.
+
+**Plans:** (created by /gsd:plan-phase)
 
 ---
 
@@ -134,13 +151,15 @@ This roadmap transforms the content generation pipeline into a trustworthy autom
 
 **Rationale:** Only after Phases 1-5 demonstrate reliability should automation be enabled. Earned autonomy through proven quality.
 
+**Plans:** (created by /gsd:plan-phase)
+
 ---
 
 ## Progress
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 1 | Pipeline Coherence | PIPE-01, PIPE-02, PIPE-03 | Not Started |
+| 1 | Pipeline Coherence | PIPE-01, PIPE-02, PIPE-03 | Planned |
 | 2 | Quality Gates | QUAL-01, QUAL-02, QUAL-03 | Not Started |
 | 3 | Human Checkpoints | CHECK-01 | Not Started |
 | 4 | Prompts and Voice Hardening | VOICE-01, VOICE-02 | Not Started |
@@ -204,3 +223,4 @@ Phase 6 (Graduated Automation)
 ---
 
 *Roadmap created: 2026-01-23*
+*Phase 1 planned: 2026-01-23*
