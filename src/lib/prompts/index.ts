@@ -60,3 +60,12 @@ export {
   type VisualStyle,
   type StyleDefinition,
 } from "./visual-styles";
+
+// Carousel prompt system (all-at-once generation with narrative arc)
+export {
+  CAROUSEL_SYSTEM_PROMPT,
+  buildCarouselUserPrompt,
+  type CarouselSlideOutput,
+  type CarouselGenerationResult,
+  type CarouselIdeaInput,
+} from "./carousel-prompt";
