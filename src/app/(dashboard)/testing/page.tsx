@@ -111,7 +111,7 @@ export default function TestingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brandId: selectedBrand.id,
-          rawContent: newIdea.keyPoints.split("\n").join(". "),
+          content: newIdea.keyPoints.split("\n").join(". "),
           type: "text",
         }),
       });
