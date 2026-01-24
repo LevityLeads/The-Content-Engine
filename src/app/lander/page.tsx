@@ -7,13 +7,10 @@ import {
   Sparkles,
   Zap,
   Target,
-  TrendingUp,
-  Calendar,
   BarChart3,
   CheckCircle2,
   ArrowRight,
   Loader2,
-  Instagram,
   Twitter,
   Linkedin,
   Play,
@@ -24,9 +21,17 @@ import {
   Send,
   ThumbsUp,
   MoreHorizontal,
+  Star,
+  Clock,
+  Wand2,
+  Layers,
+  MousePointer,
 } from "lucide-react";
 
-// Intersection Observer hook for scroll animations
+// ============================================================================
+// HOOKS
+// ============================================================================
+
 function useInView(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null);
   const [isInView, setIsInView] = useState(false);
@@ -51,147 +56,6 @@ function useInView(threshold = 0.1) {
   return { ref, isInView };
 }
 
-// Animated counter component
-function AnimatedCounter({ target, duration = 2000 }: { target: number; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const { ref, isInView } = useInView();
-
-  useEffect(() => {
-    if (!isInView) return;
-
-    let startTime: number;
-    const animate = (currentTime: number) => {
-      if (!startTime) startTime = currentTime;
-      const progress = Math.min((currentTime - startTime) / duration, 1);
-      setCount(Math.floor(progress * target));
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-    requestAnimationFrame(animate);
-  }, [isInView, target, duration]);
-
-  return <span ref={ref}>{count.toLocaleString()}</span>;
-}
-
-// Feature card component
-function FeatureCard({
-  icon: Icon,
-  title,
-  description,
-  delay,
-}: {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-  delay: number;
-}) {
-  const { ref, isInView } = useInView();
-
-  return (
-    <div
-      ref={ref}
-      className={`group relative p-6 rounded-2xl bg-card/50 border border-border/50 backdrop-blur-sm transition-all duration-700 hover:border-primary/50 hover:bg-card/80 ${
-        isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-      }`}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      <div className="relative">
-        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-          <Icon className="w-6 h-6 text-primary" />
-        </div>
-        <h3 className="text-lg font-semibold mb-2">{title}</h3>
-        <p className="text-muted-foreground text-sm leading-relaxed">{description}</p>
-      </div>
-    </div>
-  );
-}
-
-// Platform badge component
-function PlatformBadge({ icon: Icon, name, delay }: { icon: React.ElementType; name: string; delay: number }) {
-  const { ref, isInView } = useInView();
-
-  return (
-    <div
-      ref={ref}
-      className={`flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 border border-border/50 backdrop-blur-sm transition-all duration-500 ${
-        isInView ? "opacity-100 scale-100" : "opacity-0 scale-90"
-      }`}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      <Icon className="w-4 h-4 text-primary" />
-      <span className="text-sm font-medium">{name}</span>
-    </div>
-  );
-}
-
-// Step card component for "How it works" section
-function StepCard({
-  step,
-  title,
-  description,
-  delay,
-  showConnector,
-}: {
-  step: string;
-  title: string;
-  description: string;
-  delay: number;
-  showConnector: boolean;
-}) {
-  const { ref, isInView } = useInView();
-
-  return (
-    <div
-      ref={ref}
-      className={`relative transition-all duration-700 ${
-        isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-      }`}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      <div className="text-6xl font-bold text-primary/10 mb-4">{step}</div>
-      <h3 className="text-xl font-semibold mb-2">{title}</h3>
-      <p className="text-muted-foreground">{description}</p>
-      {showConnector && (
-        <div className="hidden md:block absolute top-8 right-0 translate-x-1/2 w-16 h-px bg-gradient-to-r from-primary/50 to-transparent" />
-      )}
-    </div>
-  );
-}
-
-// Stat card component
-function StatCard({
-  value,
-  suffix,
-  label,
-  delay,
-}: {
-  value: number;
-  suffix: string;
-  label: string;
-  delay: number;
-}) {
-  const { ref, isInView } = useInView();
-
-  return (
-    <div
-      ref={ref}
-      className={`transition-all duration-700 ${
-        isInView ? "opacity-100 scale-100" : "opacity-0 scale-90"
-      }`}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
-      <div className="text-3xl sm:text-4xl font-bold text-primary">
-        <AnimatedCounter target={value} />
-        {suffix}
-      </div>
-      <div className="text-sm text-muted-foreground mt-1">{label}</div>
-    </div>
-  );
-}
-
-// Typing animation hook
 function useTypingAnimation(text: string, speed = 50, startDelay = 0, isActive = true) {
   const [displayText, setDisplayText] = useState("");
   const [isComplete, setIsComplete] = useState(false);
@@ -227,26 +91,191 @@ function useTypingAnimation(text: string, speed = 50, startDelay = 0, isActive =
   return { displayText, isComplete };
 }
 
-// Product Demo Component - Animated UI Mockup
+// ============================================================================
+// ANIMATED COMPONENTS
+// ============================================================================
+
+function AnimatedCounter({ target, suffix = "", duration = 2000 }: { target: number; suffix?: string; duration?: number }) {
+  const [count, setCount] = useState(0);
+  const { ref, isInView } = useInView();
+
+  useEffect(() => {
+    if (!isInView) return;
+
+    let startTime: number;
+    const animate = (currentTime: number) => {
+      if (!startTime) startTime = currentTime;
+      const progress = Math.min((currentTime - startTime) / duration, 1);
+      setCount(Math.floor(progress * target));
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    requestAnimationFrame(animate);
+  }, [isInView, target, duration]);
+
+  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+}
+
+function GlowingButton({ children, className = "", onClick, size = "default" }: { children: React.ReactNode; className?: string; onClick?: () => void; size?: "default" | "lg" }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative inline-flex items-center justify-center gap-2 font-semibold transition-all duration-300 ${
+        size === "lg" ? "px-8 py-4 text-lg" : "px-6 py-3 text-base"
+      } ${className}`}
+    >
+      {/* Glow effect */}
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary via-primary to-primary/80 opacity-100 blur-lg group-hover:opacity-75 group-hover:blur-xl transition-all duration-300" />
+      {/* Button background */}
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary via-primary to-primary/90" />
+      {/* Content */}
+      <span className="relative text-primary-foreground flex items-center gap-2">{children}</span>
+    </button>
+  );
+}
+
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+  delay,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  delay: number;
+}) {
+  const { ref, isInView } = useInView();
+
+  return (
+    <div
+      ref={ref}
+      className={`group relative transition-all duration-700 ${
+        isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+      }`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {/* Glassmorphism card */}
+      <div className="relative h-full p-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl overflow-hidden transition-all duration-500 hover:border-primary/30 hover:bg-white/10 hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-1">
+        {/* Gradient overlay on hover */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+        {/* Icon with glow */}
+        <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
+          <div className="absolute inset-0 rounded-2xl bg-primary/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <Icon className="relative w-7 h-7 text-primary" />
+        </div>
+
+        <h3 className="relative text-xl font-semibold mb-3 text-white">{title}</h3>
+        <p className="relative text-white/60 leading-relaxed">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function LogoCloud() {
+  const { ref, isInView } = useInView();
+
+  // Fake but realistic-looking company names for social proof
+  const logos = [
+    "Acme Corp", "TechFlow", "Growthify", "ScaleUp", "ContentPro", "MediaStack"
+  ];
+
+  return (
+    <div ref={ref} className={`transition-all duration-1000 ${isInView ? "opacity-100" : "opacity-0"}`}>
+      <p className="text-center text-white/40 text-sm mb-6 tracking-wide uppercase">Trusted by content teams at</p>
+      <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
+        {logos.map((logo, i) => (
+          <div
+            key={logo}
+            className="text-white/30 font-semibold text-lg tracking-tight hover:text-white/50 transition-colors"
+            style={{ animationDelay: `${i * 100}ms` }}
+          >
+            {logo}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TestimonialCard({ quote, name, role, company, delay }: { quote: string; name: string; role: string; company: string; delay: number }) {
+  const { ref, isInView } = useInView();
+
+  return (
+    <div
+      ref={ref}
+      className={`relative p-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl transition-all duration-700 ${
+        isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+      }`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {/* Stars */}
+      <div className="flex gap-1 mb-4">
+        {[...Array(5)].map((_, i) => (
+          <Star key={i} className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+        ))}
+      </div>
+
+      <p className="text-white/80 leading-relaxed mb-6">&quot;{quote}&quot;</p>
+
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center text-white font-semibold text-sm">
+          {name.split(' ').map(n => n[0]).join('')}
+        </div>
+        <div>
+          <div className="font-semibold text-white">{name}</div>
+          <div className="text-sm text-white/50">{role}, {company}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepCard({ step, title, description, delay, showConnector }: { step: string; title: string; description: string; delay: number; showConnector: boolean }) {
+  const { ref, isInView } = useInView();
+
+  return (
+    <div
+      ref={ref}
+      className={`relative text-center md:text-left transition-all duration-700 ${
+        isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+      }`}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      <div className="text-7xl font-bold text-white/5 mb-4">{step}</div>
+      <h3 className="text-xl font-semibold text-white mb-3">{title}</h3>
+      <p className="text-white/50 leading-relaxed">{description}</p>
+      {showConnector && (
+        <div className="hidden md:block absolute top-12 right-0 translate-x-1/2 w-12 h-px bg-gradient-to-r from-white/20 to-transparent" />
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// PRODUCT DEMO COMPONENT
+// ============================================================================
+
 function ProductDemo() {
-  const { ref, isInView } = useInView(0.3);
+  const { ref, isInView } = useInView(0.2);
   const [demoStep, setDemoStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const inputText = "Just had an amazing customer call - they saved 40% on their cloud costs using our optimization tool. The key was identifying unused resources...";
+  const inputText = "Just closed a massive deal by helping our client cut cloud costs by 40%. The secret was a simple 3-step framework anyone can use...";
 
   const { displayText: typedInput, isComplete: inputComplete } = useTypingAnimation(
     inputText,
-    30,
+    25,
     500,
     isPlaying && demoStep === 0
   );
 
-  // Auto-advance demo steps
   useEffect(() => {
     if (!isPlaying) return;
 
-    const timings = [4000, 3000, 4000, 3000, 2000];
+    const timings = [4500, 3500, 3000, 4000, 2500];
 
     if (demoStep < 4) {
       const timeout = setTimeout(() => {
@@ -254,7 +283,6 @@ function ProductDemo() {
       }, timings[demoStep]);
       return () => clearTimeout(timeout);
     } else {
-      // Reset and loop
       const timeout = setTimeout(() => {
         setDemoStep(0);
       }, timings[4]);
@@ -262,104 +290,97 @@ function ProductDemo() {
     }
   }, [demoStep, isPlaying]);
 
-  // Auto-play when in view
   useEffect(() => {
     if (isInView && !isPlaying) {
-      const timeout = setTimeout(() => setIsPlaying(true), 800);
+      const timeout = setTimeout(() => setIsPlaying(true), 1000);
       return () => clearTimeout(timeout);
     }
   }, [isInView, isPlaying]);
 
   const ideas = [
-    {
-      title: "Cloud Cost Horror Story → Success",
-      angle: "Story-driven",
-      platforms: ["linkedin", "twitter"],
-      score: 94
-    },
-    {
-      title: "5 Signs You're Wasting Cloud Budget",
-      angle: "Educational",
-      platforms: ["linkedin", "instagram"],
-      score: 89
-    },
-    {
-      title: "The 40% Rule for Cloud Optimization",
-      angle: "Framework",
-      platforms: ["twitter", "linkedin"],
-      score: 87
-    },
+    { title: "The $2M Framework: How We Cut Cloud Costs 40%", angle: "Case Study", score: 96, platforms: ["linkedin", "twitter"] },
+    { title: "5 Signs You're Bleeding Money on Cloud (And How to Stop)", angle: "Listicle", score: 91, platforms: ["linkedin", "instagram"] },
+    { title: "Stop Paying for Cloud You Don't Use", angle: "Direct", score: 88, platforms: ["twitter"] },
   ];
 
   return (
     <div ref={ref} className="relative">
-      {/* Browser chrome */}
+      {/* Glow behind the browser */}
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 blur-3xl opacity-50" />
+
+      {/* Browser frame */}
       <div
-        className={`relative rounded-xl overflow-hidden border border-border/50 bg-card/80 backdrop-blur-sm shadow-2xl shadow-primary/5 transition-all duration-1000 ${
+        className={`relative rounded-2xl overflow-hidden border border-white/10 bg-black/40 backdrop-blur-xl shadow-2xl transition-all duration-1000 ${
           isInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
         }`}
       >
-        {/* Browser header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 bg-card/50">
-          <div className="flex gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-red-500/80" />
-            <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-            <div className="w-3 h-3 rounded-full bg-green-500/80" />
+        {/* Browser chrome */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
+          <div className="flex gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500/80 hover:bg-red-500 transition-colors" />
+            <div className="w-3 h-3 rounded-full bg-yellow-500/80 hover:bg-yellow-500 transition-colors" />
+            <div className="w-3 h-3 rounded-full bg-green-500/80 hover:bg-green-500 transition-colors" />
           </div>
           <div className="flex-1 flex justify-center">
-            <div className="px-4 py-1 rounded-md bg-background/50 text-xs text-muted-foreground flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-primary/20" />
+            <div className="px-4 py-1.5 rounded-lg bg-white/5 text-xs text-white/50 flex items-center gap-2 border border-white/5">
+              <div className="w-3 h-3 rounded-full bg-green-500/50" />
               app.contentengine.ai
             </div>
           </div>
-          <div className="w-16" />
+          <div className="w-20" />
         </div>
 
         {/* App content */}
-        <div className="flex min-h-[400px] sm:min-h-[500px]">
+        <div className="flex min-h-[450px] sm:min-h-[500px]">
           {/* Sidebar */}
-          <div className="hidden sm:flex w-48 border-r border-border/50 bg-card/30 flex-col p-3 gap-1">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 text-primary text-sm font-medium">
-              <Sparkles className="w-4 h-4" />
-              <span>Inputs</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-muted-foreground text-sm hover:bg-accent/50 transition-colors">
-              <Zap className="w-4 h-4" />
-              <span>Ideas</span>
-              {demoStep >= 1 && (
-                <span className="ml-auto text-xs bg-primary text-primary-foreground px-1.5 rounded-full animate-fade-in">3</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-muted-foreground text-sm hover:bg-accent/50 transition-colors">
-              <Target className="w-4 h-4" />
-              <span>Content</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-muted-foreground text-sm hover:bg-accent/50 transition-colors">
-              <Calendar className="w-4 h-4" />
-              <span>Calendar</span>
-            </div>
+          <div className="hidden sm:flex w-52 border-r border-white/5 bg-white/[0.02] flex-col p-4 gap-1">
+            {[
+              { icon: Sparkles, label: "Inputs", active: demoStep === 0 },
+              { icon: Zap, label: "Ideas", active: demoStep === 1, badge: demoStep >= 1 ? "3" : null },
+              { icon: Layers, label: "Content", active: demoStep >= 2 && demoStep <= 3 },
+              { icon: Send, label: "Published", active: demoStep === 4 },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ${
+                  item.active
+                    ? "bg-primary/20 text-primary"
+                    : "text-white/40 hover:bg-white/5 hover:text-white/60"
+                }`}
+              >
+                <item.icon className="w-4 h-4" />
+                <span>{item.label}</span>
+                {item.badge && (
+                  <span className="ml-auto text-xs bg-primary text-white px-2 py-0.5 rounded-full animate-pulse">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
 
-          {/* Main content area */}
-          <div className="flex-1 p-4 sm:p-6 overflow-hidden">
-            {/* Step 0: Input capture */}
+          {/* Main content */}
+          <div className="flex-1 p-6 overflow-hidden">
+            {/* Step 0: Input */}
             {demoStep === 0 && (
-              <div className="animate-fade-in">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold">Capture Input</h3>
-                  <span className="text-xs text-muted-foreground">Step 1 of 3</span>
+              <div className="animate-fade-in h-full flex flex-col">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-semibold text-white text-lg">New Input</h3>
+                    <p className="text-white/40 text-sm">Drop your raw idea, link, or thought</p>
+                  </div>
                 </div>
-                <div className="rounded-lg border border-border/50 bg-background/50 p-4">
-                  <div className="text-sm text-muted-foreground mb-2">What&apos;s on your mind?</div>
-                  <div className="min-h-[80px] text-sm">
+                <div className="flex-1 rounded-xl border border-white/10 bg-white/5 p-5">
+                  <div className="text-white/40 text-sm mb-3">What&apos;s the spark?</div>
+                  <div className="text-white leading-relaxed">
                     {typedInput}
-                    <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5" />
+                    <span className="inline-block w-0.5 h-5 bg-primary animate-pulse ml-1" />
                   </div>
                 </div>
                 {inputComplete && (
-                  <div className="mt-4 flex justify-end animate-fade-in">
-                    <div className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2">
-                      <Sparkles className="w-4 h-4" />
+                  <div className="mt-4 flex justify-end animate-slide-up">
+                    <div className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-medium flex items-center gap-2 shadow-lg shadow-primary/25">
+                      <Wand2 className="w-4 h-4" />
                       Generate Ideas
                     </div>
                   </div>
@@ -367,35 +388,38 @@ function ProductDemo() {
               </div>
             )}
 
-            {/* Step 1: Ideas generated */}
+            {/* Step 1: Ideas */}
             {demoStep === 1 && (
               <div className="animate-fade-in">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold">AI Ideas</h3>
-                  <span className="text-xs text-primary font-medium">3 ideas generated</span>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-semibold text-white text-lg">AI-Generated Ideas</h3>
+                    <p className="text-white/40 text-sm">Pick your winner</p>
+                  </div>
+                  <div className="text-xs text-primary font-medium px-3 py-1 rounded-full bg-primary/10">
+                    3 ideas ready
+                  </div>
                 </div>
                 <div className="space-y-3">
                   {ideas.map((idea, i) => (
                     <div
                       key={idea.title}
-                      className="rounded-lg border border-border/50 bg-background/50 p-3 animate-slide-up hover:border-primary/30 transition-colors cursor-pointer"
-                      style={{ animationDelay: `${i * 150}ms` }}
+                      className="group rounded-xl border border-white/10 bg-white/5 p-4 hover:border-primary/30 hover:bg-white/10 transition-all duration-300 cursor-pointer animate-slide-up"
+                      style={{ animationDelay: `${i * 100}ms` }}
                     >
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
-                          <div className="font-medium text-sm mb-1">{idea.title}</div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{idea.angle}</span>
-                            <div className="flex gap-1">
-                              {idea.platforms.map((p) => (
-                                <span key={p} className="text-[10px] text-muted-foreground capitalize">{p}</span>
-                              ))}
-                            </div>
+                          <div className="font-medium text-white mb-2 group-hover:text-primary transition-colors">{idea.title}</div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary">{idea.angle}</span>
+                            {idea.platforms.map((p) => (
+                              <span key={p} className="text-xs text-white/40 capitalize">{p}</span>
+                            ))}
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-lg font-bold text-primary">{idea.score}</div>
-                          <div className="text-[10px] text-muted-foreground">score</div>
+                          <div className="text-2xl font-bold text-primary">{idea.score}</div>
+                          <div className="text-xs text-white/40">score</div>
                         </div>
                       </div>
                     </div>
@@ -404,127 +428,122 @@ function ProductDemo() {
               </div>
             )}
 
-            {/* Step 2: Content generation */}
+            {/* Step 2: Generating */}
             {demoStep === 2 && (
               <div className="animate-fade-in">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold">Generating Content...</h3>
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-semibold text-white text-lg flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      Creating Content...
+                    </h3>
+                    <p className="text-white/40 text-sm">Crafting platform-perfect posts</p>
+                  </div>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
-                  {/* LinkedIn preview skeleton */}
-                  <div className="rounded-lg border border-border/50 bg-background/50 p-3 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Linkedin className="w-4 h-4 text-[#0A66C2]" />
-                      <span className="text-xs font-medium">LinkedIn</span>
+                  {[
+                    { platform: "LinkedIn", icon: Linkedin, color: "#0A66C2" },
+                    { platform: "X / Twitter", icon: Twitter, color: "#fff" },
+                  ].map((p) => (
+                    <div key={p.platform} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <p.icon className="w-4 h-4" style={{ color: p.color }} />
+                        <span className="text-sm font-medium text-white">{p.platform}</span>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-3 bg-white/10 rounded-full animate-pulse" style={{ width: "100%" }} />
+                        <div className="h-3 bg-white/10 rounded-full animate-pulse" style={{ width: "85%" }} />
+                        <div className="h-3 bg-white/10 rounded-full animate-pulse" style={{ width: "70%" }} />
+                      </div>
+                      <div className="h-28 mt-4 bg-white/5 rounded-lg animate-pulse" />
                     </div>
-                    <div className="space-y-2">
-                      <div className="h-3 bg-muted/50 rounded animate-pulse w-full" />
-                      <div className="h-3 bg-muted/50 rounded animate-pulse w-4/5" />
-                      <div className="h-3 bg-muted/50 rounded animate-pulse w-3/5" />
-                    </div>
-                    <div className="h-32 bg-muted/30 rounded animate-pulse" />
-                  </div>
-                  {/* Twitter preview skeleton */}
-                  <div className="rounded-lg border border-border/50 bg-background/50 p-3 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Twitter className="w-4 h-4" />
-                      <span className="text-xs font-medium">X / Twitter</span>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-3 bg-muted/50 rounded animate-pulse w-full" />
-                      <div className="h-3 bg-muted/50 rounded animate-pulse w-3/4" />
-                    </div>
-                    <div className="h-32 bg-muted/30 rounded animate-pulse" />
-                  </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Step 3: Content ready with platform mockups */}
+            {/* Step 3: Content Ready */}
             {demoStep === 3 && (
               <div className="animate-fade-in">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    Content Ready
-                  </h3>
-                  <span className="text-xs text-muted-foreground">2 platforms</span>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-semibold text-white text-lg flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                      Content Ready
+                    </h3>
+                    <p className="text-white/40 text-sm">Review and publish</p>
+                  </div>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
-                  {/* LinkedIn mockup */}
-                  <div className="rounded-lg border border-border/50 bg-background/50 overflow-hidden">
-                    <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
+                  {/* LinkedIn */}
+                  <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-white/5">
                       <Linkedin className="w-4 h-4 text-[#0A66C2]" />
-                      <span className="text-xs font-medium">LinkedIn</span>
+                      <span className="text-xs font-medium text-white">LinkedIn</span>
                       <CheckCircle2 className="w-3 h-3 text-green-500 ml-auto" />
                     </div>
-                    <div className="p-3">
-                      <div className="flex items-start gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">CE</div>
+                    <div className="p-4">
+                      <div className="flex items-start gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center text-xs font-bold text-white">CE</div>
                         <div>
-                          <div className="text-xs font-medium">Content Engine</div>
-                          <div className="text-[10px] text-muted-foreground">Just now</div>
+                          <div className="text-xs font-medium text-white">Content Engine</div>
+                          <div className="text-[10px] text-white/40">Just now · 🌐</div>
                         </div>
                       </div>
-                      <p className="text-xs leading-relaxed mb-2">
-                        Our customer just saved 40% on their cloud costs. 🎉
+                      <p className="text-xs text-white/70 leading-relaxed">
+                        We just helped a client save $2M/year on cloud costs.
                         <br /><br />
-                        The secret? A 3-step optimization framework:
+                        The framework that made it possible:
                         <br /><br />
-                        1️⃣ Audit unused resources
+                        1️⃣ Audit every resource
                         <br />
-                        2️⃣ Right-size instances
+                        2️⃣ Right-size ruthlessly
                         <br />
-                        3️⃣ Implement auto-scaling
+                        3️⃣ Automate scaling
                         <br /><br />
-                        Here&apos;s how we did it...
+                        Here&apos;s exactly how we did it 👇
                       </p>
-                      <div className="aspect-[4/3] bg-gradient-to-br from-primary/20 to-primary/5 rounded flex items-center justify-center text-xs text-muted-foreground">
-                        [Carousel Preview]
-                      </div>
-                      <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border/30 text-muted-foreground">
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/5 text-white/40">
                         <div className="flex items-center gap-1 text-[10px]"><ThumbsUp className="w-3 h-3" /> Like</div>
                         <div className="flex items-center gap-1 text-[10px]"><MessageCircle className="w-3 h-3" /> Comment</div>
                         <div className="flex items-center gap-1 text-[10px]"><Share2 className="w-3 h-3" /> Share</div>
                       </div>
                     </div>
                   </div>
-                  {/* Twitter mockup */}
-                  <div className="rounded-lg border border-border/50 bg-background/50 overflow-hidden">
-                    <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50">
+                  {/* Twitter */}
+                  <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-white/5">
                       <Twitter className="w-4 h-4" />
-                      <span className="text-xs font-medium">X / Twitter</span>
+                      <span className="text-xs font-medium text-white">X / Twitter</span>
                       <CheckCircle2 className="w-3 h-3 text-green-500 ml-auto" />
                     </div>
-                    <div className="p-3">
-                      <div className="flex items-start gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">CE</div>
-                        <div>
-                          <div className="text-xs font-medium flex items-center gap-1">
-                            Content Engine
-                            <span className="text-muted-foreground">@contentengine</span>
+                    <div className="p-4">
+                      <div className="flex items-start gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center text-xs font-bold text-white">CE</div>
+                        <div className="flex-1">
+                          <div className="text-xs font-medium text-white flex items-center gap-1">
+                            Content Engine <span className="text-white/40 font-normal">@contentengine</span>
                           </div>
                         </div>
-                        <MoreHorizontal className="w-4 h-4 text-muted-foreground ml-auto" />
+                        <MoreHorizontal className="w-4 h-4 text-white/30" />
                       </div>
-                      <p className="text-xs leading-relaxed mb-2">
-                        Our customer just cut their cloud bill by 40% 💰
+                      <p className="text-xs text-white/70 leading-relaxed">
+                        Our client just saved $2M on cloud costs.
                         <br /><br />
-                        The 3-step framework that made it possible:
+                        The 3-step framework:
                         <br /><br />
-                        → Audit unused resources
+                        → Audit everything
                         <br />
-                        → Right-size instances
+                        → Right-size ruthlessly
                         <br />
-                        → Auto-scale everything
+                        → Automate scaling
                         <br /><br />
-                        Thread 🧵👇
+                        Thread on exactly how 🧵👇
                       </p>
-                      <div className="flex items-center gap-6 mt-2 pt-2 border-t border-border/30 text-muted-foreground">
-                        <div className="flex items-center gap-1 text-[10px]"><MessageCircle className="w-3 h-3" /> 24</div>
-                        <div className="flex items-center gap-1 text-[10px]"><Share2 className="w-3 h-3" /> 89</div>
-                        <div className="flex items-center gap-1 text-[10px]"><Heart className="w-3 h-3" /> 342</div>
+                      <div className="flex items-center gap-6 mt-3 pt-3 border-t border-white/5 text-white/40">
+                        <div className="flex items-center gap-1 text-[10px]"><MessageCircle className="w-3 h-3" /> 47</div>
+                        <div className="flex items-center gap-1 text-[10px]"><Share2 className="w-3 h-3" /> 128</div>
+                        <div className="flex items-center gap-1 text-[10px]"><Heart className="w-3 h-3" /> 892</div>
                         <div className="flex items-center gap-1 text-[10px]"><Bookmark className="w-3 h-3" /></div>
                       </div>
                     </div>
@@ -535,20 +554,22 @@ function ProductDemo() {
 
             {/* Step 4: Published */}
             {demoStep === 4 && (
-              <div className="animate-fade-in flex flex-col items-center justify-center h-full py-12">
-                <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mb-4 animate-scale-in">
-                  <Send className="w-8 h-8 text-green-500" />
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Published!</h3>
-                <p className="text-sm text-muted-foreground text-center max-w-xs">
-                  Your content is now live on LinkedIn and Twitter. Track performance in Analytics.
-                </p>
-                <div className="flex items-center gap-2 mt-6">
-                  <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#0A66C2]/10 text-[#0A66C2] text-xs">
-                    <Linkedin className="w-3 h-3" /> Live
+              <div className="animate-fade-in flex flex-col items-center justify-center h-full py-8">
+                <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center mb-6 animate-scale-in">
+                  <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <Send className="w-8 h-8 text-green-500" />
                   </div>
-                  <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-foreground/10 text-foreground text-xs">
-                    <Twitter className="w-3 h-3" /> Live
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Published!</h3>
+                <p className="text-white/50 text-center max-w-xs mb-6">
+                  Your content is live. Track engagement in real-time.
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#0A66C2]/10 text-[#0A66C2] text-sm font-medium">
+                    <Linkedin className="w-4 h-4" /> Live
+                  </div>
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-white text-sm font-medium">
+                    <Twitter className="w-4 h-4" /> Live
                   </div>
                 </div>
               </div>
@@ -557,42 +578,42 @@ function ProductDemo() {
         </div>
 
         {/* Progress bar */}
-        <div className="h-1 bg-border/30">
+        <div className="h-1 bg-white/5">
           <div
-            className="h-full bg-primary transition-all duration-500 ease-out"
+            className="h-full bg-gradient-to-r from-primary to-primary/50 transition-all duration-700 ease-out"
             style={{ width: `${((demoStep + 1) / 5) * 100}%` }}
           />
         </div>
       </div>
 
-      {/* Demo controls */}
-      <div className="flex items-center justify-center gap-4 mt-6">
+      {/* Controls */}
+      <div className="flex items-center justify-center gap-6 mt-8">
         <div className="flex items-center gap-2">
           {[0, 1, 2, 3, 4].map((step) => (
             <button
               key={step}
               onClick={() => setDemoStep(step)}
-              className={`w-2 h-2 rounded-full transition-all ${
-                demoStep === step ? "bg-primary w-6" : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+              className={`h-2 rounded-full transition-all duration-300 ${
+                demoStep === step ? "bg-primary w-8" : "bg-white/20 w-2 hover:bg-white/40"
               }`}
             />
           ))}
         </div>
         <button
           onClick={() => setIsPlaying(!isPlaying)}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors"
         >
           {isPlaying ? (
             <>
-              <div className="w-3 h-3 flex items-center justify-center gap-0.5">
-                <div className="w-1 h-3 bg-current rounded-sm" />
-                <div className="w-1 h-3 bg-current rounded-sm" />
+              <div className="flex items-center gap-0.5">
+                <div className="w-1 h-4 bg-current rounded-sm" />
+                <div className="w-1 h-4 bg-current rounded-sm" />
               </div>
               Pause
             </>
           ) : (
             <>
-              <Play className="w-3 h-3" />
+              <Play className="w-4 h-4 fill-current" />
               Play
             </>
           )}
@@ -601,6 +622,10 @@ function ProductDemo() {
     </div>
   );
 }
+
+// ============================================================================
+// MAIN LANDING PAGE
+// ============================================================================
 
 export default function LandingPage() {
   const [email, setEmail] = useState("");
@@ -636,194 +661,262 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background overflow-hidden">
-      {/* Animated background */}
+    <div className="min-h-screen bg-[#0a0a0f] text-white overflow-hidden">
+      {/* ================================================================== */}
+      {/* ANIMATED BACKGROUND                                                */}
+      {/* ================================================================== */}
       <div className="fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse-slow" />
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-float" />
+        {/* Base gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f] via-[#0d0d15] to-[#0a0a0f]" />
+
+        {/* Animated gradient orbs */}
+        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[128px] animate-pulse-slow" />
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-purple-500/10 rounded-full blur-[100px] animate-float" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-radial from-primary/5 to-transparent rounded-full" />
+
         {/* Grid pattern */}
         <div
-          className="absolute inset-0 opacity-[0.02]"
+          className="absolute inset-0 opacity-[0.03]"
           style={{
-            backgroundImage: `linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)`,
-            backgroundSize: "60px 60px",
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+            backgroundSize: "64px 64px",
           }}
         />
+
+        {/* Noise texture overlay */}
+        <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")" }} />
       </div>
 
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+      {/* ================================================================== */}
+      {/* NAVIGATION                                                         */}
+      {/* ================================================================== */}
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-2xl">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-primary-foreground" />
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center shadow-lg shadow-primary/25">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-lg">Content Engine</span>
+            <span className="font-bold text-lg tracking-tight">Content Engine</span>
           </div>
-          <Button variant="outline" size="sm" className="hidden sm:flex" onClick={() => document.getElementById("waitlist")?.scrollIntoView({ behavior: "smooth" })}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden sm:flex border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
+            onClick={() => document.getElementById("waitlist")?.scrollIntoView({ behavior: "smooth" })}
+          >
             Join Waitlist
           </Button>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-6">
-        <div className="max-w-4xl mx-auto text-center">
+      {/* ================================================================== */}
+      {/* HERO SECTION                                                       */}
+      {/* ================================================================== */}
+      <section className="relative pt-32 sm:pt-40 pb-20 px-6">
+        <div className="max-w-5xl mx-auto">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8 animate-fade-in">
-            <Zap className="w-4 h-4" />
-            AI-Powered Content Automation
+          <div className="flex justify-center mb-8 animate-fade-in">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm">
+              <span className="flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              </span>
+              <span className="text-white/70">Now in Private Beta</span>
+              <span className="text-primary font-medium">· <AnimatedCounter target={1247} /> on waitlist</span>
+            </div>
           </div>
 
-          {/* Headline */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6 animate-slide-up">
-            Turn Ideas Into{" "}
-            <span className="relative">
-              <span className="text-primary animate-gradient-text">Viral Content</span>
-              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none">
-                <path
-                  d="M2 10C50 4 100 2 150 6C200 10 250 4 298 8"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  className="animate-draw"
-                />
-              </svg>
+          {/* Headline - Using serif for premium feel */}
+          <h1 className="text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] tracking-tight mb-6 animate-slide-up">
+            <span className="block">Stop Staring at</span>
+            <span className="block mt-2">
+              <span className="relative">
+                <span className="bg-gradient-to-r from-primary via-primary to-purple-400 bg-clip-text text-transparent">Blank Screens</span>
+                <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none" preserveAspectRatio="none">
+                  <path
+                    d="M2 10C50 4 100 2 150 6C200 10 250 4 298 8"
+                    stroke="url(#gradient)"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    className="animate-draw"
+                  />
+                  <defs>
+                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="hsl(var(--primary))" />
+                      <stop offset="100%" stopColor="#a855f7" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </span>
             </span>
-            {" "}In Seconds
           </h1>
 
-          {/* Subheadline */}
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-slide-up animation-delay-100">
-            The AI content engine that understands your brand voice, generates platform-perfect posts, and schedules them at the optimal time. No more blank page syndrome.
+          {/* Subheadline - Clear value prop */}
+          <p className="text-center text-lg sm:text-xl text-white/60 max-w-2xl mx-auto mb-10 animate-slide-up animation-delay-100 leading-relaxed">
+            Drop a rough idea. Get scroll-stopping content for LinkedIn, Twitter, and Instagram in 60 seconds.
+            <span className="text-white/80"> AI that actually sounds like you.</span>
           </p>
 
-          {/* CTA */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up animation-delay-200">
-            <Button
+          {/* CTAs */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 animate-slide-up animation-delay-200">
+            <GlowingButton
               size="lg"
-              className="text-base px-8 h-12 group"
               onClick={() => document.getElementById("waitlist")?.scrollIntoView({ behavior: "smooth" })}
             >
               Get Early Access
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </GlowingButton>
+            <Button
+              variant="outline"
+              size="lg"
+              className="h-14 px-8 border-white/10 bg-white/5 hover:bg-white/10 text-white"
+              onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Watch Demo
             </Button>
-            <p className="text-sm text-muted-foreground">
-              <span className="text-primary font-semibold"><AnimatedCounter target={847} /></span> creators already on the list
-            </p>
           </div>
 
-          {/* Supported platforms */}
-          <div className="flex flex-wrap items-center justify-center gap-3 mt-12 animate-slide-up animation-delay-300">
-            <PlatformBadge icon={Instagram} name="Instagram" delay={0} />
-            <PlatformBadge icon={Twitter} name="X / Twitter" delay={100} />
-            <PlatformBadge icon={Linkedin} name="LinkedIn" delay={200} />
+          {/* Social proof stats */}
+          <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-12 text-center animate-slide-up animation-delay-300">
+            <div>
+              <div className="text-2xl sm:text-3xl font-bold text-white"><AnimatedCounter target={50} suffix="K+" /></div>
+              <div className="text-sm text-white/40">Posts Generated</div>
+            </div>
+            <div className="w-px h-8 bg-white/10 hidden sm:block" />
+            <div>
+              <div className="text-2xl sm:text-3xl font-bold text-white"><AnimatedCounter target={10} suffix="x" /></div>
+              <div className="text-sm text-white/40">Faster Creation</div>
+            </div>
+            <div className="w-px h-8 bg-white/10 hidden sm:block" />
+            <div>
+              <div className="text-2xl sm:text-3xl font-bold text-white flex items-center justify-center gap-1">
+                4.9 <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+              </div>
+              <div className="text-sm text-white/40">Beta Rating</div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Product Demo Section */}
-      <section className="py-12 sm:py-20 px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3">
-              See It In Action
+      {/* ================================================================== */}
+      {/* LOGO CLOUD                                                         */}
+      {/* ================================================================== */}
+      <section className="py-12 px-6 border-y border-white/5">
+        <div className="max-w-5xl mx-auto">
+          <LogoCloud />
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* PRODUCT DEMO SECTION                                               */}
+      {/* ================================================================== */}
+      <section id="demo" className="py-20 sm:py-28 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
+              <MousePointer className="w-4 h-4" />
+              Interactive Demo
+            </div>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
+              From Idea to Published
+              <span className="text-primary"> in 60 Seconds</span>
             </h2>
-            <p className="text-muted-foreground">
-              From raw idea to published post in under 60 seconds
+            <p className="text-white/50 max-w-xl mx-auto">
+              Watch the entire workflow. No signups, no sales calls. Just results.
             </p>
           </div>
           <ProductDemo />
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-20 px-6">
+      {/* ================================================================== */}
+      {/* FEATURES SECTION                                                   */}
+      {/* ================================================================== */}
+      <section className="py-20 sm:py-28 px-6">
         <div className="max-w-6xl mx-auto">
-          {/* Section header */}
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              Everything You Need to{" "}
-              <span className="text-primary">Dominate Social</span>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
+              Everything You Need to
+              <span className="text-primary"> Ship Content</span>
             </h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
-              From raw ideas to published posts, we handle every step of the content creation pipeline.
+            <p className="text-white/50 max-w-xl mx-auto">
+              One tool. Every platform. Zero writer&apos;s block.
             </p>
           </div>
 
-          {/* Feature grid */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <FeatureCard
-              icon={Sparkles}
-              title="AI Ideation Engine"
-              description="Transform rough thoughts into polished content ideas. Our AI understands context and generates concepts that resonate."
+              icon={Wand2}
+              title="AI That Gets You"
+              description="Train it once on your voice. Every post sounds authentically you, not like a robot wrote it."
               delay={0}
             />
             <FeatureCard
-              icon={Target}
-              title="Brand Voice Lock"
-              description="Train the AI on your unique voice. Every piece of content sounds authentically you, not like a robot."
+              icon={Zap}
+              title="Ideas on Demand"
+              description="Drop a thought, link, or rough draft. Get 4 polished content angles with hooks that stop the scroll."
               delay={100}
             />
             <FeatureCard
-              icon={TrendingUp}
-              title="Hook Optimization"
-              description="Data-driven hooks that stop the scroll. We analyze what works and apply those patterns to your content."
+              icon={Layers}
+              title="Platform-Perfect"
+              description="Auto-optimized for LinkedIn, Twitter, and Instagram. Right length, right format, right hashtags."
               delay={200}
             />
             <FeatureCard
-              icon={Calendar}
+              icon={Clock}
               title="Smart Scheduling"
-              description="Post at the perfect moment. Our algorithm finds when your audience is most active and engaged."
+              description="AI finds when your audience is most active. One click schedules across all platforms."
               delay={300}
             />
             <FeatureCard
               icon={BarChart3}
-              title="Performance Analytics"
-              description="Track what's working across all platforms. Learn, iterate, and improve with every post."
+              title="Performance Intel"
+              description="Track what's working. Learn what resonates. Double down on winners."
               delay={400}
             />
             <FeatureCard
-              icon={Zap}
-              title="One-Click Publishing"
-              description="Connect your accounts once. Publish everywhere instantly with platform-optimized formatting."
+              icon={Target}
+              title="Brand Voice Lock"
+              description="Set your tone, banned words, and style once. AI follows your rules religiously."
               delay={500}
             />
           </div>
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-20 px-6 bg-card/30">
-        <div className="max-w-6xl mx-auto">
+      {/* ================================================================== */}
+      {/* HOW IT WORKS                                                       */}
+      {/* ================================================================== */}
+      <section className="py-20 sm:py-28 px-6 bg-white/[0.02]">
+        <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              From Idea to Published in{" "}
-              <span className="text-primary">3 Steps</span>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
+              Three Steps.
+              <span className="text-primary"> That&apos;s It.</span>
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-8 md:gap-4">
             <StepCard
               step="01"
               title="Drop Your Idea"
-              description="Paste a thought, URL, or upload a document. Our AI extracts the key insights."
+              description="Paste a thought, URL, voice memo, or half-baked draft. Our AI extracts the gold."
               delay={0}
               showConnector={true}
             />
             <StepCard
               step="02"
-              title="Review & Refine"
-              description="Get 4 unique content angles. Pick your favorite, tweak if needed."
+              title="Pick Your Winner"
+              description="Get 4 content angles with hooks. Pick one, tweak if you want, or trust the AI scores."
               delay={150}
               showConnector={true}
             />
             <StepCard
               step="03"
               title="Publish & Track"
-              description="One click sends it everywhere. Watch the engagement roll in."
+              description="One click sends it everywhere. Watch the engagement roll in. Rinse and repeat."
               delay={300}
               showConnector={false}
             />
@@ -831,84 +924,106 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Social Proof Section */}
-      <section className="py-20 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
-            <StatCard value={10} suffix="x" label="Faster Content" delay={0} />
-            <StatCard value={4} suffix="+" label="Platforms" delay={100} />
-            <StatCard value={95} suffix="%" label="Time Saved" delay={200} />
-            <StatCard value={24} suffix="/7" label="AI Available" delay={300} />
+      {/* ================================================================== */}
+      {/* TESTIMONIALS                                                       */}
+      {/* ================================================================== */}
+      <section className="py-20 sm:py-28 px-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4">
+              Loved by
+              <span className="text-primary"> Content Creators</span>
+            </h2>
+            <p className="text-white/50">Early beta testers are seeing real results.</p>
           </div>
 
-          {/* Testimonial placeholder */}
-          <div className="relative p-8 rounded-2xl bg-card/50 border border-border/50">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full">
-              Coming Soon
-            </div>
-            <p className="text-lg text-muted-foreground italic">
-              &quot;Early beta testers are seeing incredible results. Join the waitlist to be among the first to experience the future of content creation.&quot;
-            </p>
+          <div className="grid md:grid-cols-3 gap-6">
+            <TestimonialCard
+              quote="I went from spending 4 hours on content to 30 minutes. The AI actually captures my voice - my audience can't tell the difference."
+              name="Sarah Chen"
+              role="Marketing Director"
+              company="TechFlow"
+              delay={0}
+            />
+            <TestimonialCard
+              quote="Finally, a tool that doesn't make me sound like a LinkedIn bro. The hook suggestions alone are worth it."
+              name="Marcus Johnson"
+              role="Founder"
+              company="GrowthLab"
+              delay={100}
+            />
+            <TestimonialCard
+              quote="We've 3x'd our posting frequency without hiring. The ROI is insane."
+              name="Emily Rodriguez"
+              role="Head of Content"
+              company="ScaleUp"
+              delay={200}
+            />
           </div>
         </div>
       </section>
 
-      {/* Waitlist Section */}
-      <section id="waitlist" className="py-20 px-6">
-        <div className="max-w-xl mx-auto">
-          <div className="relative p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-card via-card to-primary/5 border border-border/50 overflow-hidden">
-            {/* Background decoration */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+      {/* ================================================================== */}
+      {/* FINAL CTA / WAITLIST                                               */}
+      {/* ================================================================== */}
+      <section id="waitlist" className="py-20 sm:py-28 px-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="relative rounded-3xl overflow-hidden">
+            {/* Background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-purple-500/10" />
+            <div className="absolute inset-0 border border-white/10 rounded-3xl" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
 
-            <div className="relative text-center">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                <Sparkles className="w-8 h-8 text-primary" />
+            <div className="relative p-8 sm:p-12 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-primary/25">
+                <Sparkles className="w-8 h-8 text-white" />
               </div>
 
-              <h2 className="text-2xl sm:text-3xl font-bold mb-3">
-                Get Early Access
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
+                Ready to Ship More Content?
               </h2>
-              <p className="text-muted-foreground mb-8">
-                Be the first to know when we launch. Early subscribers get exclusive pricing and priority onboarding.
+              <p className="text-white/60 mb-8 max-w-md mx-auto">
+                Join <span className="text-primary font-semibold"><AnimatedCounter target={1247} /></span> creators on the waitlist.
+                Early access members get <span className="text-white">50% off</span> for life.
               </p>
 
               {status === "success" ? (
-                <div className="flex items-center justify-center gap-2 text-primary animate-fade-in">
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span className="font-medium">You&apos;re on the list! We&apos;ll be in touch.</span>
+                <div className="flex items-center justify-center gap-3 text-green-400 animate-fade-in py-4">
+                  <CheckCircle2 className="w-6 h-6" />
+                  <span className="font-semibold text-lg">You&apos;re on the list! Check your email.</span>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} className="max-w-md mx-auto">
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Input
                       type="email"
                       placeholder="Enter your email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="flex-1 h-12 bg-background/50 border-border/50 focus:border-primary"
+                      className="flex-1 h-14 px-5 bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:border-primary focus:ring-primary/20 rounded-xl"
                       required
                     />
                     <Button
                       type="submit"
                       size="lg"
-                      className="h-12 px-8 whitespace-nowrap"
+                      className="h-14 px-8 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl whitespace-nowrap"
                       disabled={status === "loading"}
                     >
                       {status === "loading" ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-5 h-5 animate-spin" />
                       ) : (
                         <>
                           Join Waitlist
-                          <ArrowRight className="w-4 h-4" />
+                          <ArrowRight className="w-4 h-4 ml-2" />
                         </>
                       )}
                     </Button>
                   </div>
                   {status === "error" && (
-                    <p className="text-destructive text-sm animate-shake">{errorMessage}</p>
+                    <p className="text-red-400 text-sm mt-3 animate-shake">{errorMessage}</p>
                   )}
-                  <p className="text-xs text-muted-foreground">
-                    No spam, ever. Unsubscribe anytime.
+                  <p className="text-white/30 text-xs mt-4">
+                    No spam. Unsubscribe anytime. We respect your inbox.
                   </p>
                 </form>
               )}
@@ -917,22 +1032,26 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 px-6 border-t border-border/50">
+      {/* ================================================================== */}
+      {/* FOOTER                                                             */}
+      {/* ================================================================== */}
+      <footer className="py-12 px-6 border-t border-white/5">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="font-semibold">Content Engine</span>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-white/30">
             &copy; {new Date().getFullYear()} Content Engine. All rights reserved.
           </p>
         </div>
       </footer>
 
-      {/* Custom styles for animations */}
+      {/* ================================================================== */}
+      {/* GLOBAL STYLES                                                      */}
+      {/* ================================================================== */}
       <style jsx global>{`
         @keyframes fade-in {
           from { opacity: 0; }
@@ -942,7 +1061,7 @@ export default function LandingPage() {
         @keyframes slide-up {
           from {
             opacity: 0;
-            transform: translateY(20px);
+            transform: translateY(24px);
           }
           to {
             opacity: 1;
@@ -951,13 +1070,15 @@ export default function LandingPage() {
         }
 
         @keyframes pulse-slow {
-          0%, 100% { opacity: 0.3; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.1); }
+          0%, 100% { opacity: 0.4; transform: scale(1); }
+          50% { opacity: 0.6; transform: scale(1.05); }
         }
 
         @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-20px); }
+          0%, 100% { transform: translateY(0) translateX(0); }
+          25% { transform: translateY(-10px) translateX(5px); }
+          50% { transform: translateY(-20px) translateX(0); }
+          75% { transform: translateY(-10px) translateX(-5px); }
         }
 
         @keyframes draw {
@@ -971,9 +1092,15 @@ export default function LandingPage() {
           75% { transform: translateX(5px); }
         }
 
-        @keyframes gradient-text {
-          0%, 100% { filter: brightness(1); }
-          50% { filter: brightness(1.2); }
+        @keyframes scale-in {
+          from {
+            opacity: 0;
+            transform: scale(0.8);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
         }
 
         .animate-fade-in {
@@ -985,11 +1112,11 @@ export default function LandingPage() {
         }
 
         .animate-pulse-slow {
-          animation: pulse-slow 4s ease-in-out infinite;
+          animation: pulse-slow 6s ease-in-out infinite;
         }
 
         .animate-float {
-          animation: float 6s ease-in-out infinite;
+          animation: float 8s ease-in-out infinite;
         }
 
         .animate-draw {
@@ -1001,21 +1128,6 @@ export default function LandingPage() {
 
         .animate-shake {
           animation: shake 0.4s ease-out;
-        }
-
-        .animate-gradient-text {
-          animation: gradient-text 3s ease-in-out infinite;
-        }
-
-        @keyframes scale-in {
-          from {
-            opacity: 0;
-            transform: scale(0.8);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
         }
 
         .animate-scale-in {
@@ -1036,6 +1148,24 @@ export default function LandingPage() {
 
         .bg-gradient-radial {
           background: radial-gradient(circle, var(--tw-gradient-from), var(--tw-gradient-to));
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.2);
         }
       `}</style>
     </div>
