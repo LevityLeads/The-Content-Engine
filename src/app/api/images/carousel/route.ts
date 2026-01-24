@@ -23,6 +23,7 @@ import {
   type CarouselDesignSystem,
   type SlideContent,
 } from '@/lib/slide-templates';
+import { computeDesignContext, type DesignContext } from '@/lib/design';
 import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from '@/lib/image-models';
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL, type VideoModelKey, platformSupportsMixedCarousel } from '@/lib/video-models';
 import { BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from '@/types/database';
@@ -335,6 +336,7 @@ export async function POST(request: NextRequest) {
     const {
       contentId,
       slides,              // Array of { slideNumber, text, imagePrompt }
+      designContext: providedDesignContext, // NEW: Pre-computed DesignContext from content generation
       designPreset,        // Legacy: 'dark-coral', 'navy-gold', etc. or full CarouselDesignSystem
       textStyle,           // New: 'bold-editorial', 'clean-modern', etc.
       textColor,           // New: 'white-coral', 'white-teal', etc.
@@ -548,13 +550,50 @@ export async function POST(request: NextRequest) {
     };
 
     // Resolve design system
-    // Priority: 1) Full object, 2) Brand colors, 3) textStyle+textColor combo, 4) legacy designPreset, 5) default
+    // Priority: 1) providedDesignContext, 2) Full object, 3) Brand colors, 4) textStyle+textColor combo, 5) legacy designPreset, 6) default
     let design: CarouselDesignSystem;
-    if (typeof designPreset === 'object' && designPreset !== null) {
+    let resolvedDesignContext: DesignContext | null = null;
+
+    if (providedDesignContext && typeof providedDesignContext === 'object') {
+      // Use the pre-computed DesignContext (preferred path from content generation)
+      // This ensures the SAME design context flows through the entire pipeline
+      resolvedDesignContext = providedDesignContext as DesignContext;
+
+      // Convert DesignContext to CarouselDesignSystem for the compositor
+      // CarouselDesignSystem is Omit<DesignContext, 'visualStyle' | 'masterBrandPrompt'>
+      design = {
+        primaryColor: resolvedDesignContext.primaryColor,
+        accentColor: resolvedDesignContext.accentColor,
+        backgroundColor: resolvedDesignContext.backgroundColor,
+        fontFamily: resolvedDesignContext.fontFamily,
+        headlineFontSize: resolvedDesignContext.headlineFontSize,
+        bodyFontSize: resolvedDesignContext.bodyFontSize,
+        headlineFontWeight: resolvedDesignContext.headlineFontWeight,
+        bodyFontWeight: resolvedDesignContext.bodyFontWeight,
+        paddingX: resolvedDesignContext.paddingX,
+        paddingY: resolvedDesignContext.paddingY,
+        aesthetic: resolvedDesignContext.aesthetic,
+      };
+
+      console.log('[Carousel Images] Design context resolved:', {
+        source: 'provided',
+        visualStyle: resolvedDesignContext.visualStyle,
+        primaryColor: resolvedDesignContext.primaryColor,
+        accentColor: resolvedDesignContext.accentColor,
+      });
+    } else if (typeof designPreset === 'object' && designPreset !== null) {
       // Full design system object passed directly
       design = designPreset as CarouselDesignSystem;
+      console.log('[Carousel Images] Using provided design system object');
     } else if (typedBrandColors?.primary_color || typedBrandColors?.accent_color) {
-      // NEW: Build design system from brand colors
+      // Build design system from brand colors (fallback path)
+      // Also compute a DesignContext for consistency
+      resolvedDesignContext = computeDesignContext({
+        visualStyle: visualStyle || 'typography',
+        textStyle: textStyle || 'bold-editorial',
+        brandVisualConfig: typedBrandColors,
+      });
+
       const stylePreset = TEXT_STYLE_PRESETS[textStyle] || TEXT_STYLE_PRESETS['bold-editorial'];
 
       // Create a custom color preset from brand colors
@@ -576,18 +615,38 @@ export async function POST(request: NextRequest) {
       // Override the accent to use brand primary color prominently
       design.accentColor = primaryBrandColor;
 
-      console.log(`Using brand colors: primary=${primaryBrandColor}, accent=${accentBrandColor}`);
+      console.log('[Carousel Images] Design context resolved:', {
+        source: 'computed-from-brand',
+        visualStyle: resolvedDesignContext.visualStyle,
+        primaryColor: resolvedDesignContext.primaryColor,
+        accentColor: resolvedDesignContext.accentColor,
+      });
     } else if (textStyle && textColor) {
       // Build from separate style and color presets
+      // Also compute a DesignContext for consistency
+      resolvedDesignContext = computeDesignContext({
+        visualStyle: visualStyle || 'typography',
+        textStyle: textStyle || 'bold-editorial',
+      });
+
       const stylePreset = TEXT_STYLE_PRESETS[textStyle] || TEXT_STYLE_PRESETS['bold-editorial'];
       const colorPreset = TEXT_COLOR_PRESETS[textColor] || TEXT_COLOR_PRESETS['white-coral'];
       design = buildDesignSystem(stylePreset, colorPreset);
+
+      console.log('[Carousel Images] Design context resolved:', {
+        source: 'computed-from-presets',
+        visualStyle: resolvedDesignContext.visualStyle,
+        primaryColor: resolvedDesignContext.primaryColor,
+        accentColor: resolvedDesignContext.accentColor,
+      });
     } else if (typeof designPreset === 'string' && PRESET_DESIGN_SYSTEMS[designPreset]) {
       // Legacy: Use named preset
       design = PRESET_DESIGN_SYSTEMS[designPreset];
+      console.log('[Carousel Images] Using legacy design preset:', designPreset);
     } else {
       // Default
       design = PRESET_DESIGN_SYSTEMS['dark-coral'];
+      console.log('[Carousel Images] Using default design preset: dark-coral');
     }
 
     // Dimensions
@@ -706,7 +765,13 @@ export async function POST(request: NextRequest) {
         slideContent.ctaText = 'Follow for More';
       }
 
-      console.log(`Compositing slide ${slide.slideNumber}/${totalSlides} (${templateType})`);
+      // Log per-slide design context for pipeline verification
+      console.log(`[Slide ${slide.slideNumber}] Compositing with design:`, {
+        templateType,
+        primaryColor: design.primaryColor,
+        accentColor: design.accentColor,
+        headlineFontSize: design.headlineFontSize,
+      });
 
       try {
         // Generate composite image (returns base64 data URL)
@@ -838,8 +903,9 @@ export async function POST(request: NextRequest) {
         : `Generated ${generatedImages.length} carousel slides with consistent styling`,
       images: generatedImages,
       design: {
-        preset: typeof designPreset === 'string' ? designPreset : 'custom',
+        preset: typeof designPreset === 'string' ? designPreset : 'computed',
         system: design,
+        context: resolvedDesignContext || undefined,  // Include DesignContext if available
       },
       backgroundGenerated: !!backgroundStyle && !!bgImage,
       backgroundError,
@@ -877,6 +943,12 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     description: 'Generate all carousel slides with consistent styling',
+    version: 'v2',
+    features: [
+      'Accepts pre-computed DesignContext for pipeline coherence',
+      'Falls back to computing design from params for backwards compatibility',
+      'Logs design context at each step for verification',
+    ],
     designPresets: Object.keys(PRESET_DESIGN_SYSTEMS),
     backgroundStyles: [
       'gradient-dark',
@@ -893,10 +965,12 @@ export async function GET() {
         { slideNumber: 1, text: 'Hook text for slide 1' },
         { slideNumber: 2, text: 'Content for slide 2' },
       ],
-      designPreset: 'dark-coral | navy-gold | light-minimal | teal-cream | custom object',
+      designContext: 'DesignContext object from content generation (preferred - ensures pipeline coherence)',
+      designPreset: 'dark-coral | navy-gold | light-minimal | teal-cream | custom object (legacy)',
       backgroundStyle: 'gradient-dark | etc. (optional - generates AI background)',
       backgroundImage: 'data:image/png;base64,... (optional - use your own)',
       useNumberedSlides: 'boolean (optional - use numbered template for middle slides)',
     },
+    designContextNote: 'When designContext is provided, it takes priority over all other design params to ensure content and image generation use identical visual settings.',
   });
 }
