@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, CheckCircle2, AlertCircle, Image as ImageIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Sparkles, CheckCircle2, AlertCircle, Image as ImageIcon, Plus } from "lucide-react";
 import { useBrand } from "@/contexts/brand-context";
 import type { DesignContext } from "@/lib/design";
 
@@ -80,8 +82,80 @@ export default function TestingPage() {
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
 
+  // Create idea form state - auto-show when no ideas
+  const [showCreateForm, setShowCreateForm] = useState(true);
+  const [isCreatingIdea, setIsCreatingIdea] = useState(false);
+  const [newIdea, setNewIdea] = useState({
+    concept: "The science of productive breaks",
+    angle: "educational",
+    keyPoints: "40% productivity increase with regular breaks\nPomodoro technique: 25 min work, 5 min break\nNatural attention span alignment",
+    hooks: "You're not lazy. You're burned out.\nWhat if doing less made you more productive?",
+  });
+
   const addLog = (message: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
+  };
+
+  // Create a test idea
+  const createTestIdea = async () => {
+    if (!selectedBrand?.id) return;
+
+    setIsCreatingIdea(true);
+    setError(null);
+    addLog("Creating test idea...");
+
+    try {
+      // First create an input
+      const inputRes = await fetch("/api/inputs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandId: selectedBrand.id,
+          rawContent: newIdea.keyPoints.split("\n").join(". "),
+          type: "text",
+        }),
+      });
+      const inputData = await inputRes.json();
+
+      if (!inputData.success) {
+        throw new Error(inputData.error || "Failed to create input");
+      }
+      addLog(`✓ Input created: ${inputData.input.id}`);
+
+      // Then create the idea
+      const ideaRes = await fetch("/api/ideas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandId: selectedBrand.id,
+          inputId: inputData.input.id,
+          concept: newIdea.concept,
+          angle: newIdea.angle,
+          keyPoints: newIdea.keyPoints.split("\n").filter(Boolean),
+          potentialHooks: newIdea.hooks.split("\n").filter(Boolean),
+          status: "approved",
+        }),
+      });
+      const ideaData = await ideaRes.json();
+
+      if (!ideaData.success) {
+        throw new Error(ideaData.error || "Failed to create idea");
+      }
+      addLog(`✓ Idea created: ${ideaData.idea.id}`);
+
+      // Add to list and select it
+      const createdIdea = ideaData.idea;
+      setIdeas(prev => [createdIdea, ...prev]);
+      setSelectedIdea(createdIdea);
+      setShowCreateForm(false);
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(message);
+      addLog(`✗ Error: ${message}`);
+    } finally {
+      setIsCreatingIdea(false);
+    }
   };
 
   // Fetch approved ideas
@@ -244,16 +318,94 @@ export default function TestingPage() {
             {/* Idea Selection */}
             <Card className="bg-zinc-900 border-zinc-800">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-zinc-300">1. Select Idea</CardTitle>
+                <CardTitle className="text-sm font-medium text-zinc-300 flex items-center justify-between">
+                  1. Select Idea
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowCreateForm(!showCreateForm)}
+                    className="h-7 text-xs"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    {showCreateForm ? "Cancel" : "Create"}
+                  </Button>
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {isLoadingIdeas ? (
+              <CardContent className="space-y-3">
+                {showCreateForm ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-zinc-500 mb-1 block">Concept</label>
+                      <Input
+                        value={newIdea.concept}
+                        onChange={(e) => setNewIdea(prev => ({ ...prev, concept: e.target.value }))}
+                        placeholder="e.g. The science of productive breaks"
+                        className="bg-zinc-800 border-zinc-700 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-500 mb-1 block">Angle</label>
+                      <Input
+                        value={newIdea.angle}
+                        onChange={(e) => setNewIdea(prev => ({ ...prev, angle: e.target.value }))}
+                        placeholder="e.g. educational, inspirational"
+                        className="bg-zinc-800 border-zinc-700 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-500 mb-1 block">Key Points (one per line)</label>
+                      <Textarea
+                        value={newIdea.keyPoints}
+                        onChange={(e) => setNewIdea(prev => ({ ...prev, keyPoints: e.target.value }))}
+                        placeholder="Point 1&#10;Point 2&#10;Point 3"
+                        className="bg-zinc-800 border-zinc-700 text-sm min-h-[80px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-500 mb-1 block">Potential Hooks (one per line)</label>
+                      <Textarea
+                        value={newIdea.hooks}
+                        onChange={(e) => setNewIdea(prev => ({ ...prev, hooks: e.target.value }))}
+                        placeholder="Hook 1&#10;Hook 2"
+                        className="bg-zinc-800 border-zinc-700 text-sm min-h-[60px]"
+                      />
+                    </div>
+                    <Button
+                      onClick={createTestIdea}
+                      disabled={isCreatingIdea || !newIdea.concept}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                      size="sm"
+                    >
+                      {isCreatingIdea ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-3 w-3 mr-2" />
+                          Create Test Idea
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : isLoadingIdeas ? (
                   <div className="flex items-center gap-2 text-zinc-500">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Loading ideas...
                   </div>
                 ) : ideas.length === 0 ? (
-                  <p className="text-zinc-500 text-sm">No approved ideas found for this brand</p>
+                  <div className="text-center py-4">
+                    <p className="text-zinc-500 text-sm mb-3">No approved ideas found</p>
+                    <Button
+                      onClick={() => setShowCreateForm(true)}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Plus className="h-3 w-3 mr-2" />
+                      Create Test Idea
+                    </Button>
+                  </div>
                 ) : (
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {ideas.map((idea) => (
