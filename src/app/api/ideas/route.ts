@@ -1,6 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const body = await request.json();
+    const { brandId, inputId, concept, angle, keyPoints, potentialHooks, status } = body;
+
+    if (!brandId || !concept) {
+      return NextResponse.json(
+        { error: "Brand ID and concept are required" },
+        { status: 400 }
+      );
+    }
+
+    const { data: idea, error } = await supabase
+      .from("ideas")
+      .insert({
+        brand_id: brandId,
+        input_id: inputId || null,
+        concept,
+        angle: angle || null,
+        key_points: keyPoints || [],
+        potential_hooks: potentialHooks || [],
+        status: status || "pending",
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error creating idea:", error);
+      return NextResponse.json(
+        { error: "Failed to create idea" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      idea,
+    });
+  } catch (error) {
+    console.error("Error in POST /api/ideas:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
