@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAnthropicClient, DEFAULT_MODEL, extractTextContent } from '@/lib/anthropic/client';
-import { computeDesignContext, type DesignContext } from '@/lib/design';
+import { computeDesignContext } from '@/lib/design';
 import {
   CAROUSEL_SYSTEM_PROMPT,
   buildCarouselUserPrompt,

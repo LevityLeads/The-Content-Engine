@@ -2,7 +2,7 @@
 
 **Milestone:** Content Pipeline Automation
 **Started:** 2026-01-23
-**Last Updated:** 2026-01-23
+**Last Updated:** 2026-01-24
 
 ---
 
@@ -10,7 +10,7 @@
 
 **Core Value:** Consistent, trustworthy content generation that enables hands-off automation.
 
-**Current Focus:** Phase 1 in progress. Plan 01-01 complete.
+**Current Focus:** Phase 1 - Plans 01-01 through 01-04 complete. Wave 4 (01-05) next.
 
 **Quality Bar:** 9/10 outputs good enough to post without editing.
 
@@ -20,14 +20,14 @@
 
 ```
 Phase:    [1] of [6] (Pipeline Coherence)
-Plan:     [1] of [5] complete
+Plan:     [4] of [5] complete
 Status:   In progress
-Progress: [##........] 20%
+Progress: [########..] 80%
 ```
 
-**Last Activity:** 2026-01-23 - Completed 01-01-PLAN.md (Design Context Provider)
+**Last Activity:** 2026-01-24 - Completed 01-04-PLAN.md (API Route Wiring)
 
-**Next Action:** Execute plans 01-02 and 01-03 (Wave 2, parallel)
+**Next Action:** Execute Plan 01-05 (End-to-end Verification) - Wave 4
 
 ---
 
@@ -35,7 +35,7 @@ Progress: [##........] 20%
 
 | Phase | Name | Status | Progress |
 |-------|------|--------|----------|
-| 1 | Pipeline Coherence | In Progress | 20% |
+| 1 | Pipeline Coherence | In Progress | 80% |
 | 2 | Quality Gates | Not Started | 0% |
 | 3 | Human Checkpoints | Not Started | 0% |
 | 4 | Prompts and Voice Hardening | Not Started | 0% |
@@ -51,7 +51,7 @@ Progress: [##........] 20%
 | Auto-approve quality | 9/10 good | N/A | Not measured |
 | Confidence calibration | Within 10% | N/A | Not measured |
 | Hook variety | No repeat in 2 weeks | N/A | Not measured |
-| Visual consistency | All slides unified | N/A | Not measured |
+| Visual consistency | All slides unified | Ready for test | Pipeline wired |
 | Self-healing catch rate | 80%+ | N/A | Not measured |
 
 ---
@@ -68,6 +68,9 @@ Progress: [##........] 20%
 | Brand primary as accent color | 2026-01-23 | Brands want their color as highlights, not replacing all text |
 | Fixed padding (60x80) | 2026-01-23 | Template constraint for visual consistency across carousels |
 | Inter font only | 2026-01-23 | Satori rendering requires loaded fonts; Inter provides readability |
+| DesignContext in content.metadata | 2026-01-24 | Enables reproducibility if images need regeneration |
+| DesignContext returned in response | 2026-01-24 | Enables immediate downstream image generation |
+| Backwards compatibility in image route | 2026-01-24 | Existing callers work; new path preferred via priority |
 
 ### Technical Findings
 
@@ -75,6 +78,9 @@ Progress: [##........] 20%
 - computeDesignContext is a pure function with no side effects
 - DesignContext interface has 13 fields matching research spec
 - TEXT_STYLE_PRESETS from slide-templates integrated successfully
+- CarouselDesignSystem is now alias for Omit<DesignContext, 'visualStyle' | 'masterBrandPrompt'>
+- All-at-once carousel generation endpoint at `/api/content/carousel`
+- Image carousel accepts DesignContext with priority over other params
 
 ### Open Questions
 
@@ -96,37 +102,50 @@ Progress: [##........] 20%
 
 ### What Was Just Completed
 
-- Plan 01-01: Design Context Provider (Wave 1)
-  - Created `src/lib/design/types.ts` with DesignContext interface
-  - Created `src/lib/design/context-provider.ts` with computeDesignContext function
-  - Created `src/lib/design/index.ts` barrel export
-  - Commits: c6b3f11, 41e3f91, 3d3ae5b
+- Plan 01-04: API Route Wiring (Wave 3)
+  - Created `src/app/api/content/carousel/route.ts` - dedicated endpoint for all-at-once generation
+  - Updated `src/app/api/images/carousel/route.ts` - accepts DesignContext, logging
+  - Pipeline logging added at content generation, image generation, and per-slide compositing
+  - Commits: 67e7823, 43c4f71
 
 ### What Comes Next
 
-1. Execute Plan 01-02 (Carousel Prompts) - Wave 2
-2. Execute Plan 01-03 (Template Enforcement) - Wave 2 (parallel with 01-02)
-3. Execute Plan 01-04 (API Route Wiring) - Wave 3
-4. Execute Plan 01-05 (End-to-end Verification) - Wave 4
+1. Execute Plan 01-05 (End-to-end Verification) - Wave 4
+2. Phase 1 complete after 01-05
+3. Begin Phase 2 (Quality Gates)
 
 ### Context for Next Session
 
-Plan 01-01 established the Design Context Provider - the single source of truth for visual decisions. Key export:
+Phase 1 Pipeline Coherence is nearly complete. The pipeline now flows:
 
-```typescript
-import { computeDesignContext, type DesignContext } from '@/lib/design';
+```
+Content Generation (01-04)
+  ↓
+  computeDesignContext() from 01-01
+  ↓
+  CAROUSEL_SYSTEM_PROMPT from 01-02
+  ↓
+  Saves DesignContext in content.metadata
+  ↓
+  Returns DesignContext in response
+  ↓
+Image Generation (01-04)
+  ↓
+  Accepts DesignContext (preferred) or computes fallback
+  ↓
+  Uses CarouselDesignSystem from 01-03
+  ↓
+  Composites all slides with identical design
 ```
 
-Plans 01-02 and 01-03 will use this context to:
-- Generate all slide content in one Claude call (01-02)
-- Enforce template constraints during composition (01-03)
-
-Research patterns being implemented:
-- Design context computed ONCE, not per-slide (01-01 DONE)
-- All slides generated in ONE Claude call for narrative coherence (01-02 next)
-- Templates constrain design; AI handles content only (01-03 next)
-- Programmatic composition (Satori + Sharp), not AI-driven (01-03 next)
+Verification steps for Plan 01-05:
+1. Call POST /api/content/carousel with an idea
+2. Verify response includes designContext
+3. Call POST /api/images/carousel with the returned designContext
+4. Verify logs show `[Carousel Images] Design context resolved: { source: 'provided', ... }`
+5. Verify all slides use identical design properties in logs
 
 ---
 
 *State initialized: 2026-01-23*
+*Last updated: 2026-01-24*
