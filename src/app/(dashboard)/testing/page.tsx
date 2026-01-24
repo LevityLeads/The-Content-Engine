@@ -82,8 +82,8 @@ export default function TestingPage() {
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
 
-  // Create idea form state - auto-show when no ideas
-  const [showCreateForm, setShowCreateForm] = useState(true);
+  // Create idea form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [isCreatingIdea, setIsCreatingIdea] = useState(false);
   const [newIdea, setNewIdea] = useState({
     concept: "The science of productive breaks",
