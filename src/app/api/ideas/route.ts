@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
     const body = await request.json();
-    const { brandId, inputId, concept, angle, keyPoints, potentialHooks, status } = body;
+    const { brandId, inputId, concept, angle, keyPoints, potentialHooks, status, targetPlatforms } = body;
 
     if (!brandId || !concept) {
       return NextResponse.json(
@@ -14,13 +14,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate angle if provided (must be one of the allowed values)
+    const validAngles = ['educational', 'entertaining', 'inspirational', 'promotional', 'conversational'];
+    const resolvedAngle = validAngles.includes(angle) ? angle : 'educational';
+
     const { data: idea, error } = await supabase
       .from("ideas")
       .insert({
         brand_id: brandId,
         input_id: inputId || null,
         concept,
-        angle: angle || null,
+        angle: resolvedAngle,
+        target_platforms: targetPlatforms || ['instagram'],
         key_points: keyPoints || [],
         potential_hooks: potentialHooks || [],
         status: status || "pending",
