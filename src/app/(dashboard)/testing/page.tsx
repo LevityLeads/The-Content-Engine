@@ -280,10 +280,10 @@ export default function TestingPage() {
       addLog(`✓ Images generated successfully`);
       addLog(`✓ Design context source in response: ${data.design?.source || 'unknown'}`);
 
-      // Map images
-      const images = data.images?.map((img: { slideNumber: number; url: string }) => ({
+      // Map images - API returns imageUrl field
+      const images = data.images?.map((img: { slideNumber: number; imageUrl: string }) => ({
         slideNumber: img.slideNumber,
-        url: img.url,
+        url: img.imageUrl,
       })) || [];
 
       setGeneratedImages(images);
