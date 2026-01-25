@@ -478,34 +478,35 @@ export default function IdeasPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Ideas</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Ideas</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Review and approve AI-generated content ideas
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => mutate()} disabled={isValidating}>
+          <Button variant="outline" size="sm" onClick={() => mutate()} disabled={isValidating} className="min-h-[40px] md:min-h-0">
             <RefreshCw className={cn("mr-2 h-4 w-4", isValidating && "animate-spin")} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Badge variant="outline" className="text-sm">
+          <Badge variant="outline" className="text-xs md:text-sm">
             {pendingCount} pending
           </Badge>
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2">
+      {/* Filter Tabs - Scrollable on mobile */}
+      <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 md:overflow-visible scrollbar-hide">
         {["pending", "approved", "generated", "rejected", ""].map((f) => (
           <Button
             key={f || "all"}
             variant={filter === f ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter(f)}
+            className="flex-shrink-0 min-h-[40px] md:min-h-0"
           >
             {f || "All"}
           </Button>
@@ -514,12 +515,12 @@ export default function IdeasPage() {
 
       {/* Bulk Actions Bar */}
       {ideas.length > 0 && (
-        <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-lg border bg-muted/30 p-3">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 gap-2"
+              className="h-10 sm:h-8 gap-2"
               onClick={toggleSelectAll}
             >
               {selectedItems.size === ideas.length ? (
@@ -527,7 +528,7 @@ export default function IdeasPage() {
               ) : (
                 <Square className="h-4 w-4" />
               )}
-              {selectedItems.size === ideas.length ? "Deselect All" : "Select All"}
+              {selectedItems.size === ideas.length ? "Deselect" : "Select All"}
             </Button>
             {selectedItems.size > 0 && (
               <span className="text-sm text-muted-foreground">
@@ -536,11 +537,11 @@ export default function IdeasPage() {
             )}
           </div>
           {selectedItems.size > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                className="flex-shrink-0 h-10 sm:h-8 gap-1 sm:gap-2 bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
                 onClick={handleBulkApprove}
                 disabled={isBulkApproving || isBulkDeleting || isBulkRejecting}
               >
@@ -549,12 +550,12 @@ export default function IdeasPage() {
                 ) : (
                   <Check className="h-4 w-4" />
                 )}
-                Approve ({selectedItems.size})
+                <span className="hidden sm:inline">Approve</span> ({selectedItems.size})
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20"
+                className="flex-shrink-0 h-10 sm:h-8 gap-1 sm:gap-2 bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20"
                 onClick={handleBulkReject}
                 disabled={isBulkApproving || isBulkDeleting || isBulkRejecting}
               >
@@ -563,12 +564,12 @@ export default function IdeasPage() {
                 ) : (
                   <X className="h-4 w-4" />
                 )}
-                Reject ({selectedItems.size})
+                <span className="hidden sm:inline">Reject</span> ({selectedItems.size})
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
+                className="flex-shrink-0 h-10 sm:h-8 gap-1 sm:gap-2 bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
                 onClick={handleBulkDelete}
                 disabled={isBulkApproving || isBulkDeleting || isBulkRejecting}
               >
@@ -577,7 +578,7 @@ export default function IdeasPage() {
                 ) : (
                   <Trash2 className="h-4 w-4" />
                 )}
-                Delete ({selectedItems.size})
+                <span className="hidden sm:inline">Delete</span> ({selectedItems.size})
               </Button>
             </div>
           )}

@@ -3088,33 +3088,34 @@ export default function ContentPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Content</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Content</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Review, edit, and publish generated content
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={fetchContent}>
+          <Button variant="outline" size="sm" onClick={fetchContent} className="min-h-[40px] md:min-h-0">
             <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Badge variant="outline">{draftCount} drafts</Badge>
-          <Badge variant="outline">{approvedCount} approved</Badge>
+          <Badge variant="outline" className="text-xs">{draftCount} drafts</Badge>
+          <Badge variant="outline" className="text-xs">{approvedCount} approved</Badge>
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex gap-2 items-center">
+      {/* Filter Tabs - Scrollable on mobile */}
+      <div className="flex gap-2 items-center overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 md:overflow-visible scrollbar-hide">
         {["draft", "approved", "scheduled", "published", ""].map((f) => (
           <Button
             key={f || "all"}
             variant={filter === f ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter(f)}
+            className="flex-shrink-0 min-h-[40px] md:min-h-0"
           >
             {f || "All"}
           </Button>
@@ -3124,23 +3125,24 @@ export default function ContentPage() {
         {filter === "approved" && approvedCount > 0 && (
           <Button
             size="sm"
-            className="ml-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0"
+            className="ml-2 md:ml-4 flex-shrink-0 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0 min-h-[40px] md:min-h-0"
             onClick={openBulkMagicDialog}
           >
-            <Sparkles className="mr-2 h-4 w-4" />
-            Magic Schedule All ({approvedCount})
+            <Sparkles className="mr-1 md:mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">Magic Schedule</span>
+            <span className="sm:hidden">Schedule</span> ({approvedCount})
           </Button>
         )}
       </div>
 
       {/* Bulk Actions Bar - hidden in Kanban view */}
       {content.length > 0 && filter !== "" && (
-        <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-lg border bg-muted/30 p-3">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 gap-2"
+              className="h-10 sm:h-8 gap-2"
               onClick={toggleSelectAll}
             >
               {selectedItems.size === content.length ? (
@@ -3148,7 +3150,7 @@ export default function ContentPage() {
               ) : (
                 <Square className="h-4 w-4" />
               )}
-              {selectedItems.size === content.length ? "Deselect All" : "Select All"}
+              {selectedItems.size === content.length ? "Deselect" : "Select All"}
             </Button>
             {selectedItems.size > 0 && (
               <span className="text-sm text-muted-foreground">
@@ -3161,7 +3163,7 @@ export default function ContentPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                className="flex-1 sm:flex-none h-10 sm:h-8 gap-2 bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
                 onClick={handleBulkApprove}
                 disabled={isBulkApproving || isBulkDeleting}
               >
@@ -3175,7 +3177,7 @@ export default function ContentPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
+                className="flex-1 sm:flex-none h-10 sm:h-8 gap-2 bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
                 onClick={handleBulkDelete}
                 disabled={isBulkApproving || isBulkDeleting}
               >

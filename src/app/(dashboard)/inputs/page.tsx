@@ -349,11 +349,11 @@ export default function InputsPage() {
   const isFormValid = content.trim().length > 0 || file !== null;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="max-w-5xl mx-auto space-y-4 md:space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Add Content Input</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Add Content Input</h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-1">
           Transform your raw content into engaging social media ideas
         </p>
       </div>
@@ -381,9 +381,9 @@ export default function InputsPage() {
           </div>
         )}
 
-        <CardContent className="p-6">
-          {/* Input Type Selector */}
-          <div className="flex gap-2 mb-6">
+        <CardContent className="p-4 md:p-6">
+          {/* Input Type Selector - Grid on mobile, flex on desktop */}
+          <div className="grid grid-cols-4 gap-2 md:flex md:gap-2 mb-4 md:mb-6">
             {(Object.keys(inputTypeConfig) as InputType[]).map((type) => {
               const config = inputTypeConfig[type];
               const isActive = inputType === type;
@@ -395,16 +395,16 @@ export default function InputsPage() {
                     clearInput();
                   }}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 transition-all",
+                    "flex flex-col md:flex-row items-center gap-1 md:gap-2 px-2 md:px-4 py-2 md:py-2.5 rounded-lg border-2 transition-all min-h-[60px] md:min-h-0",
                     isActive
                       ? config.color + " border-current"
-                      : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted"
+                      : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted active:bg-muted/80"
                   )}
                 >
                   {config.icon}
-                  <div className="text-left">
-                    <p className="font-medium text-sm">{config.label}</p>
-                    <p className="text-xs opacity-70 hidden sm:block">
+                  <div className="text-center md:text-left">
+                    <p className="font-medium text-xs md:text-sm">{config.label}</p>
+                    <p className="text-xs opacity-70 hidden md:block">
                       {config.description}
                     </p>
                   </div>
@@ -420,7 +420,7 @@ export default function InputsPage() {
               <div className="relative">
                 <Textarea
                   placeholder="Paste your content here... articles, notes, transcripts, ideas - anything that could become great social content."
-                  className="min-h-[200px] resize-y text-base leading-relaxed"
+                  className="min-h-[120px] md:min-h-[200px] resize-y text-base leading-relaxed"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                 />
@@ -580,29 +580,29 @@ export default function InputsPage() {
           </div>
 
           {/* Idea Count Selector */}
-          <div className="mt-6 p-4 rounded-xl bg-muted/30 border">
+          <div className="mt-4 md:mt-6 p-3 md:p-4 rounded-xl bg-muted/30 border">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Lightbulb className="h-5 w-5 text-amber-400" />
-                <span className="font-medium">Number of Ideas</span>
+                <Lightbulb className="h-4 w-4 md:h-5 md:w-5 text-amber-400" />
+                <span className="font-medium text-sm md:text-base">Ideas to Generate</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 md:gap-2">
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-9 w-9 md:h-8 md:w-8"
                   onClick={() => setIdeaCount(Math.max(1, ideaCount - 1))}
                   disabled={ideaCount <= 1}
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
-                <span className="w-12 text-center text-xl font-bold">
+                <span className="w-10 md:w-12 text-center text-lg md:text-xl font-bold">
                   {ideaCount}
                 </span>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-9 w-9 md:h-8 md:w-8"
                   onClick={() => setIdeaCount(Math.min(10, ideaCount + 1))}
                   disabled={ideaCount >= 10}
                 >
@@ -618,7 +618,7 @@ export default function InputsPage() {
               step={1}
               className="w-full"
             />
-            <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+            <div className="hidden md:flex justify-between mt-2 text-xs text-muted-foreground">
               <span>1 idea</span>
               <span>Quick (1-3)</span>
               <span>Standard (4-6)</span>
@@ -646,12 +646,12 @@ export default function InputsPage() {
           )}
 
           {/* Submit Button */}
-          <div className="mt-6 flex justify-end">
+          <div className="mt-4 md:mt-6">
             <Button
               size="lg"
               onClick={handleSubmit}
               disabled={!isFormValid || isLoading || isAnalyzingImage}
-              className="px-8"
+              className="w-full md:w-auto md:ml-auto md:flex px-8 min-h-[48px]"
             >
               {isLoading ? (
                 <>
@@ -671,14 +671,14 @@ export default function InputsPage() {
 
       {/* Recent Inputs */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Clock className="h-5 w-5 text-muted-foreground" />
+        <CardHeader className="pb-3 p-4 md:p-6 md:pb-3">
+          <CardTitle className="text-base md:text-lg flex items-center gap-2">
+            <Clock className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
             Recent Inputs
           </CardTitle>
-          <CardDescription>Your latest content submissions</CardDescription>
+          <CardDescription className="text-xs md:text-sm">Your latest content submissions</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
           {isLoadingRecent ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

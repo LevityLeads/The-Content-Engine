@@ -820,22 +820,22 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Content Calendar</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Content Calendar</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Plan and schedule your content publishing
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
           {/* View mode toggle */}
-          <div className="flex items-center rounded-lg border p-1">
+          <div className="flex items-center rounded-lg border p-1 flex-shrink-0">
             <Button
               variant={viewMode === "month" ? "default" : "ghost"}
               size="sm"
-              className="h-7 text-xs"
+              className="h-8 md:h-7 text-xs"
               onClick={() => setViewMode("month")}
             >
               Month
@@ -843,18 +843,18 @@ export default function CalendarPage() {
             <Button
               variant={viewMode === "week" ? "default" : "ghost"}
               size="sm"
-              className="h-7 text-xs"
+              className="h-8 md:h-7 text-xs"
               onClick={() => setViewMode("week")}
             >
               Week
             </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={goToToday}>
+          <Button variant="outline" size="sm" onClick={goToToday} className="min-h-[40px] md:min-h-0 flex-shrink-0">
             Today
           </Button>
-          <Button variant="outline" size="sm" onClick={fetchContent}>
+          <Button variant="outline" size="sm" onClick={fetchContent} className="min-h-[40px] md:min-h-0 flex-shrink-0">
             <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
       </div>
@@ -878,9 +878,9 @@ export default function CalendarPage() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-4 lg:grid-cols-3">
+      <div className="grid gap-4 md:gap-6 xl:grid-cols-4 lg:grid-cols-3">
         {/* Calendar */}
-        <Card className={cn(viewMode === "week" ? "xl:col-span-4 lg:col-span-3" : "xl:col-span-3 lg:col-span-2")}>
+        <Card className={cn(viewMode === "week" ? "xl:col-span-4 lg:col-span-3" : "xl:col-span-3 lg:col-span-2 col-span-full")}>
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <Button variant="outline" size="icon" onClick={goToPrevious}>
@@ -907,21 +907,22 @@ export default function CalendarPage() {
             ) : (
               <>
                 {/* Day Headers */}
-                <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
-                    (day) => (
+                <div className="grid grid-cols-7 gap-0.5 md:gap-1 text-center mb-2">
+                  {["S", "M", "T", "W", "T", "F", "S"].map(
+                    (day, i) => (
                       <div
-                        key={day}
-                        className="p-2 text-xs font-medium text-muted-foreground"
+                        key={i}
+                        className="p-1 md:p-2 text-[10px] md:text-xs font-medium text-muted-foreground"
                       >
-                        {day}
+                        <span className="sm:hidden">{day}</span>
+                        <span className="hidden sm:inline">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][i]}</span>
                       </div>
                     )
                   )}
                 </div>
 
                 {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-0.5 md:gap-1">
                   {calendarDays.map(({ date, isCurrentMonth }, index) => {
                     const dayContent = getContentForDate(date);
                     const hasContent = dayContent.length > 0;
@@ -937,32 +938,50 @@ export default function CalendarPage() {
                         key={index}
                         onClick={() => setSelectedDate(date)}
                         className={cn(
-                          "relative min-h-[100px] rounded-lg p-2 text-left transition-all hover:bg-muted/80 border",
+                          "relative min-h-[60px] md:min-h-[100px] rounded-md md:rounded-lg p-1 md:p-2 text-left transition-all hover:bg-muted/80 border",
                           !isCurrentMonth && "text-muted-foreground/30 bg-muted/20",
                           isCurrentMonth && "bg-card",
-                          isToday(date) && isCurrentMonth && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                          isToday(date) && isCurrentMonth && "ring-2 ring-primary ring-offset-1 md:ring-offset-2 ring-offset-background",
                           isSelected(date) && "bg-primary/10 border-primary"
                         )}
                       >
                         {/* Date number */}
                         <span
                           className={cn(
-                            "flex h-7 w-7 items-center justify-center rounded-full text-sm font-medium",
+                            "flex h-5 w-5 md:h-7 md:w-7 items-center justify-center rounded-full text-xs md:text-sm font-medium",
                             isToday(date) && isCurrentMonth && "bg-primary text-primary-foreground"
                           )}
                         >
                           {date.getDate()}
                         </span>
 
-                        {/* Content previews */}
+                        {/* Content previews - simplified on mobile */}
                         {hasContent && isCurrentMonth && (
-                          <div className="mt-1 space-y-1">
-                            {dayContent.slice(0, 2).map((item) => renderContentPill(item, true))}
-                            {dayContent.length > 2 && (
-                              <p className="text-[10px] text-muted-foreground text-center">
-                                +{dayContent.length - 2} more
-                              </p>
-                            )}
+                          <div className="mt-0.5 md:mt-1 space-y-0.5 md:space-y-1">
+                            {/* Mobile: just show dots */}
+                            <div className="flex gap-0.5 md:hidden flex-wrap">
+                              {dayContent.slice(0, 3).map((item) => (
+                                <div
+                                  key={item.id}
+                                  className={cn(
+                                    "h-1.5 w-1.5 rounded-full",
+                                    statusDotColors[item.status] || "bg-gray-400"
+                                  )}
+                                />
+                              ))}
+                              {dayContent.length > 3 && (
+                                <span className="text-[8px] text-muted-foreground">+{dayContent.length - 3}</span>
+                              )}
+                            </div>
+                            {/* Desktop: show pills */}
+                            <div className="hidden md:block space-y-1">
+                              {dayContent.slice(0, 2).map((item) => renderContentPill(item, true))}
+                              {dayContent.length > 2 && (
+                                <p className="text-[10px] text-muted-foreground text-center">
+                                  +{dayContent.length - 2} more
+                                </p>
+                              )}
+                            </div>
                           </div>
                         )}
                       </button>
@@ -971,16 +990,16 @@ export default function CalendarPage() {
                 </div>
 
                 {/* Legend */}
-                <div className="mt-4 flex items-center justify-center gap-6 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2">
+                <div className="mt-3 md:mt-4 flex items-center justify-center gap-3 md:gap-6 text-[10px] md:text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1 md:gap-2">
                     <div className="h-2 w-2 rounded-full bg-blue-500" />
                     <span>Scheduled</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 md:gap-2">
                     <div className="h-2 w-2 rounded-full bg-emerald-500" />
                     <span>Published</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 md:gap-2">
                     <div className="h-2 w-2 rounded-full bg-amber-500" />
                     <span>Approved</span>
                   </div>
