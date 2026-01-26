@@ -567,7 +567,7 @@ export default function ContentPage() {
     try {
       // First generate prompts for all slides
       const contentItem = content.find((c) => c.id === contentId);
-      const currentStyle = selectedVisualStyle[contentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
+      const currentStyle = getEffectiveStyle(contentId, contentItem?.metadata);
 
       const promptResponse = await fetch("/api/prompts/generate", {
         method: "POST",
@@ -629,7 +629,7 @@ export default function ContentPage() {
 
     try {
       const contentItem = content.find((c) => c.id === contentId);
-      const currentStyle = selectedVisualStyle[contentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
+      const currentStyle = getEffectiveStyle(contentId, contentItem?.metadata);
 
       // Generate prompt
       const promptResponse = await fetch("/api/prompts/generate", {
@@ -699,7 +699,7 @@ export default function ContentPage() {
       const contentItem = content.find((c) => c.id === contentId);
       if (!contentItem) return;
 
-      const currentStyle = selectedVisualStyle[contentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
+      const currentStyle = getEffectiveStyle(contentId, contentItem?.metadata);
 
       // Generate new prompt
       const promptResponse = await fetch("/api/prompts/generate", {
@@ -770,7 +770,7 @@ export default function ContentPage() {
 
     try {
       const contentItem = content.find((c) => c.id === contentId);
-      const currentStyle = selectedVisualStyle[contentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
+      const currentStyle = getEffectiveStyle(contentId, contentItem?.metadata);
 
       // First generate prompts for all slides
       const promptResponse = await fetch("/api/prompts/generate", {
@@ -833,7 +833,7 @@ export default function ContentPage() {
 
   const handleRegenerateStyle = async (contentId: string, slides: CarouselSlide[], andGenerateImages: boolean = false) => {
     const contentItem = content.find((c) => c.id === contentId);
-    const currentStyle = selectedVisualStyle[contentId] || getCarouselStyleId(contentItem?.metadata?.carouselStyle);
+    const currentStyle = getEffectiveStyle(contentId, contentItem?.metadata);
 
     setRegeneratingStyle(contentId);
     setImageMessage(`Regenerating ${currentStyle} style design system...`);
