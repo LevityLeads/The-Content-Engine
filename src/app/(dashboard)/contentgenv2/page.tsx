@@ -224,7 +224,7 @@ export default function ContentGenV2Page() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {result.inputAssessment.signals.rich.length > 0 && (
+              {result.inputAssessment.signals?.rich?.length > 0 && (
                 <div className="mb-3">
                   <p className="text-sm font-medium text-green-500 mb-1">Rich Signals:</p>
                   <ul className="text-sm text-muted-foreground">
@@ -234,7 +234,7 @@ export default function ContentGenV2Page() {
                   </ul>
                 </div>
               )}
-              {result.inputAssessment.signals.thin.length > 0 && (
+              {result.inputAssessment.signals?.thin?.length > 0 && (
                 <div>
                   <p className="text-sm font-medium text-orange-500 mb-1">Thin Signals:</p>
                   <ul className="text-sm text-muted-foreground">
@@ -411,13 +411,13 @@ export default function ContentGenV2Page() {
                     <XCircle className="w-4 h-4 text-red-500" />
                   )}
                 </h4>
-                {result.audit.aiPatterns.blacklistedWords.length > 0 && (
+                {result.audit.aiPatterns?.blacklistedWords?.length > 0 && (
                   <div className="mb-2">
                     <p className="text-sm text-red-500">Blacklisted words:</p>
                     <p className="text-sm">{result.audit.aiPatterns.blacklistedWords.join(", ")}</p>
                   </div>
                 )}
-                {result.audit.aiPatterns.blacklistedPhrases.length > 0 && (
+                {result.audit.aiPatterns?.blacklistedPhrases?.length > 0 && (
                   <div className="mb-2">
                     <p className="text-sm text-red-500">Blacklisted phrases:</p>
                     <p className="text-sm">{result.audit.aiPatterns.blacklistedPhrases.join(", ")}</p>
@@ -452,7 +452,7 @@ export default function ContentGenV2Page() {
                   Short punch ratio: <span className="font-mono">{(result.audit.rhythm.shortPunchRatio * 100).toFixed(0)}%</span>
                   <span className="text-muted-foreground"> (target: 15-40%)</span>
                 </p>
-                {result.audit.rhythm.monotonousSequences.length > 0 && (
+                {result.audit.rhythm?.monotonousSequences?.length > 0 && (
                   <p className="text-sm text-yellow-500 mt-1">
                     {result.audit.rhythm.monotonousSequences.length} monotonous sequences found
                   </p>
