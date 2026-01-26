@@ -100,10 +100,15 @@ Each idea must have:
    - What problem does it solve?
 
 4. APPROPRIATE FORMAT
-   - Thread: Complex ideas, step-by-step, listicles
-   - Single: Hot takes, observations, quick insights
-   - Carousel: Visual frameworks, before/after, tutorials
-   - Story: Personal experiences, case studies
+   - Thread: Complex ideas, step-by-step, listicles (best for Twitter)
+   - Single: Hot takes, observations, quick insights (Twitter/LinkedIn)
+   - Carousel: Visual frameworks, before/after, tutorials (REQUIRED for Instagram)
+   - Story: Personal experiences, case studies (any platform)
+
+   **Platform Format Rules**:
+   - Instagram → ALWAYS use carousel (highest engagement format)
+   - Twitter → Prefer thread or single
+   - LinkedIn → Prefer single or story
 
 ## Output Format
 
@@ -180,10 +185,14 @@ export function buildV2IdeationPrompt(config: {
   if (config.platforms.includes("instagram")) {
     sections.push(`
 ### Instagram Optimization
-- Visual appeal required for carousels
-- First slide must stop the scroll
-- Text needs to work on mobile
-- Save/share is key metric here`);
+- **ALWAYS use carousel format for Instagram** - it's the highest-performing format
+- Carousels get 3x more engagement than single posts
+- First slide must stop the scroll with a bold hook
+- Each slide = one clear point (visual hierarchy matters)
+- Text needs to work on mobile (large, readable)
+- Final slide = clear CTA or takeaway
+- Save/share is the key metric here
+- 5-7 slides is optimal for retention`);
   }
 
   return sections.join("\n");
