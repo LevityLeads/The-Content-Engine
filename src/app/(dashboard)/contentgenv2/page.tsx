@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, Sparkles, AlertTriangle, CheckCircle, XCircle, ImageIcon } from "lucide-react";
 
 interface ContentIdea {
   id: string;
@@ -78,12 +79,17 @@ export default function ContentGenV2Page() {
     rawResponse?: string;
     error?: string;
   } | null>(null);
+  const [images, setImages] = useState<{ slideNumber: number; imageUrl: string }[]>([]);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     if (!input.trim()) return;
 
     setLoading(true);
     setResult(null);
+    setImages([]);
+    setImageError(null);
 
     try {
       const response = await fetch("/api/content/generate-v2", {
@@ -103,6 +109,42 @@ export default function ContentGenV2Page() {
       setResult({ error: error instanceof Error ? error.message : "Unknown error" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateImages = async () => {
+    if (!result?.content?.copy?.slides) return;
+
+    setImageLoading(true);
+    setImageError(null);
+
+    try {
+      const slides = result.content.copy.slides.map((slide, idx) => ({
+        slideNumber: idx + 1,
+        headline: slide.headline,
+        body: slide.body,
+      }));
+
+      const response = await fetch("/api/content/generate-v2/images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slides,
+          backgroundStyle: "gradient-dark",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.images) {
+        setImages(data.images);
+      } else {
+        setImageError(data.error || "Failed to generate images");
+      }
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : "Unknown error");
+    } finally {
+      setImageLoading(false);
     }
   };
 
@@ -335,12 +377,41 @@ export default function ContentGenV2Page() {
       {result?.content && (
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Generated Content
-              <Badge variant="outline">{result.content.format}</Badge>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                Generated Content
+                <Badge variant="outline">{result.content.format}</Badge>
+              </span>
+              {result.content.copy.type === "carousel" && result.content.copy.slides && (
+                <Button
+                  onClick={handleGenerateImages}
+                  disabled={imageLoading}
+                  variant="outline"
+                  size="sm"
+                >
+                  {imageLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating Images...
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="w-4 h-4 mr-2" />
+                      Generate Images
+                    </>
+                  )}
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Image Error */}
+            {imageError && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-500 text-sm">
+                {imageError}
+              </div>
+            )}
+
             <div className="bg-muted/50 rounded-lg p-4 font-mono text-sm whitespace-pre-wrap">
               {result.content.copy.type === "single" && result.content.copy.text}
               {result.content.copy.type === "thread" &&
@@ -351,14 +422,65 @@ export default function ContentGenV2Page() {
                   </div>
                 ))}
               {result.content.copy.type === "carousel" &&
-                result.content.copy.slides?.map((s, i) => (
-                  <div key={i} className="mb-4 pb-4 border-b border-border last:border-0">
-                    <span className="text-muted-foreground">Slide {i + 1}:</span>
-                    <p className="mt-1 font-bold">{s.headline}</p>
-                    {s.body && <p className="mt-1">{s.body}</p>}
-                  </div>
-                ))}
+                result.content.copy.slides?.map((s, i) => {
+                  const slideImage = images.find(img => img.slideNumber === i + 1);
+                  return (
+                    <div key={i} className="mb-6 pb-6 border-b border-border last:border-0">
+                      <div className="flex gap-4">
+                        {/* Image Preview */}
+                        <div className="w-[160px] h-[200px] shrink-0 bg-muted rounded-lg overflow-hidden relative">
+                          {slideImage ? (
+                            <Image
+                              src={slideImage.imageUrl}
+                              alt={`Slide ${i + 1}`}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                              {imageLoading ? (
+                                <Loader2 className="w-6 h-6 animate-spin" />
+                              ) : (
+                                <ImageIcon className="w-8 h-8" />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {/* Text Content */}
+                        <div className="flex-1">
+                          <span className="text-muted-foreground">Slide {i + 1}:</span>
+                          <p className="mt-1 font-bold text-base">{s.headline}</p>
+                          {s.body && <p className="mt-2 text-muted-foreground">{s.body}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
+
+            {/* Generated Images Gallery */}
+            {images.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-sm font-medium mb-3">Generated Carousel Images</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {images.map((img) => (
+                    <div key={img.slideNumber} className="relative aspect-[4/5] rounded-lg overflow-hidden bg-muted">
+                      <Image
+                        src={img.imageUrl}
+                        alt={`Slide ${img.slideNumber}`}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                      <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        Slide {img.slideNumber}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {result.content.selfAssessment && (
               <div className="mt-4 grid grid-cols-4 gap-4">
