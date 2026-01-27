@@ -14,7 +14,7 @@ import {
   LateApiError,
 } from './types';
 
-const LATE_API_BASE_URL = 'https://getlate.dev/api/v1';
+const LATE_API_BASE_URL = 'https://getlate.dev/api';
 
 /**
  * Custom error class for Late.dev API errors
@@ -155,7 +155,7 @@ export class LateClient {
    * ```
    */
   async createPost(request: CreatePostRequest): Promise<CreatePostResponse> {
-    return this.request<CreatePostResponse>('POST', '/posts', request);
+    return this.request<CreatePostResponse>('POST', '/v1/posts', request);
   }
 
   /**
@@ -165,7 +165,7 @@ export class LateClient {
    * @returns Post details and status
    */
   async getPost(postId: string): Promise<GetPostResponse> {
-    return this.request<GetPostResponse>('GET', `/posts/${postId}`);
+    return this.request<GetPostResponse>('GET', `/v1/posts/${postId}`);
   }
 
   /**
@@ -175,7 +175,7 @@ export class LateClient {
    * @returns Post analytics per platform
    */
   async getPostAnalytics(postId: string): Promise<GetPostAnalyticsResponse> {
-    return this.request<GetPostAnalyticsResponse>('GET', `/posts/${postId}/analytics`);
+    return this.request<GetPostAnalyticsResponse>('GET', `/v1/posts/${postId}/analytics`);
   }
 
   /**
@@ -184,7 +184,7 @@ export class LateClient {
    * @param postId - Late.dev post ID
    */
   async cancelPost(postId: string): Promise<void> {
-    await this.request<void>('DELETE', `/posts/${postId}`);
+    await this.request<void>('DELETE', `/v1/posts/${postId}`);
   }
 
   /**
@@ -193,7 +193,7 @@ export class LateClient {
    * @returns List of connected accounts
    */
   async listAccounts(): Promise<ListAccountsResponse> {
-    return this.request<ListAccountsResponse>('GET', '/accounts');
+    return this.request<ListAccountsResponse>('GET', '/v1/accounts');
   }
 
   /**
@@ -231,7 +231,7 @@ export class LateClient {
       params.set('callbackUrl', callbackUrl);
     }
 
-    const connectUrl = `${this.baseUrl}/connect/${platform}?${params.toString()}`;
+    const connectUrl = `${this.baseUrl}/v1/connect/${platform}?${params.toString()}`;
 
     // For Late.dev, the connect endpoint itself IS the auth URL
     // We just need to redirect the user there with proper auth
@@ -251,7 +251,7 @@ export class LateClient {
    * @param accountId - Late.dev account ID
    */
   async disconnectAccount(accountId: string): Promise<void> {
-    await this.request<void>('DELETE', `/accounts/${accountId}`);
+    await this.request<void>('DELETE', `/v1/accounts/${accountId}`);
   }
 }
 
