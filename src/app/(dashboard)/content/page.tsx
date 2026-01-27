@@ -1952,11 +1952,12 @@ export default function ContentPage() {
     return text.slice(0, maxLength) + "...";
   };
 
-  const { draftCount, approvedCount, scheduledCount, publishedCount } = useMemo(() => ({
+  const { draftCount, approvedCount, scheduledCount, publishedCount, failedCount } = useMemo(() => ({
     draftCount: content.filter((c) => c.status === "draft").length,
     approvedCount: content.filter((c) => c.status === "approved").length,
     scheduledCount: content.filter((c) => c.status === "scheduled").length,
     publishedCount: content.filter((c) => c.status === "published").length,
+    failedCount: content.filter((c) => c.status === "failed").length,
   }), [content]);
 
   // Kanban board columns configuration
@@ -3109,7 +3110,7 @@ export default function ContentPage() {
 
       {/* Filter Tabs - Scrollable on mobile */}
       <div className="flex gap-2 items-center overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:pb-0 md:overflow-visible scrollbar-hide">
-        {["draft", "approved", "scheduled", "published", ""].map((f) => (
+        {["draft", "approved", "scheduled", "published", "failed", ""].map((f) => (
           <Button
             key={f || "all"}
             variant={filter === f ? "default" : "outline"}
