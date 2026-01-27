@@ -77,7 +77,10 @@ export class LateClient {
     let response: Response;
     try {
       console.log(`Late.dev API request: ${method} ${url}`);
+      console.log(`Late.dev API request body:`, JSON.stringify(body, null, 2));
+      console.log(`Late.dev API headers:`, JSON.stringify(Object.fromEntries(Object.entries(headers).map(([k, v]) => [k, k === 'Authorization' ? 'Bearer ***' : v])), null, 2));
       response = await fetch(url, options);
+      console.log(`Late.dev API response status: ${response.status}`);
     } catch (error) {
       // Network error - API unreachable
       const message = error instanceof Error ? error.message : 'Network request failed';
