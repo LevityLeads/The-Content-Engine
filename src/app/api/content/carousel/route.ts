@@ -26,6 +26,7 @@ import {
   type CarouselIdeaInput,
 } from '@/lib/prompts';
 import { buildVoicePrompt, type VoiceConfig, type VisualConfig } from '@/lib/prompts';
+import { type BrandStyle } from '@/contexts/brand-context';
 
 /**
  * POST /api/content/carousel
@@ -81,13 +82,34 @@ export async function POST(request: NextRequest) {
       image_style?: string;
       fonts?: { heading?: string; body?: string };
       master_brand_prompt?: string;
+      brandStyle?: BrandStyle;
+      useBrandStylePriority?: boolean;
     } | undefined;
+
+    // Extract brand style if available
+    const brandStyle = brandVisualConfig?.brandStyle;
+    const useBrandStylePriority = brandVisualConfig?.useBrandStylePriority === true;
+
+    // If brand style priority is enabled and we have a brand style, use its colors
+    const effectiveVisualConfig = useBrandStylePriority && brandStyle ? {
+      ...brandVisualConfig,
+      primary_color: brandStyle.colorPalette?.primary || brandVisualConfig?.primary_color,
+      accent_color: brandStyle.colorPalette?.accent || brandVisualConfig?.accent_color,
+      secondary_color: brandStyle.colorPalette?.secondary || brandVisualConfig?.secondary_color,
+      master_brand_prompt: brandStyle.masterPrompt || brandVisualConfig?.master_brand_prompt,
+    } : brandVisualConfig;
 
     const designContext = computeDesignContext({
       visualStyle: visualStyle || 'typography',
       textStyle: textStyle || 'bold-editorial',
-      brandVisualConfig,
+      brandVisualConfig: effectiveVisualConfig,
     });
+
+    // If brand style priority is enabled, enhance design context with brand style's master prompt
+    if (useBrandStylePriority && brandStyle?.masterPrompt) {
+      designContext.masterBrandPrompt = brandStyle.masterPrompt;
+      console.log('[Carousel Content] Using BRAND STYLE PRIORITY - master prompt from custom brand style');
+    }
 
     // Log design context for pipeline verification
     console.log('[Carousel Content] Design context computed:', {
