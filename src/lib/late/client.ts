@@ -67,6 +67,7 @@ export class LateClient {
     const options: RequestInit = {
       method,
       headers,
+      redirect: 'follow', // Follow redirects but log them
     };
 
     if (body) {
@@ -75,6 +76,7 @@ export class LateClient {
 
     let response: Response;
     try {
+      console.log(`Late.dev API request: ${method} ${url}`);
       response = await fetch(url, options);
     } catch (error) {
       // Network error - API unreachable
@@ -86,6 +88,11 @@ export class LateClient {
         },
         0
       );
+    }
+
+    // Log if there was a redirect
+    if (response.url !== url) {
+      console.log(`Late.dev API was redirected: ${url} -> ${response.url}`);
     }
 
     // Handle error responses
