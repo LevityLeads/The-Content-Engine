@@ -77,7 +77,10 @@ export class LateClient {
     let response: Response;
     try {
       console.log(`Late.dev API request: ${method} ${url}`);
+      console.log(`Late.dev API request body:`, JSON.stringify(body, null, 2));
+      console.log(`Late.dev API headers:`, JSON.stringify(Object.fromEntries(Object.entries(headers).map(([k, v]) => [k, k === 'Authorization' ? 'Bearer ***' : v])), null, 2));
       response = await fetch(url, options);
+      console.log(`Late.dev API response status: ${response.status}`);
     } catch (error) {
       // Network error - API unreachable
       const message = error instanceof Error ? error.message : 'Network request failed';
@@ -152,7 +155,7 @@ export class LateClient {
    * ```
    */
   async createPost(request: CreatePostRequest): Promise<CreatePostResponse> {
-    return this.request<CreatePostResponse>('POST', '/posts', request);
+    return this.request<CreatePostResponse>('POST', '/v1/posts', request);
   }
 
   /**
@@ -162,7 +165,7 @@ export class LateClient {
    * @returns Post details and status
    */
   async getPost(postId: string): Promise<GetPostResponse> {
-    return this.request<GetPostResponse>('GET', `/posts/${postId}`);
+    return this.request<GetPostResponse>('GET', `/v1/posts/${postId}`);
   }
 
   /**
@@ -172,7 +175,7 @@ export class LateClient {
    * @returns Post analytics per platform
    */
   async getPostAnalytics(postId: string): Promise<GetPostAnalyticsResponse> {
-    return this.request<GetPostAnalyticsResponse>('GET', `/posts/${postId}/analytics`);
+    return this.request<GetPostAnalyticsResponse>('GET', `/v1/posts/${postId}/analytics`);
   }
 
   /**
@@ -181,7 +184,7 @@ export class LateClient {
    * @param postId - Late.dev post ID
    */
   async cancelPost(postId: string): Promise<void> {
-    await this.request<void>('DELETE', `/posts/${postId}`);
+    await this.request<void>('DELETE', `/v1/posts/${postId}`);
   }
 
   /**
@@ -190,7 +193,7 @@ export class LateClient {
    * @returns List of connected accounts
    */
   async listAccounts(): Promise<ListAccountsResponse> {
-    return this.request<ListAccountsResponse>('GET', '/accounts');
+    return this.request<ListAccountsResponse>('GET', '/v1/accounts');
   }
 
   /**
@@ -228,7 +231,7 @@ export class LateClient {
       params.set('callbackUrl', callbackUrl);
     }
 
-    const connectUrl = `${this.baseUrl}/connect/${platform}?${params.toString()}`;
+    const connectUrl = `${this.baseUrl}/v1/connect/${platform}?${params.toString()}`;
 
     // For Late.dev, the connect endpoint itself IS the auth URL
     // We just need to redirect the user there with proper auth
@@ -248,7 +251,7 @@ export class LateClient {
    * @param accountId - Late.dev account ID
    */
   async disconnectAccount(accountId: string): Promise<void> {
-    await this.request<void>('DELETE', `/accounts/${accountId}`);
+    await this.request<void>('DELETE', `/v1/accounts/${accountId}`);
   }
 }
 
