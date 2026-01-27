@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Maximum images for enhanced analysis
+const MAX_IMAGES = 15;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { images } = body; // Array of base64 image strings
+    const {
+      images, // Array of base64 image strings
+      generateBrandStyle, // If true, generate comprehensive brand style
+      platforms, // Optional: platforms these images are from
+    } = body;
 
     if (!images || !Array.isArray(images) || images.length === 0) {
       return NextResponse.json(
@@ -12,9 +19,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (images.length > 5) {
+    if (images.length > MAX_IMAGES) {
       return NextResponse.json(
-        { error: "Maximum 5 images allowed" },
+        { error: `Maximum ${MAX_IMAGES} images allowed` },
         { status: 400 }
       );
     }
@@ -43,7 +50,96 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    const analysisPrompt = `You are a brand visual analyst. Analyze these ${images.length} example social media post images from the same brand.
+    // Build the analysis prompt - enhanced version for brand style generation
+    const platformContext = platforms && platforms.length > 0
+      ? `These images are from: ${platforms.join(", ")}. `
+      : "";
+
+    const analysisPrompt = generateBrandStyle
+      ? `You are an expert brand visual analyst and AI prompt engineer. Analyze these ${images.length} example social media post images from the same brand. ${platformContext}
+
+Your task is to extract EVERY visual detail needed to recreate this brand's exact look in AI-generated images.
+
+## EXTRACTION REQUIREMENTS
+
+### 1. COLOR PALETTE (be EXACT with hex codes)
+- Primary brand color (most dominant, used for emphasis)
+- Secondary color (supporting color)
+- Accent color (for highlights, CTAs, emphasis)
+- Background color(s) (what backgrounds are used)
+- Text color(s) (for headlines and body text)
+- Any additional colors that appear consistently
+
+### 2. TYPOGRAPHY (describe in detail)
+- Headline font characteristics: weight (thin/regular/bold/black), style (sans-serif/serif/display/script), case (uppercase/lowercase/mixed), any effects
+- Body text font characteristics: weight, style, size relative to headlines
+- Distinctive treatments: letter spacing, line height, text shadows, outlines, gradients on text
+- If you can identify specific fonts, name them
+
+### 3. VISUAL STYLE & COMPOSITION
+- Overall aesthetic category: minimalist, bold, elegant, playful, corporate, edgy, etc.
+- Image style if used: photography (candid/studio/lifestyle/product), illustration (flat/3D/hand-drawn), abstract, none
+- Graphic elements: shapes, lines, patterns, textures, gradients
+- Layout patterns: centered, asymmetric, grid-based, full-bleed, with margins
+- Text placement: where is text typically positioned? How much space around it?
+- Background treatment: solid, gradient, photo, pattern, texture
+
+### 4. MOOD & EMOTIONAL QUALITY
+- Overall feel: professional, friendly, luxurious, energetic, calm, bold, minimal
+- Contrast level: high contrast, muted, balanced
+- Energy level: dynamic, static, flowing
+- Sophistication level: casual, refined, premium
+
+### 5. RECURRING ELEMENTS (critical for consistency)
+- Logo placement and size
+- Border or frame styles
+- Overlay treatments (gradient overlays, color washes)
+- Icon or symbol usage
+- Any signature design elements that appear repeatedly
+- Spacing and margin patterns
+
+### 6. LAYOUT PATTERNS (for carousels especially)
+- How are hook/title slides designed?
+- How are content slides designed?
+- How are CTA/follow slides designed?
+- Consistency rules across slides
+
+## OUTPUT FORMAT
+
+Create a comprehensive MASTER BRAND PROMPT that will serve as the PRIMARY AUTHORITY for all AI image generation. This prompt must be detailed enough that an AI can recreate the exact visual style without seeing the original images.
+
+{
+  "colors": {
+    "primary": "#hexcode",
+    "secondary": "#hexcode",
+    "accent": "#hexcode",
+    "background": "#hexcode",
+    "text": "#hexcode",
+    "additional": ["#hex1", "#hex2"]
+  },
+  "typography": {
+    "headline_style": "Detailed description of headline typography",
+    "body_style": "Detailed description of body text typography",
+    "treatments": "Special treatments like shadows, spacing, effects",
+    "detected_fonts": ["Font Name 1", "Font Name 2"]
+  },
+  "visual_style": "Comprehensive description of the overall visual aesthetic",
+  "image_style": "Photography/illustration style if applicable",
+  "mood": "Emotional quality and feel",
+  "layout_patterns": ["Pattern 1", "Pattern 2"],
+  "consistent_elements": ["Element 1", "Element 2", "Element 3"],
+  "platform_variations": {
+    "instagram": "Any Instagram-specific style notes",
+    "twitter": "Any Twitter-specific style notes",
+    "linkedin": "Any LinkedIn-specific style notes"
+  },
+  "master_brand_prompt": "A COMPREHENSIVE 3-4 paragraph prompt that describes EXACTLY how to recreate this brand's visual style. This is the MOST IMPORTANT output. Include:\\n\\n1. Specific hex colors and where each is used\\n2. Exact typography specifications\\n3. Layout and composition rules\\n4. Background treatment details\\n5. Consistent design elements to include\\n6. Mood and aesthetic direction\\n7. What to AVOID that would break the brand style\\n\\nThis prompt will be the PRIMARY AUTHORITY for all image generation, so be extremely specific and actionable."
+}
+
+CRITICAL: The master_brand_prompt must be detailed enough that someone could recreate the brand's look perfectly just from reading it. Include specific hex codes, typography details, spacing preferences, and mood direction. Do NOT be vague - be precise and actionable.
+
+Respond ONLY with valid JSON, no additional text.`
+      : `You are a brand visual analyst. Analyze these ${images.length} example social media post images from the same brand.
 
 Extract and describe the following visual brand elements in detail:
 
