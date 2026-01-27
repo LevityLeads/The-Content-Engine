@@ -70,6 +70,80 @@ export interface ApprovedStyle {
   addedAt: string; // ISO timestamp
 }
 
+// Platform-specific example posts with category labels
+export interface ExamplePost {
+  id: string;
+  url: string; // base64 or URL
+  platform?: 'instagram' | 'twitter' | 'linkedin' | 'facebook' | 'general';
+  contentType?: 'carousel' | 'single' | 'story' | 'general';
+  addedAt: string;
+}
+
+// Comprehensive brand style extracted from example posts
+export interface BrandStyle {
+  id: string;
+  name: string;
+  isCustom: true; // Distinguishes from preset styles
+
+  // Core visual identity (extracted from examples)
+  colorPalette: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    text: string;
+    additionalColors?: string[];
+  };
+
+  // Typography extracted from examples
+  typography: {
+    headlineStyle: string; // e.g., "Bold sans-serif, all caps"
+    bodyStyle: string;
+    treatments: string; // e.g., "Letter spacing, drop shadows"
+    detectedFonts?: string[];
+  };
+
+  // Visual characteristics
+  visualCharacteristics: {
+    style: string; // Overall style description
+    mood: string; // Emotional quality
+    layoutPatterns: string[];
+    recurringElements: string[];
+    imageStyle?: string; // Photography/illustration style
+  };
+
+  // The master prompt - THE PRIMARY AUTHORITY for image generation
+  masterPrompt: string;
+
+  // Platform-specific variations (optional)
+  platformVariations?: {
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
+
+  // Refinement history
+  refinementHistory?: Array<{
+    date: string;
+    feedback: string;
+    promptBefore: string;
+    promptAfter: string;
+  }>;
+
+  // Test images generated with this style
+  testImages?: Array<{
+    id: string;
+    url: string;
+    generatedAt: string;
+    feedback?: 'approved' | 'needs_work' | 'rejected';
+    notes?: string;
+  }>;
+
+  createdAt: string;
+  updatedAt: string;
+  sourceExampleCount: number; // How many examples were used to create this
+}
+
 export interface VisualConfig {
   primary_color?: string;
   secondary_color?: string;
@@ -81,11 +155,16 @@ export interface VisualConfig {
   image_style?: string;
   extracted_images?: string[];
   color_palette?: string[];
-  example_posts?: string[]; // User-uploaded example images (base64 or URLs)
-  master_brand_prompt?: string; // AI-generated visual brand description from example posts
+  example_posts?: string[]; // Legacy: simple base64 array (kept for backwards compat)
+  examplePostsV2?: ExamplePost[]; // Enhanced: structured example posts with metadata
+  master_brand_prompt?: string; // Legacy: simple string prompt (kept for backwards compat)
+  brandStyle?: BrandStyle; // Enhanced: comprehensive brand style with full control
   savedDesignSystems?: SavedDesignSystemPreset[]; // Saved design system presets
   defaultStyle?: BrandDefaultStyle; // Default style selected during onboarding
   approvedStyles?: ApprovedStyle[]; // Style palette - all approved styles for this brand
+
+  // New: preference for using custom brand style over presets
+  useBrandStylePriority?: boolean; // When true, brandStyle takes complete precedence
 }
 
 export interface BrandWithConfig extends Omit<Brand, "voice_config" | "visual_config"> {
