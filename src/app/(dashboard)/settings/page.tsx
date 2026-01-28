@@ -210,6 +210,14 @@ function SettingsPageContent() {
         updates = { voice_config: voiceConfig };
         break;
       case "visual":
+        // Debug: log what's being saved
+        console.log("[Settings] Saving visual_config:", {
+          hasBrandStyle: !!visualConfig.brandStyle,
+          brandStyleId: visualConfig.brandStyle?.id,
+          masterPromptLength: visualConfig.brandStyle?.masterPrompt?.length,
+          testImagesCount: visualConfig.brandStyle?.testImages?.length,
+          examplePostsV2Count: visualConfig.examplePostsV2?.length,
+        });
         updates = { visual_config: visualConfig };
         break;
     }
@@ -217,6 +225,19 @@ function SettingsPageContent() {
     const result = await updateBrand(selectedBrand.id, updates);
 
     if (result) {
+      // Debug: log what was returned
+      if (section === "visual") {
+        console.log("[Settings] Save result visual_config:", {
+          hasBrandStyle: !!result.visual_config?.brandStyle,
+          brandStyleId: result.visual_config?.brandStyle?.id,
+          masterPromptLength: result.visual_config?.brandStyle?.masterPrompt?.length,
+        });
+        // Ensure local state is synced with what was saved
+        // This prevents race conditions with the useEffect that syncs from selectedBrand
+        if (result.visual_config) {
+          setVisualConfig(result.visual_config);
+        }
+      }
       setSaveMessage({ type: "success", text: "Settings saved!" });
     } else {
       setSaveMessage({ type: "error", text: "Failed to save settings" });
