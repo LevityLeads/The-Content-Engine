@@ -19,6 +19,17 @@ interface BrandVisualConfig {
   primary_color?: string;
   accent_color?: string;
   color_palette?: string[];
+  brandStyle?: {
+    masterPrompt?: string;
+    colorPalette?: {
+      primary: string;
+      secondary: string;
+      accent: string;
+      background: string;
+      text: string;
+    };
+  };
+  useBrandStylePriority?: boolean;
 }
 
 // Visual style descriptions for prompt generation
@@ -250,7 +261,7 @@ OUTPUT: Return ONLY the image prompt with a unique scene for this specific slide
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { contentId, slides, visualStyle, mediaType, brandId, forceRegenerate } = body;
+    const { contentId, slides, visualStyle, mediaType, brandId, forceRegenerate, useBrandStylePriority, treatment } = body;
     const effectiveStyle = visualStyle || "typography";
     const effectiveMediaType = (mediaType || "image") as "image" | "video";
 
@@ -302,6 +313,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch brand info for design system constraints
     let brandConfig: BrandVisualConfig | null = null;
+    let masterBrandPrompt: string | null = null;
     if (brandId) {
       const { data: brand } = await supabase
         .from("brands")
@@ -311,6 +323,12 @@ export async function POST(request: NextRequest) {
 
       if (brand?.visual_config) {
         brandConfig = brand.visual_config as BrandVisualConfig;
+
+        // Extract master brand prompt if using brand style priority
+        if (useBrandStylePriority && brandConfig.brandStyle?.masterPrompt) {
+          masterBrandPrompt = brandConfig.brandStyle.masterPrompt;
+          console.log(`[Prompts API] Using brand style priority with master prompt (${masterBrandPrompt.length} chars)`);
+        }
       }
     }
 
@@ -423,7 +441,19 @@ export async function POST(request: NextRequest) {
       });
 
       // Extract the generated prompt
-      const generatedPrompt = extractTextContent(response).trim();
+      let generatedPrompt = extractTextContent(response).trim();
+
+      // If using brand style priority, prepend the master brand prompt
+      // This ensures the brand's visual identity is the PRIMARY AUTHORITY
+      // The slide prompt then layers specific content on top
+      if (masterBrandPrompt) {
+        generatedPrompt = `${masterBrandPrompt}
+
+---
+NOW CREATE THIS SPECIFIC SLIDE:
+${generatedPrompt}`;
+        console.log(`[Prompts API] Prepended master brand prompt to slide ${slideNumber}`);
+      }
 
       prompts.push({
         slideNumber,

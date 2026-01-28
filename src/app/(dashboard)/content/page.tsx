@@ -121,6 +121,7 @@ const statusColors: Record<string, string> = {
 
 // Visual style options for style change
 const visualStyleOptions = [
+  { id: "brand-default", label: "Default Brand Style", description: "Uses your brand's master prompt" },
   { id: "typography", label: "Typography", description: "Bold text-focused" },
   { id: "photorealistic", label: "Photo", description: "Photo-quality backgrounds" },
   { id: "illustration", label: "Illustration", description: "Hand-drawn art" },
@@ -128,6 +129,16 @@ const visualStyleOptions = [
   { id: "abstract-art", label: "Abstract", description: "Bold shapes & gradients" },
   { id: "collage", label: "Collage", description: "Mixed media layers" },
   { id: "experimental", label: "Experimental", description: "Wild & boundary-pushing" },
+];
+
+// Treatment options (subset of visual styles that can layer on brand style)
+const treatmentOptions = [
+  { id: "none", label: "No Treatment", description: "Pure brand style only" },
+  { id: "typography", label: "Typography", description: "Bold text-focused" },
+  { id: "photorealistic", label: "Photo", description: "Photo-quality backgrounds" },
+  { id: "illustration", label: "Illustration", description: "Hand-drawn art" },
+  { id: "3d-render", label: "3D Render", description: "Modern 3D scenes" },
+  { id: "abstract-art", label: "Abstract", description: "Bold shapes & gradients" },
 ];
 
 export default function ContentPage() {
@@ -771,6 +782,10 @@ export default function ContentPage() {
     try {
       const contentItem = content.find((c) => c.id === contentId);
       const currentStyle = getEffectiveStyle(contentId, contentItem?.metadata);
+      const currentTreatment = getEffectiveTreatment(contentId);
+
+      // Determine if we should use brand style priority (brand-default mode)
+      const useBrandStylePriority = currentStyle === "brand-default" && hasCustomBrandStyle;
 
       // First generate prompts for all slides
       const promptResponse = await fetch("/api/prompts/generate", {
@@ -779,9 +794,11 @@ export default function ContentPage() {
         body: JSON.stringify({
           contentId,
           slides: slides.map((s) => ({ slideNumber: s.slideNumber, text: s.text })),
-          visualStyle: currentStyle,
+          visualStyle: useBrandStylePriority ? (currentTreatment !== "none" ? currentTreatment : "typography") : currentStyle,
           mediaType: "image",
           brandId: selectedBrand?.id,
+          useBrandStylePriority, // When true, master brand prompt is prepended to all prompts
+          treatment: currentTreatment !== "none" ? currentTreatment : undefined, // Optional visual treatment
         }),
       });
 
@@ -834,9 +851,13 @@ export default function ContentPage() {
   const handleRegenerateStyle = async (contentId: string, slides: CarouselSlide[], andGenerateImages: boolean = false) => {
     const contentItem = content.find((c) => c.id === contentId);
     const currentStyle = getEffectiveStyle(contentId, contentItem?.metadata);
+    const currentTreatment = getEffectiveTreatment(contentId);
+
+    // Determine if we should use brand style priority (brand-default mode)
+    const useBrandStylePriority = currentStyle === "brand-default" && hasCustomBrandStyle;
 
     setRegeneratingStyle(contentId);
-    setImageMessage(`Regenerating ${currentStyle} style design system...`);
+    setImageMessage(`Regenerating ${useBrandStylePriority ? "brand" : currentStyle} style design system...`);
 
     try {
       const promptResponse = await fetch("/api/prompts/generate", {
@@ -845,10 +866,12 @@ export default function ContentPage() {
         body: JSON.stringify({
           contentId,
           slides: slides.map((s) => ({ slideNumber: s.slideNumber, text: s.text })),
-          visualStyle: currentStyle,
+          visualStyle: useBrandStylePriority ? (currentTreatment !== "none" ? currentTreatment : "typography") : currentStyle,
           mediaType: "image",
           brandId: selectedBrand?.id,
           forceRegenerate: true, // Force regenerate the design system
+          useBrandStylePriority, // When true, master brand prompt is prepended to all prompts
+          treatment: currentTreatment !== "none" ? currentTreatment : undefined, // Optional visual treatment
         }),
       });
 
@@ -1920,19 +1943,36 @@ export default function ContentPage() {
     return "typography";
   };
 
+  // Check if brand has a custom brand style with master prompt
+  const hasCustomBrandStyle = useMemo(() => {
+    return !!(selectedBrand?.visual_config?.brandStyle?.masterPrompt &&
+              selectedBrand?.visual_config?.useBrandStylePriority);
+  }, [selectedBrand?.visual_config?.brandStyle?.masterPrompt, selectedBrand?.visual_config?.useBrandStylePriority]);
+
   // Get effective style for a content item, with brand default as fallback
   const getEffectiveStyle = (contentId: string, contentMetadata?: Content["metadata"]): string => {
-    // Priority: 1. User selection, 2. Content saved style, 3. Brand default, 4. "typography"
+    // Priority: 1. User selection, 2. Content saved style, 3. Brand custom style, 4. Brand default preset, 5. "typography"
     if (selectedVisualStyle[contentId]) {
       return selectedVisualStyle[contentId];
     }
     if (contentMetadata?.carouselStyle) {
       return getCarouselStyleId(contentMetadata.carouselStyle);
     }
+    // If brand has custom style with master prompt, use brand-default
+    if (hasCustomBrandStyle) {
+      return "brand-default";
+    }
     if (selectedBrand?.visual_config?.defaultStyle?.visualStyle) {
       return selectedBrand.visual_config.defaultStyle.visualStyle;
     }
     return "typography";
+  };
+
+  // Get treatment for a content item (only relevant when using brand-default style)
+  const [selectedTreatment, setSelectedTreatment] = useState<Record<string, string>>({});
+
+  const getEffectiveTreatment = (contentId: string): string => {
+    return selectedTreatment[contentId] || "none";
   };
 
   // Helper to update content metadata locally (for immediate UI feedback)
@@ -2241,95 +2281,161 @@ export default function ContentPage() {
               </div>
 
               {/* Visual Style Selector */}
-              <div>
+              <div className="space-y-2">
                 <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                  Visual Style
-                  {selectedBrand?.visual_config?.defaultStyle && !selectedVisualStyle[item.id] && !item.metadata?.carouselStyle && (
-                    <span className="ml-1 text-primary">(brand default)</span>
+                  {hasCustomBrandStyle ? "Brand Style" : "Visual Style"}
+                  {hasCustomBrandStyle && getEffectiveStyle(item.id, item.metadata) === "brand-default" && (
+                    <span className="ml-1 text-primary">(custom)</span>
                   )}
                 </label>
-                <div className="flex gap-1">
-                  <select
-                    className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
-                    value={getEffectiveStyle(item.id, item.metadata)}
-                    onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                  >
-                    {visualStyleOptions.map((style) => (
-                      <option key={style.id} value={style.id}>{style.label}</option>
-                    ))}
-                  </select>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    onClick={() => handleRegenerateStyle(item.id, slides, false)}
-                    disabled={regeneratingStyle === item.id}
-                    title="Regenerate style design system"
-                  >
-                    {regeneratingStyle === item.id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3 w-3" />
-                    )}
-                  </Button>
-                  {/* Presets Menu */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7 shrink-0"
-                        title="Style presets"
-                      >
-                        <MoreVertical className="h-3 w-3" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64 p-2" align="end">
-                      <div className="space-y-2">
-                        {/* Brand Style Palette - Quick picks from onboarding */}
-                        {selectedBrand?.visual_config?.approvedStyles && selectedBrand.visual_config.approvedStyles.length > 0 && (
-                          <>
-                            <div className="text-xs font-medium text-muted-foreground px-1">Brand Style Palette</div>
-                            <div className="grid grid-cols-3 gap-1">
-                              {selectedBrand.visual_config.approvedStyles.map((style: ApprovedStyle) => (
-                                <button
-                                  key={style.id}
-                                  className={cn(
-                                    "relative rounded-md overflow-hidden border-2 transition-all aspect-[4/5]",
-                                    getEffectiveStyle(item.id, item.metadata) === style.visualStyle
-                                      ? "border-primary ring-1 ring-primary"
-                                      : "border-muted hover:border-primary/50"
-                                  )}
-                                  onClick={() => {
-                                    setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: style.visualStyle }));
-                                    if (style.designSystem) {
-                                      // Apply the design system from the approved style
-                                      const newDesignSystems = {
-                                        ...(item.metadata?.designSystems || {}),
-                                        [style.visualStyle]: style.designSystem,
-                                      };
-                                      updateContentMetadata(item.id, { designSystems: newDesignSystems });
-                                    }
-                                  }}
-                                  title={style.name}
-                                >
-                                  {style.sampleImage ? (
-                                    <img
-                                      src={style.sampleImage}
-                                      alt={style.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-muted flex items-center justify-center">
-                                      <span className="text-[8px] text-muted-foreground text-center px-1">{style.name}</span>
-                                    </div>
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="border-t border-muted my-1" />
-                          </>
-                        )}
+
+                {/* Show brand style info when active */}
+                {hasCustomBrandStyle && getEffectiveStyle(item.id, item.metadata) === "brand-default" ? (
+                  <div className="space-y-2">
+                    {/* Brand Style Badge */}
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-primary/10 border border-primary/30">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-medium text-primary">Default Brand Style</span>
+                    </div>
+
+                    {/* Treatment Selector */}
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                        Treatment (optional)
+                      </label>
+                      <div className="flex gap-1">
+                        <select
+                          className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
+                          value={getEffectiveTreatment(item.id)}
+                          onChange={(e) => setSelectedTreatment((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                        >
+                          {treatmentOptions.map((treatment) => (
+                            <option key={treatment.id} value={treatment.id}>{treatment.label}</option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => {
+                            // Switch to non-brand style mode
+                            setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: "typography" }));
+                          }}
+                        >
+                          Change Style
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Master brand prompt is always applied. Treatment adds visual variation.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  /* Standard Visual Style Selector */
+                  <div className="flex gap-1">
+                    <select
+                      className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
+                      value={getEffectiveStyle(item.id, item.metadata)}
+                      onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                    >
+                      {/* Show brand-default option only if brand has custom style */}
+                      {hasCustomBrandStyle && (
+                        <option value="brand-default">Default Brand Style</option>
+                      )}
+                      {visualStyleOptions.filter(s => s.id !== "brand-default").map((style) => (
+                        <option key={style.id} value={style.id}>{style.label}</option>
+                      ))}
+                    </select>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => handleRegenerateStyle(item.id, slides, false)}
+                      disabled={regeneratingStyle === item.id}
+                      title="Regenerate style design system"
+                    >
+                      {regeneratingStyle === item.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                    </Button>
+                    {/* Presets Menu */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          title="Style presets"
+                        >
+                          <MoreVertical className="h-3 w-3" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-2" align="end">
+                        <div className="space-y-2">
+                          {/* Use Brand Default Option */}
+                          {hasCustomBrandStyle && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full justify-start h-7 text-xs"
+                                onClick={() => {
+                                  setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: "brand-default" }));
+                                }}
+                              >
+                                <Sparkles className="h-3 w-3 mr-2 text-primary" />
+                                Use Default Brand Style
+                              </Button>
+                              <div className="border-t border-muted my-1" />
+                            </>
+                          )}
+
+                          {/* Brand Style Palette - Quick picks from onboarding */}
+                          {selectedBrand?.visual_config?.approvedStyles && selectedBrand.visual_config.approvedStyles.length > 0 && (
+                            <>
+                              <div className="text-xs font-medium text-muted-foreground px-1">Brand Style Palette</div>
+                              <div className="grid grid-cols-3 gap-1">
+                                {selectedBrand.visual_config.approvedStyles.map((style: ApprovedStyle) => (
+                                  <button
+                                    key={style.id}
+                                    className={cn(
+                                      "relative rounded-md overflow-hidden border-2 transition-all aspect-[4/5]",
+                                      getEffectiveStyle(item.id, item.metadata) === style.visualStyle
+                                        ? "border-primary ring-1 ring-primary"
+                                        : "border-muted hover:border-primary/50"
+                                    )}
+                                    onClick={() => {
+                                      setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: style.visualStyle }));
+                                      if (style.designSystem) {
+                                        // Apply the design system from the approved style
+                                        const newDesignSystems = {
+                                          ...(item.metadata?.designSystems || {}),
+                                          [style.visualStyle]: style.designSystem,
+                                        };
+                                        updateContentMetadata(item.id, { designSystems: newDesignSystems });
+                                      }
+                                    }}
+                                    title={style.name}
+                                  >
+                                    {style.sampleImage ? (
+                                      <img
+                                        src={style.sampleImage}
+                                        alt={style.name}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                                        <span className="text-[8px] text-muted-foreground text-center px-1">{style.name}</span>
+                                      </div>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="border-t border-muted my-1" />
+                            </>
+                          )}
 
                         <div className="text-xs font-medium text-muted-foreground px-1">Style Presets</div>
                         {/* Save current design system */}
@@ -2381,7 +2487,8 @@ export default function ContentPage() {
                       </div>
                     </PopoverContent>
                   </Popover>
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Generate All Images Button */}
@@ -2512,147 +2619,214 @@ export default function ContentPage() {
               </div>
 
               {/* Visual Style Selector */}
-              <div>
+              <div className="space-y-2">
                 <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
-                  Visual Style
-                  {selectedBrand?.visual_config?.defaultStyle && !selectedVisualStyle[item.id] && !item.metadata?.carouselStyle && (
-                    <span className="ml-1 text-primary">(brand default)</span>
+                  {hasCustomBrandStyle ? "Brand Style" : "Visual Style"}
+                  {hasCustomBrandStyle && getEffectiveStyle(item.id, item.metadata) === "brand-default" && (
+                    <span className="ml-1 text-primary">(custom)</span>
                   )}
                 </label>
-                <div className="flex gap-1">
-                  <select
-                    className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
-                    value={getEffectiveStyle(item.id, item.metadata)}
-                    onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                  >
-                    {visualStyleOptions.map((style) => (
-                      <option key={style.id} value={style.id}>{style.label}</option>
-                    ))}
-                  </select>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    onClick={() => handleRegenerateStyle(item.id, slides, false)}
-                    disabled={regeneratingStyle === item.id}
-                    title="Regenerate style design system"
-                  >
-                    {regeneratingStyle === item.id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3 w-3" />
-                    )}
-                  </Button>
-                  {/* Presets Menu (Video Tab) */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7 shrink-0"
-                        title="Style presets"
-                      >
-                        <MoreVertical className="h-3 w-3" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64 p-2" align="end">
-                      <div className="space-y-2">
-                        {/* Brand Style Palette - Quick picks from onboarding */}
-                        {selectedBrand?.visual_config?.approvedStyles && selectedBrand.visual_config.approvedStyles.length > 0 && (
-                          <>
-                            <div className="text-xs font-medium text-muted-foreground px-1">Brand Style Palette</div>
-                            <div className="grid grid-cols-3 gap-1">
-                              {selectedBrand.visual_config.approvedStyles.map((style: ApprovedStyle) => (
-                                <button
-                                  key={style.id}
-                                  className={cn(
-                                    "relative rounded-md overflow-hidden border-2 transition-all aspect-[4/5]",
-                                    getEffectiveStyle(item.id, item.metadata) === style.visualStyle
-                                      ? "border-primary ring-1 ring-primary"
-                                      : "border-muted hover:border-primary/50"
-                                  )}
-                                  onClick={() => {
-                                    setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: style.visualStyle }));
-                                    if (style.designSystem) {
-                                      // Apply the design system from the approved style
-                                      const newDesignSystems = {
-                                        ...(item.metadata?.designSystems || {}),
-                                        [style.visualStyle]: style.designSystem,
-                                      };
-                                      updateContentMetadata(item.id, { designSystems: newDesignSystems });
-                                    }
-                                  }}
-                                  title={style.name}
-                                >
-                                  {style.sampleImage ? (
-                                    <img
-                                      src={style.sampleImage}
-                                      alt={style.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-muted flex items-center justify-center">
-                                      <span className="text-[8px] text-muted-foreground text-center px-1">{style.name}</span>
-                                    </div>
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                            <div className="border-t border-muted my-1" />
-                          </>
-                        )}
 
-                        <div className="text-xs font-medium text-muted-foreground px-1">Style Presets</div>
-                        {/* Save current design system */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start h-7 text-xs"
-                          onClick={() => openSavePresetDialog(item.id)}
-                          disabled={!item.metadata?.designSystems?.[getEffectiveStyle(item.id, item.metadata)]}
+                {/* Show brand style info when active */}
+                {hasCustomBrandStyle && getEffectiveStyle(item.id, item.metadata) === "brand-default" ? (
+                  <div className="space-y-2">
+                    {/* Brand Style Badge */}
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-primary/10 border border-primary/30">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-medium text-primary">Default Brand Style</span>
+                    </div>
+
+                    {/* Treatment Selector */}
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                        Treatment (optional)
+                      </label>
+                      <div className="flex gap-1">
+                        <select
+                          className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
+                          value={getEffectiveTreatment(item.id)}
+                          onChange={(e) => setSelectedTreatment((prev) => ({ ...prev, [item.id]: e.target.value }))}
                         >
-                          <Save className="h-3 w-3 mr-2" />
-                          Save current style
+                          {treatmentOptions.map((treatment) => (
+                            <option key={treatment.id} value={treatment.id}>{treatment.label}</option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => {
+                            // Switch to non-brand style mode
+                            setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: "typography" }));
+                          }}
+                        >
+                          Change Style
                         </Button>
-                        {/* Load saved presets */}
-                        {selectedBrand?.visual_config?.savedDesignSystems && selectedBrand.visual_config.savedDesignSystems.length > 0 ? (
-                          <>
-                            <div className="border-t border-muted my-1" />
-                            <div className="text-[10px] text-muted-foreground px-1 py-1">Saved Presets</div>
-                            {selectedBrand.visual_config.savedDesignSystems.map((preset) => (
-                              <div key={preset.id} className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="flex-1 justify-start h-7 text-xs"
-                                  onClick={() => handleLoadPreset(item.id, preset)}
-                                  disabled={loadingPreset === item.id}
-                                >
-                                  <FolderOpen className="h-3 w-3 mr-2" />
-                                  <span className="truncate">{preset.name}</span>
-                                  <span className="ml-auto text-[10px] text-muted-foreground">{preset.visualStyle}</span>
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
-                                  onClick={() => handleDeletePreset(preset.id)}
-                                  title="Delete preset"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
-                          </>
-                        ) : (
-                          <div className="text-[10px] text-muted-foreground px-1 py-2">
-                            No saved presets yet. Generate images, then save the style to reuse it.
-                          </div>
-                        )}
                       </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Master brand prompt is always applied. Treatment adds visual variation.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  /* Standard Visual Style Selector */
+                  <div className="flex gap-1">
+                    <select
+                      className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs"
+                      value={getEffectiveStyle(item.id, item.metadata)}
+                      onChange={(e) => setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                    >
+                      {/* Show brand-default option only if brand has custom style */}
+                      {hasCustomBrandStyle && (
+                        <option value="brand-default">Default Brand Style</option>
+                      )}
+                      {visualStyleOptions.filter(s => s.id !== "brand-default").map((style) => (
+                        <option key={style.id} value={style.id}>{style.label}</option>
+                      ))}
+                    </select>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => handleRegenerateStyle(item.id, slides, false)}
+                      disabled={regeneratingStyle === item.id}
+                      title="Regenerate style design system"
+                    >
+                      {regeneratingStyle === item.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                    </Button>
+                    {/* Presets Menu (Video Tab) */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          title="Style presets"
+                        >
+                          <MoreVertical className="h-3 w-3" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-2" align="end">
+                        <div className="space-y-2">
+                          {/* Use Brand Default Option */}
+                          {hasCustomBrandStyle && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-full justify-start h-7 text-xs"
+                                onClick={() => {
+                                  setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: "brand-default" }));
+                                }}
+                              >
+                                <Sparkles className="h-3 w-3 mr-2 text-primary" />
+                                Use Default Brand Style
+                              </Button>
+                              <div className="border-t border-muted my-1" />
+                            </>
+                          )}
+
+                          {/* Brand Style Palette - Quick picks from onboarding */}
+                          {selectedBrand?.visual_config?.approvedStyles && selectedBrand.visual_config.approvedStyles.length > 0 && (
+                            <>
+                              <div className="text-xs font-medium text-muted-foreground px-1">Brand Style Palette</div>
+                              <div className="grid grid-cols-3 gap-1">
+                                {selectedBrand.visual_config.approvedStyles.map((style: ApprovedStyle) => (
+                                  <button
+                                    key={style.id}
+                                    className={cn(
+                                      "relative rounded-md overflow-hidden border-2 transition-all aspect-[4/5]",
+                                      getEffectiveStyle(item.id, item.metadata) === style.visualStyle
+                                        ? "border-primary ring-1 ring-primary"
+                                        : "border-muted hover:border-primary/50"
+                                    )}
+                                    onClick={() => {
+                                      setSelectedVisualStyle((prev) => ({ ...prev, [item.id]: style.visualStyle }));
+                                      if (style.designSystem) {
+                                        // Apply the design system from the approved style
+                                        const newDesignSystems = {
+                                          ...(item.metadata?.designSystems || {}),
+                                          [style.visualStyle]: style.designSystem,
+                                        };
+                                        updateContentMetadata(item.id, { designSystems: newDesignSystems });
+                                      }
+                                    }}
+                                    title={style.name}
+                                  >
+                                    {style.sampleImage ? (
+                                      <img
+                                        src={style.sampleImage}
+                                        alt={style.name}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                                        <span className="text-[8px] text-muted-foreground text-center px-1">{style.name}</span>
+                                      </div>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="border-t border-muted my-1" />
+                            </>
+                          )}
+
+                          <div className="text-xs font-medium text-muted-foreground px-1">Style Presets</div>
+                          {/* Save current design system */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start h-7 text-xs"
+                            onClick={() => openSavePresetDialog(item.id)}
+                            disabled={!item.metadata?.designSystems?.[getEffectiveStyle(item.id, item.metadata)]}
+                          >
+                            <Save className="h-3 w-3 mr-2" />
+                            Save current style
+                          </Button>
+                          {/* Load saved presets */}
+                          {selectedBrand?.visual_config?.savedDesignSystems && selectedBrand.visual_config.savedDesignSystems.length > 0 ? (
+                            <>
+                              <div className="border-t border-muted my-1" />
+                              <div className="text-[10px] text-muted-foreground px-1 py-1">Saved Presets</div>
+                              {selectedBrand.visual_config.savedDesignSystems.map((preset) => (
+                                <div key={preset.id} className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex-1 justify-start h-7 text-xs"
+                                    onClick={() => handleLoadPreset(item.id, preset)}
+                                    disabled={loadingPreset === item.id}
+                                  >
+                                    <FolderOpen className="h-3 w-3 mr-2" />
+                                    <span className="truncate">{preset.name}</span>
+                                    <span className="ml-auto text-[10px] text-muted-foreground">{preset.visualStyle}</span>
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                                    onClick={() => handleDeletePreset(preset.id)}
+                                    title="Delete preset"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </>
+                          ) : (
+                            <div className="text-[10px] text-muted-foreground px-1 py-2">
+                              No saved presets yet. Generate images, then save the style to reuse it.
+                            </div>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
               </div>
 
               {/* Duration and Audio Settings */}
