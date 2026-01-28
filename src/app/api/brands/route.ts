@@ -37,6 +37,21 @@ export async function GET() {
         );
       }
 
+      // Debug logging for brand style persistence
+      if (brands && brands.length > 0) {
+        for (const brand of brands) {
+          const vc = brand.visual_config as Record<string, unknown> | null;
+          if (vc?.brandStyle) {
+            const brandStyle = vc.brandStyle as Record<string, unknown>;
+            console.log(`[Brands API] GET brand "${brand.name}" has brandStyle:`, {
+              id: brandStyle.id,
+              masterPromptLength: (brandStyle.masterPrompt as string)?.length,
+              testImagesCount: (brandStyle.testImages as unknown[])?.length,
+            });
+          }
+        }
+      }
+
       return NextResponse.json(
         {
           success: true,
@@ -171,6 +186,19 @@ export async function PATCH(request: NextRequest) {
     // Add updated_at timestamp
     updates.updated_at = new Date().toISOString();
 
+    // Debug logging for visual_config saves
+    if (updates.visual_config) {
+      const vc = updates.visual_config;
+      console.log("[Brands API] PATCH visual_config received:", {
+        hasBrandStyle: !!vc.brandStyle,
+        brandStyleId: vc.brandStyle?.id,
+        masterPromptLength: vc.brandStyle?.masterPrompt?.length,
+        testImagesCount: vc.brandStyle?.testImages?.length,
+        examplePostsV2Count: vc.examplePostsV2?.length,
+        useBrandStylePriority: vc.useBrandStylePriority,
+      });
+    }
+
     const { data: brand, error } = await supabase
       .from("brands")
       .update(updates)
@@ -184,6 +212,17 @@ export async function PATCH(request: NextRequest) {
         { error: "Failed to update brand" },
         { status: 500 }
       );
+    }
+
+    // Debug logging for what was saved
+    if (updates.visual_config && brand?.visual_config) {
+      const vc = brand.visual_config as Record<string, unknown>;
+      const brandStyle = vc.brandStyle as Record<string, unknown> | undefined;
+      console.log("[Brands API] PATCH visual_config saved:", {
+        hasBrandStyle: !!brandStyle,
+        brandStyleId: brandStyle?.id,
+        masterPromptLength: (brandStyle?.masterPrompt as string)?.length,
+      });
     }
 
     return NextResponse.json({
