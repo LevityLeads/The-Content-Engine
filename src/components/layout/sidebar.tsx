@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandSwitcher } from "@/components/brand/brand-switcher";
-import { BrandCreationDialog } from "@/components/brand/brand-creation-dialog";
+import { SimplifiedBrandOnboarding } from "@/components/brand/simplified-brand-onboarding";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 const navigation = [
@@ -170,7 +170,7 @@ export function MobileHeader() {
       </Sheet>
 
       {/* Brand Creation Dialog */}
-      <BrandCreationDialog
+      <SimplifiedBrandOnboarding
         open={showBrandDialog}
         onOpenChange={setShowBrandDialog}
       />
@@ -189,7 +189,7 @@ export function Sidebar() {
       </div>
 
       {/* Brand Creation Dialog */}
-      <BrandCreationDialog
+      <SimplifiedBrandOnboarding
         open={showBrandDialog}
         onOpenChange={setShowBrandDialog}
       />
