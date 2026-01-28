@@ -12,7 +12,6 @@ import { useBrand, VoiceConfig, VisualConfig, BrandDefaultStyle, ApprovedStyle }
 import { StrictnessSlider } from "@/components/brand/strictness-slider";
 import { BrandDeletionDialog } from "@/components/brand/brand-deletion-dialog";
 import { StylePickerDialog } from "@/components/brand/style-picker-dialog";
-import { BrandStyleEditor } from "@/components/brand/brand-style-editor";
 import { type BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
 import { VIDEO_MODELS, type VideoModelKey } from "@/lib/video-models";
 import { formatCost } from "@/lib/video-utils";
@@ -762,228 +761,111 @@ function SettingsPageContent() {
         </CardContent>
       </Card>
 
-      {/* Voice Configuration */}
-      <Card>
+      {/* Unified Brand Style Section */}
+      <Card className="border-primary/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Volume2 className="h-5 w-5" />
-            Voice & Tone
+            <Palette className="h-5 w-5 text-primary" />
+            Brand Style
+            {visualConfig.brandStyle && (
+              <Badge variant="secondary" className="ml-2 text-xs">AI-Enhanced</Badge>
+            )}
           </CardTitle>
           <CardDescription>
-            Define how your content should sound across platforms
+            Your brand&apos;s complete visual and voice identity. Upload examples to let AI extract your style, or configure manually.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Brand Strictness */}
-          <StrictnessSlider
-            value={voiceConfig.strictness ?? 0.7}
-            onChange={(value) => setVoiceConfig({ ...voiceConfig, strictness: value })}
-          />
-
-          <div>
-            <label className="text-sm font-medium">Tone Keywords</label>
-            <p className="text-xs text-muted-foreground mb-2">
-              Words that describe your brand&apos;s voice (click to remove)
-            </p>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {voiceConfig.tone_keywords?.map((keyword) => (
-                <Badge
-                  key={keyword}
-                  className="cursor-pointer hover:bg-destructive/20"
-                  onClick={() => removeToneKeyword(keyword)}
-                >
-                  {keyword}
-                  <span className="ml-1">×</span>
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={newKeyword}
-                onChange={(e) => setNewKeyword(e.target.value)}
-                placeholder="Add keyword..."
-                className="flex-1"
-                onKeyDown={(e) => e.key === "Enter" && addToneKeyword()}
-              />
-              <Button variant="outline" size="sm" onClick={addToneKeyword}>
-                Add
-              </Button>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Words to Avoid</label>
-            <p className="text-xs text-muted-foreground mb-2">
-              Words your brand should never use (click to remove)
-            </p>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {voiceConfig.words_to_avoid?.map((word) => (
-                <Badge
-                  key={word}
-                  variant="destructive"
-                  className="cursor-pointer"
-                  onClick={() => removeAvoidWord(word)}
-                >
-                  {word}
-                  <span className="ml-1">×</span>
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={newAvoidWord}
-                onChange={(e) => setNewAvoidWord(e.target.value)}
-                placeholder="Add word to avoid..."
-                className="flex-1"
-                onKeyDown={(e) => e.key === "Enter" && addAvoidWord()}
-              />
-              <Button variant="outline" size="sm" onClick={addAvoidWord}>
-                Add
-              </Button>
-            </div>
-          </div>
-
-          {voiceConfig.extracted_voice?.writing_style && (
-            <div>
-              <label className="text-sm font-medium">Writing Style</label>
-              <p className="text-sm text-muted-foreground mt-1">
-                {voiceConfig.extracted_voice.writing_style}
-              </p>
-            </div>
-          )}
-
-          <div>
-            <label className="text-sm font-medium">Example Posts (Good)</label>
-            <Textarea
-              value={voiceConfig.example_posts?.join("\n\n") || ""}
-              onChange={(e) =>
-                setVoiceConfig({
-                  ...voiceConfig,
-                  example_posts: e.target.value.split("\n\n").filter(Boolean),
-                })
-              }
-              placeholder="Paste examples of posts that represent your ideal voice..."
-              className="mt-1"
-              rows={4}
-            />
-          </div>
-          <Button onClick={() => handleSave("voice")} disabled={isSaving}>
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Save Voice Settings
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Visual Brand */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            Visual Brand
-          </CardTitle>
-          <CardDescription>
-            Colors and style for generated images
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium">Primary Color</label>
-              <div className="mt-1 flex gap-2">
-                <input
-                  type="color"
-                  value={visualConfig.primary_color || "#1a1a1a"}
-                  onChange={(e) =>
-                    setVisualConfig({ ...visualConfig, primary_color: e.target.value })
-                  }
-                  className="h-10 w-14 p-1 rounded cursor-pointer"
-                />
-                <Input
-                  value={visualConfig.primary_color || "#1a1a1a"}
-                  onChange={(e) =>
-                    setVisualConfig({ ...visualConfig, primary_color: e.target.value })
-                  }
-                  className="flex-1 font-mono"
-                />
+        <CardContent className="space-y-6">
+          {/* Colors Section */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Palette className="h-4 w-4" />
+              Colors
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Primary Color</label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    type="color"
+                    value={visualConfig.primary_color || "#1a1a1a"}
+                    onChange={(e) =>
+                      setVisualConfig({ ...visualConfig, primary_color: e.target.value })
+                    }
+                    className="h-10 w-14 p-1 rounded cursor-pointer"
+                  />
+                  <Input
+                    value={visualConfig.primary_color || "#1a1a1a"}
+                    onChange={(e) =>
+                      setVisualConfig({ ...visualConfig, primary_color: e.target.value })
+                    }
+                    className="flex-1 font-mono"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Accent Color</label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    type="color"
+                    value={visualConfig.accent_color || "#3b82f6"}
+                    onChange={(e) =>
+                      setVisualConfig({ ...visualConfig, accent_color: e.target.value })
+                    }
+                    className="h-10 w-14 p-1 rounded cursor-pointer"
+                  />
+                  <Input
+                    value={visualConfig.accent_color || "#3b82f6"}
+                    onChange={(e) =>
+                      setVisualConfig({ ...visualConfig, accent_color: e.target.value })
+                    }
+                    className="flex-1 font-mono"
+                  />
+                </div>
               </div>
             </div>
-            <div>
-              <label className="text-sm font-medium">Accent Color</label>
-              <div className="mt-1 flex gap-2">
-                <input
-                  type="color"
-                  value={visualConfig.accent_color || "#3b82f6"}
-                  onChange={(e) =>
-                    setVisualConfig({ ...visualConfig, accent_color: e.target.value })
-                  }
-                  className="h-10 w-14 p-1 rounded cursor-pointer"
-                />
-                <Input
-                  value={visualConfig.accent_color || "#3b82f6"}
-                  onChange={(e) =>
-                    setVisualConfig({ ...visualConfig, accent_color: e.target.value })
-                  }
-                  className="flex-1 font-mono"
-                />
-              </div>
-            </div>
-          </div>
 
-          {/* Only show "Extracted" colors if URL analysis was done */}
-          {voiceConfig.source_url && visualConfig.color_palette && visualConfig.color_palette.length > 0 && (
-            <div>
-              <label className="text-sm font-medium">Extracted Color Palette</label>
-              <div className="mt-2 flex gap-2">
-                {visualConfig.color_palette.map((color, i) => (
-                  <div key={i} className="text-center">
-                    <div
-                      className="h-10 w-10 rounded border"
-                      style={{ backgroundColor: color }}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">{color}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="text-sm font-medium">Image Style</label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {["minimalist", "photorealistic", "illustrated", "3d", "abstract", "bold", "elegant"].map((style) => (
-                <Badge
-                  key={style}
-                  variant={visualConfig.image_style === style ? "default" : "outline"}
-                  className="cursor-pointer capitalize"
-                  onClick={() => setVisualConfig({ ...visualConfig, image_style: style })}
-                >
-                  {style}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* Brand Fonts */}
-          <div>
-            <label className="text-sm font-medium">Brand Fonts</label>
-            {visualConfig.fonts?.heading || visualConfig.fonts?.body ? (
-              <p className="text-xs text-muted-foreground mb-2">
-                Detected from your website - used for carousel text overlays
-              </p>
-            ) : (
-              <div className="mt-2 mb-3 p-3 rounded-lg border border-amber-500/50 bg-amber-500/10">
-                <p className="text-sm text-amber-200 font-medium">Fonts not detected</p>
-                <p className="text-xs text-amber-200/70 mt-1">
-                  Your website uses custom or proprietary fonts that couldn&apos;t be automatically detected.
-                  Please enter your brand fonts manually below for best results in generated content.
-                </p>
+            {/* Show extracted palette from brand style or website analysis */}
+            {(visualConfig.brandStyle?.colorPalette?.additionalColors?.length ||
+              (voiceConfig.source_url && visualConfig.color_palette?.length)) && (
+              <div>
+                <label className="text-xs text-muted-foreground">Extracted Palette</label>
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  {visualConfig.brandStyle?.colorPalette?.additionalColors?.map((color, i) => (
+                    <div key={`brand-${i}`} className="text-center">
+                      <div
+                        className="h-8 w-8 rounded border shadow-sm cursor-pointer hover:ring-2 ring-primary/50"
+                        style={{ backgroundColor: color }}
+                        onClick={() => setVisualConfig({ ...visualConfig, accent_color: color })}
+                        title="Click to use as accent"
+                      />
+                    </div>
+                  )) || visualConfig.color_palette?.map((color, i) => (
+                    <div key={`web-${i}`} className="text-center">
+                      <div
+                        className="h-8 w-8 rounded border shadow-sm cursor-pointer hover:ring-2 ring-primary/50"
+                        style={{ backgroundColor: color }}
+                        onClick={() => setVisualConfig({ ...visualConfig, accent_color: color })}
+                        title="Click to use as accent"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4 mt-2">
+          </div>
+
+          {/* Fonts Section */}
+          <div className="space-y-4 border-t pt-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Fonts
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
               <div className="p-3 rounded-lg border bg-muted/30">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Heading Font</div>
                 <Input
-                  value={visualConfig.fonts?.heading || ""}
+                  value={visualConfig.fonts?.heading || visualConfig.brandStyle?.typography?.detectedFonts?.[0] || ""}
                   onChange={(e) =>
                     setVisualConfig({
                       ...visualConfig,
@@ -993,12 +875,11 @@ function SettingsPageContent() {
                   className="font-semibold"
                   placeholder="e.g. Poppins, Montserrat"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Used for titles & headlines</p>
               </div>
               <div className="p-3 rounded-lg border bg-muted/30">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Body Font</div>
                 <Input
-                  value={visualConfig.fonts?.body || ""}
+                  value={visualConfig.fonts?.body || visualConfig.brandStyle?.typography?.detectedFonts?.[1] || ""}
                   onChange={(e) =>
                     setVisualConfig({
                       ...visualConfig,
@@ -1007,57 +888,259 @@ function SettingsPageContent() {
                   }
                   placeholder="e.g. Open Sans, Roboto"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Used for body text & captions</p>
               </div>
             </div>
+            {visualConfig.brandStyle?.typography && (
+              <p className="text-xs text-muted-foreground">
+                Style: {visualConfig.brandStyle.typography.headlineStyle} / {visualConfig.brandStyle.typography.bodyStyle}
+              </p>
+            )}
           </div>
 
+          {/* Voice & Tone Section */}
+          <div className="space-y-4 border-t pt-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Volume2 className="h-4 w-4" />
+              Voice & Tone
+            </h3>
 
-          {/* Only show "Extracted" images if URL analysis was done */}
-          {voiceConfig.source_url && visualConfig.extracted_images && visualConfig.extracted_images.length > 0 && (
+            {/* Brand Strictness */}
+            <StrictnessSlider
+              value={voiceConfig.strictness ?? 0.7}
+              onChange={(value) => setVoiceConfig({ ...voiceConfig, strictness: value })}
+            />
+
             <div>
-              <label className="text-sm font-medium">Extracted Images</label>
-              <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
-                {visualConfig.extracted_images.map((img, i) => (
+              <label className="text-sm font-medium">Tone Keywords</label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Words that describe your brand&apos;s voice (click to remove)
+              </p>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {voiceConfig.tone_keywords?.map((keyword) => (
+                  <Badge
+                    key={keyword}
+                    className="cursor-pointer hover:bg-destructive/20"
+                    onClick={() => removeToneKeyword(keyword)}
+                  >
+                    {keyword}
+                    <span className="ml-1">×</span>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={newKeyword}
+                  onChange={(e) => setNewKeyword(e.target.value)}
+                  placeholder="Add keyword..."
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && addToneKeyword()}
+                />
+                <Button variant="outline" size="sm" onClick={addToneKeyword}>
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Words to Avoid</label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Words your brand should never use (click to remove)
+              </p>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {voiceConfig.words_to_avoid?.map((word) => (
+                  <Badge
+                    key={word}
+                    variant="destructive"
+                    className="cursor-pointer"
+                    onClick={() => removeAvoidWord(word)}
+                  >
+                    {word}
+                    <span className="ml-1">×</span>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={newAvoidWord}
+                  onChange={(e) => setNewAvoidWord(e.target.value)}
+                  placeholder="Add word to avoid..."
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === "Enter" && addAvoidWord()}
+                />
+                <Button variant="outline" size="sm" onClick={addAvoidWord}>
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            {voiceConfig.extracted_voice?.writing_style && (
+              <div className="p-3 rounded-lg bg-muted/30">
+                <label className="text-xs text-muted-foreground">Extracted Writing Style</label>
+                <p className="text-sm mt-1">{voiceConfig.extracted_voice.writing_style}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Example Posts Section */}
+          <div className="space-y-4 border-t pt-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <ImageIcon className="h-4 w-4" />
+              Example Posts ({examplePosts.length}/15)
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Upload example posts to let AI extract your visual style. More examples = better extraction.
+            </p>
+
+            {/* Image Grid */}
+            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+              {examplePosts.map((post, i) => (
+                <div key={i} className="relative group aspect-square">
                   <img
-                    key={i}
-                    src={img}
-                    alt={`Sample ${i + 1}`}
-                    className="h-20 w-20 rounded-lg object-cover border"
+                    src={post}
+                    alt={`Example ${i + 1}`}
+                    className="w-full h-full rounded-lg object-cover border"
                   />
+                  <button
+                    onClick={() => handleRemoveExamplePost(i)}
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+
+              {/* Upload button */}
+              {examplePosts.length < 15 && (
+                <label className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
+                  <Upload className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground mt-1">Upload</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleExamplePostUpload}
+                  />
+                </label>
+              )}
+            </div>
+
+            {/* Analyze Button */}
+            {examplePosts.length > 0 && (
+              <Button
+                onClick={handleAnalyzeExamplePosts}
+                disabled={isAnalyzingVisuals}
+                variant="outline"
+                className="w-full"
+              >
+                {isAnalyzingVisuals ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                {isAnalyzingVisuals
+                  ? "Analyzing..."
+                  : visualConfig.master_brand_prompt
+                  ? "Re-analyze Examples"
+                  : `Analyze ${examplePosts.length} Example${examplePosts.length > 1 ? "s" : ""}`}
+              </Button>
+            )}
+          </div>
+
+          {/* Master Brand Prompt Section */}
+          {(visualConfig.master_brand_prompt || visualConfig.brandStyle?.masterPrompt) && (
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Master Brand Prompt
+                <Badge variant="secondary" className="text-[10px]">Controls Image Generation</Badge>
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                This AI-generated prompt controls how all images are generated for your brand. Edit to fine-tune.
+              </p>
+              <Textarea
+                value={visualConfig.brandStyle?.masterPrompt || visualConfig.master_brand_prompt || ""}
+                onChange={(e) => {
+                  if (visualConfig.brandStyle) {
+                    setVisualConfig({
+                      ...visualConfig,
+                      brandStyle: {
+                        ...visualConfig.brandStyle,
+                        masterPrompt: e.target.value,
+                        updatedAt: new Date().toISOString(),
+                      },
+                      master_brand_prompt: e.target.value,
+                    });
+                  } else {
+                    setVisualConfig({
+                      ...visualConfig,
+                      master_brand_prompt: e.target.value,
+                    });
+                  }
+                }}
+                rows={6}
+                className="font-mono text-xs"
+                placeholder="The master prompt that defines your brand's visual style..."
+              />
+            </div>
+          )}
+
+          {/* Image Style (shown if no brand style extracted) */}
+          {!visualConfig.brandStyle && (
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="text-sm font-semibold">Image Style</h3>
+              <div className="flex flex-wrap gap-2">
+                {["minimalist", "photorealistic", "illustrated", "3d", "abstract", "bold", "elegant"].map((style) => (
+                  <Badge
+                    key={style}
+                    variant={visualConfig.image_style === style ? "default" : "outline"}
+                    className="cursor-pointer capitalize"
+                    onClick={() => setVisualConfig({ ...visualConfig, image_style: style })}
+                  >
+                    {style}
+                  </Badge>
                 ))}
               </div>
             </div>
           )}
 
-          <Button onClick={() => handleSave("visual")} disabled={isSaving}>
-            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Save Visual Settings
-          </Button>
-        </CardContent>
-      </Card>
+          {/* Visual Style Info (when brand style exists) */}
+          {visualConfig.brandStyle?.visualCharacteristics && (
+            <div className="p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="outline" className="capitalize">
+                  {visualConfig.brandStyle.visualCharacteristics.mood}
+                </Badge>
+                {visualConfig.brandStyle.visualCharacteristics.recurringElements?.slice(0, 3).map((el, i) => (
+                  <Badge key={i} variant="secondary" className="text-xs">
+                    {el}
+                  </Badge>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {visualConfig.brandStyle.visualCharacteristics.style}
+              </p>
+            </div>
+          )}
 
-      {/* Custom Brand Style Editor */}
-      <Card className="border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Custom Brand Style
-          </CardTitle>
-          <CardDescription>
-            Upload example posts to create a bespoke visual style that matches your brand exactly.
-            This overrides preset styles for authentic brand consistency.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <BrandStyleEditor
-            visualConfig={visualConfig}
-            onVisualConfigChange={setVisualConfig}
-            onSave={async () => {
-              await handleSave("visual");
-            }}
-            brandName={selectedBrand?.name || "Brand"}
-          />
+          {/* Save Button */}
+          <div className="flex justify-end pt-4 border-t">
+            <Button
+              onClick={async () => {
+                setIsSaving(true);
+                try {
+                  await handleSave("voice");
+                  await handleSave("visual");
+                } finally {
+                  setIsSaving(false);
+                }
+              }}
+              disabled={isSaving}
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save Brand Style
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
