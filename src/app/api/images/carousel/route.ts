@@ -1,12 +1,21 @@
 /**
- * Carousel Image Generation API
+ * @deprecated LEGACY CAROUSEL ROUTE - DO NOT USE FOR NEW FEATURES
  *
- * Generates all slides for a carousel using the hybrid compositing system:
- * 1. Generate or use provided background image
- * 2. Composite each slide with consistent text rendering
- * 3. Save all images to database
+ * This route uses the old Satori-based text compositing approach:
+ * 1. Generate background with Gemini (no text)
+ * 2. Render text as SVG using Satori
+ * 3. Composite text layer over background with Sharp
  *
- * This endpoint ensures visual consistency across all carousel slides.
+ * CURRENT APPROACH (use /api/images/generate instead):
+ * - Use Gemini "Nano Banana Pro" (gemini-3-pro-image-preview) directly
+ * - Gemini generates complete images WITH text in a single call
+ * - Master Brand Prompt controls the entire visual output
+ * - No compositing needed - cleaner, more consistent results
+ *
+ * This route is only used by the /testing page for legacy carousel experiments.
+ * All production image generation should use /api/images/generate.
+ *
+ * TODO: Migrate testing page to use the new approach and delete this route.
  */
 
 import { NextRequest, NextResponse } from 'next/server';

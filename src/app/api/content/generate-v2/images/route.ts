@@ -1,8 +1,13 @@
 /**
- * Lightweight Image Generation for V2 Test UI
+ * @deprecated LEGACY V2 TEST ROUTE - DO NOT USE FOR NEW FEATURES
  *
- * Generates carousel images without database storage.
- * Returns base64 images directly for display in the test UI.
+ * This route uses the old Satori-based text compositing approach.
+ * See /api/images/carousel/route.ts for full deprecation details.
+ *
+ * CURRENT APPROACH: Use Gemini "Nano Banana Pro" directly via /api/images/generate
+ * which generates complete images with text in a single call using the Master Brand Prompt.
+ *
+ * This route exists only for the legacy contentgenv2 test page.
  */
 
 import { NextRequest, NextResponse } from "next/server";
