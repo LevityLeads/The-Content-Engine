@@ -196,8 +196,12 @@ Format your response as JSON:
 Respond ONLY with valid JSON, no additional text.`;
 
     // Call Gemini API with vision capabilities
+    // Use gemini-2.0-flash for vision analysis (supports image input)
+    const modelId = "gemini-2.0-flash";
+    console.log(`Analyzing ${images.length} images with ${modelId}...`);
+
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${googleApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${googleApiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -212,7 +216,7 @@ Respond ONLY with valid JSON, no additional text.`;
           ],
           generationConfig: {
             temperature: 0.4,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 8192,
           },
         }),
       }
@@ -221,8 +225,22 @@ Respond ONLY with valid JSON, no additional text.`;
     if (!response.ok) {
       const errorData = await response.text();
       console.error("Gemini API error:", response.status, errorData);
+
+      // Provide more specific error messages
+      if (response.status === 429) {
+        return NextResponse.json(
+          { error: "Rate limit exceeded. Please wait a moment and try again." },
+          { status: 429 }
+        );
+      } else if (response.status === 400 && errorData.includes("size")) {
+        return NextResponse.json(
+          { error: "Images are too large. Try uploading fewer or smaller images." },
+          { status: 400 }
+        );
+      }
+
       return NextResponse.json(
-        { error: "Failed to analyze images with AI" },
+        { error: "Failed to analyze images with AI. Please try again." },
         { status: 500 }
       );
     }

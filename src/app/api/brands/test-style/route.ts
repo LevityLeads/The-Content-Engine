@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BrandStyle } from "@/contexts/brand-context";
+import { IMAGE_MODELS, DEFAULT_MODEL } from "@/lib/image-models";
 
 // Test prompts for generating sample images
 const TEST_CONTENT_PROMPTS = [
@@ -46,6 +47,10 @@ export async function POST(request: NextRequest) {
     const testImages: Array<{ url: string; type: string; text: string }> = [];
     const errors: string[] = [];
 
+    // Use the default image model
+    const modelConfig = IMAGE_MODELS[DEFAULT_MODEL];
+    console.log(`Using model for test images: ${modelConfig.name} (${modelConfig.id})`);
+
     // Generate test images
     const testsToRun = TEST_CONTENT_PROMPTS.slice(0, Math.min(count, 3));
 
@@ -69,12 +74,14 @@ CRITICAL REQUIREMENTS:
 - The text "${test.text}" must be clearly readable and be the focal point
 - This should look like it belongs to the same brand as the example images
 - Aspect ratio: 4:5 (portrait, suitable for Instagram carousel)
+- DO NOT include any app interfaces, phone screens, or social media UI elements
+- The output should be ONLY the designed graphic itself
 
 Generate a single social media image that perfectly matches this brand's style.`;
 
       try {
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${googleApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:generateContent?key=${googleApiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
