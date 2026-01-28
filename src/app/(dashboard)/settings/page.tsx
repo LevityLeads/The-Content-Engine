@@ -12,6 +12,7 @@ import { useBrand, VoiceConfig, VisualConfig, BrandDefaultStyle, ApprovedStyle }
 import { StrictnessSlider } from "@/components/brand/strictness-slider";
 import { BrandDeletionDialog } from "@/components/brand/brand-deletion-dialog";
 import { StylePickerDialog } from "@/components/brand/style-picker-dialog";
+import { BrandStyleEditor } from "@/components/brand/brand-style-editor";
 import { type BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
 import { VIDEO_MODELS, type VideoModelKey } from "@/lib/video-models";
 import { formatCost } from "@/lib/video-utils";
@@ -965,79 +966,6 @@ function SettingsPageContent() {
             </div>
           </div>
 
-          {/* Example Posts - Visual Brand Reference */}
-          <div className="pt-4 border-t">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" />
-                  Example Posts
-                </label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Upload 2-3 example posts from this brand. AI will analyze them to create a master visual prompt.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 flex gap-3 flex-wrap">
-              {examplePosts.map((post, i) => (
-                <div key={i} className="relative group">
-                  <img
-                    src={post}
-                    alt={`Example post ${i + 1}`}
-                    className="h-24 w-24 rounded-lg object-cover border"
-                  />
-                  <button
-                    onClick={() => handleRemoveExamplePost(i)}
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-
-              {examplePosts.length < 3 && (
-                <label className="h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
-                  <Upload className="h-6 w-6 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground mt-1">Upload</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleExamplePostUpload}
-                  />
-                </label>
-              )}
-            </div>
-
-            {examplePosts.length > 0 && (
-              <div className="mt-4 space-y-3">
-                <Button
-                  onClick={handleAnalyzeExamplePosts}
-                  disabled={isAnalyzingVisuals}
-                  variant="outline"
-                  className="w-full"
-                >
-                  {isAnalyzingVisuals ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-4 w-4" />
-                  )}
-                  {isAnalyzingVisuals ? "Analyzing..." : "Analyze & Generate Brand Prompt"}
-                </Button>
-
-                {visualConfig.master_brand_prompt && (
-                  <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
-                    <p className="text-xs font-medium text-emerald-400 mb-1">Master Brand Prompt Generated</p>
-                    <p className="text-xs text-muted-foreground line-clamp-3">
-                      {visualConfig.master_brand_prompt}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
 
           {/* Only show "Extracted" images if URL analysis was done */}
           {voiceConfig.source_url && visualConfig.extracted_images && visualConfig.extracted_images.length > 0 && (
@@ -1060,6 +988,30 @@ function SettingsPageContent() {
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Save Visual Settings
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Custom Brand Style Editor */}
+      <Card className="border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Custom Brand Style
+          </CardTitle>
+          <CardDescription>
+            Upload example posts to create a bespoke visual style that matches your brand exactly.
+            This overrides preset styles for authentic brand consistency.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BrandStyleEditor
+            visualConfig={visualConfig}
+            onVisualConfigChange={setVisualConfig}
+            onSave={async () => {
+              await handleSave("visual");
+            }}
+            brandName={selectedBrand?.name || "Brand"}
+          />
         </CardContent>
       </Card>
 

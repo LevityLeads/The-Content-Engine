@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from "@/lib/image-models";
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/video-models";
 import { BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
+import { BrandStyle } from "@/contexts/brand-context";
 
 // Helper to update job status
 async function updateJobStatus(
@@ -66,7 +67,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { contentId, prompt, model: requestedModel } = body;
+    const {
+      contentId,
+      prompt,
+      model: requestedModel,
+      brandStyle, // NEW: Enhanced brand style for visual consistency
+      useBrandStylePriority, // NEW: When true, brand style takes precedence
+    } = body;
+
+    // Type the brandStyle
+    const typedBrandStyle = brandStyle as BrandStyle | undefined;
+    const brandStylePriorityEnabled = useBrandStylePriority === true;
 
     if (!contentId || !prompt) {
       return NextResponse.json(
@@ -251,9 +262,34 @@ export async function POST(request: NextRequest) {
           await updateJobStatus(supabase, jobId, { progress: 20, currentStep: 'Calling image API' });
         }
 
-        // Build clean prompt WITHOUT any social media or platform references
-        // The image generator should create a pure graphic design, not a mockup
-        const fullPrompt = `${prompt}
+        // Build prompt - when brand style priority is enabled, prepend the master brand prompt
+        // This ensures all generated images match the brand's visual identity exactly
+        let fullPrompt: string;
+
+        if (brandStylePriorityEnabled && typedBrandStyle?.masterPrompt) {
+          // BRAND STYLE PRIORITY: Use brand style as the primary visual authority
+          fullPrompt = `${typedBrandStyle.masterPrompt}
+
+---
+
+NOW CREATE THIS SPECIFIC IMAGE:
+${prompt}
+
+CRITICAL OUTPUT REQUIREMENTS:
+- Follow the brand style guidelines above EXACTLY
+- Use the exact colors: Primary ${typedBrandStyle.colorPalette?.primary || '#1a1a1a'}, Accent ${typedBrandStyle.colorPalette?.accent || '#ff6b6b'}
+- Aspect ratio: ${imageConfig.aspectRatio}
+- DO NOT include any app interfaces, phone screens, or UI elements
+- DO NOT include like buttons, comment icons, share buttons, or follower counts
+- DO NOT include profile pictures, avatars, or user interface elements
+- DO NOT include any social media mockups or frames
+- The output should be ONLY the designed graphic itself
+- Match the brand's visual identity PRECISELY`;
+
+          console.log('Using BrandStyle masterPrompt as PRIMARY AUTHORITY for single image generation');
+        } else {
+          // Standard prompt without brand style
+          fullPrompt = `${prompt}
 
 CRITICAL OUTPUT REQUIREMENTS:
 - Create a clean graphic design with typography
@@ -264,6 +300,7 @@ CRITICAL OUTPUT REQUIREMENTS:
 - DO NOT include any social media mockups or frames
 - The output should be ONLY the designed graphic itself
 - Pure editorial/poster-style design with text and visuals only`;
+        }
 
         // Use the selected model for image generation
         console.log(`Using model: ${modelConfig.name} (${modelConfig.id})`);
