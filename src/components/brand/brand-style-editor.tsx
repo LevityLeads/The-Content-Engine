@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Upload,
   Sparkles,
@@ -96,6 +96,25 @@ export function BrandStyleEditor({
   // Test image feedback state
   const [feedbackNote, setFeedbackNote] = useState("");
   const [isRefining, setIsRefining] = useState(false);
+
+  // Sync examplePosts state when visualConfig prop changes (e.g., after page refresh)
+  useEffect(() => {
+    if (visualConfig.examplePostsV2 && visualConfig.examplePostsV2.length > 0) {
+      setExamplePosts(visualConfig.examplePostsV2);
+    } else if (visualConfig.example_posts && visualConfig.example_posts.length > 0) {
+      setExamplePosts(
+        visualConfig.example_posts.map((url, i) => ({
+          id: `legacy-${i}`,
+          url,
+          platform: "general" as const,
+          contentType: "general" as const,
+          addedAt: new Date().toISOString(),
+        }))
+      );
+    } else {
+      setExamplePosts([]);
+    }
+  }, [visualConfig.examplePostsV2, visualConfig.example_posts]);
 
   // Handle image upload
   const handleExamplePostUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
