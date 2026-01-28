@@ -411,6 +411,7 @@ export default function ContentPage() {
         approvedStyles: selectedBrand.visual_config.approvedStyles,
         image_style: selectedBrand.visual_config.image_style,
         fonts: selectedBrand.visual_config.fonts,
+        logo_url: selectedBrand.visual_config.logo_url,
       } : undefined;
 
       // Get strictness from voice_config (0-1 scale)

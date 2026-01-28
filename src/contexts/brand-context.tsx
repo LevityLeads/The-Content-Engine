@@ -165,6 +165,9 @@ export interface VisualConfig {
 
   // New: preference for using custom brand style over presets
   useBrandStylePriority?: boolean; // When true, brandStyle takes complete precedence
+
+  // Brand logo URL (uploaded to Supabase Storage)
+  logo_url?: string;
 }
 
 export interface BrandWithConfig extends Omit<Brand, "voice_config" | "visual_config"> {

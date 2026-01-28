@@ -26,6 +26,7 @@ export interface BrandVisualConfig {
     name: string;
     visualStyle: string;
   }>;
+  logo_url?: string; // URL to uploaded brand logo
 }
 
 /**
@@ -139,6 +140,16 @@ Apply this visual style to the content below.`);
     if (colorSection) {
       sections.push(colorSection);
     }
+  }
+
+  // Add logo instructions if available (only for consistent/strict adherence)
+  if (brandColors?.logo_url && strictness >= 0.6) {
+    sections.push(`
+BRAND LOGO:
+Include the brand logo positioned subtly in a corner (10-15% of image width).
+Logo reference: ${brandColors.logo_url}
+The logo should be visible but not dominate - integrate naturally with the design.
+Place it where it won't interfere with the main content.`);
   }
 
   // Add the actual content to visualize
