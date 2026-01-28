@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// For App Router, body size is handled differently
+// The default is 4MB for App Router, but we may need to handle large payloads
+// If issues persist, we can use streaming or chunk the data
+
 // GET all brands (for the current organization)
 export async function GET() {
   try {
@@ -59,7 +63,8 @@ export async function GET() {
         },
         {
           headers: {
-            'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
+            // Reduced caching to prevent stale data after save
+            'Cache-Control': 'private, max-age=5, stale-while-revalidate=10',
           },
         }
       );
@@ -170,7 +175,19 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const body = await request.json();
+
+    // Parse request body with error handling for size issues
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      console.error("[Brands API] Failed to parse request body:", parseError);
+      return NextResponse.json(
+        { error: "Request body too large or malformed" },
+        { status: 413 }
+      );
+    }
+
     const { id, ...updates } = body;
 
     if (!id) {
@@ -189,6 +206,7 @@ export async function PATCH(request: NextRequest) {
     // Debug logging for visual_config saves
     if (updates.visual_config) {
       const vc = updates.visual_config;
+      const vcSize = JSON.stringify(vc).length;
       console.log("[Brands API] PATCH visual_config received:", {
         hasBrandStyle: !!vc.brandStyle,
         brandStyleId: vc.brandStyle?.id,
@@ -196,6 +214,8 @@ export async function PATCH(request: NextRequest) {
         testImagesCount: vc.brandStyle?.testImages?.length,
         examplePostsV2Count: vc.examplePostsV2?.length,
         useBrandStylePriority: vc.useBrandStylePriority,
+        totalSizeBytes: vcSize,
+        totalSizeMB: (vcSize / 1024 / 1024).toFixed(2),
       });
     }
 
