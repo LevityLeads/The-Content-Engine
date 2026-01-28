@@ -4,6 +4,7 @@ import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from "@/lib/image-mod
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/video-models";
 import { BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
 import { BrandStyle } from "@/contexts/brand-context";
+import { buildBrandAwareImagePrompt, type BrandVisualConfig } from "@/lib/visual-strictness";
 
 // Helper to update job status
 async function updateJobStatus(
@@ -71,13 +72,20 @@ export async function POST(request: NextRequest) {
       contentId,
       prompt,
       model: requestedModel,
-      brandStyle, // NEW: Enhanced brand style for visual consistency
-      useBrandStylePriority, // NEW: When true, brand style takes precedence
+      // Legacy: Enhanced brand style system
+      brandStyle,
+      useBrandStylePriority,
+      // New: Brand-aware generation with strictness
+      brandConfig,
+      strictness = 0.5,
+      treatment,
     } = body;
 
-    // Type the brandStyle
+    // Type the brandStyle (legacy)
     const typedBrandStyle = brandStyle as BrandStyle | undefined;
     const brandStylePriorityEnabled = useBrandStylePriority === true;
+    // Type the brand config (new system)
+    const typedBrandConfig = brandConfig as BrandVisualConfig | undefined;
 
     if (!contentId || !prompt) {
       return NextResponse.json(
@@ -262,12 +270,23 @@ export async function POST(request: NextRequest) {
           await updateJobStatus(supabase, jobId, { progress: 20, currentStep: 'Calling image API' });
         }
 
-        // Build prompt - when brand style priority is enabled, prepend the master brand prompt
-        // This ensures all generated images match the brand's visual identity exactly
+        // Build brand-aware prompt based on available brand data
+        // Priority: 1) brandConfig with strictness, 2) legacy brandStyle, 3) plain prompt
         let fullPrompt: string;
 
-        if (brandStylePriorityEnabled && typedBrandStyle?.masterPrompt) {
-          // BRAND STYLE PRIORITY: Use brand style as the primary visual authority
+        if (typedBrandConfig?.master_brand_prompt || treatment) {
+          // NEW SYSTEM: Use the brand-aware prompt builder with strictness
+          fullPrompt = buildBrandAwareImagePrompt(
+            typedBrandConfig?.master_brand_prompt,
+            treatment,
+            prompt,
+            strictness,
+            typedBrandConfig
+          );
+          fullPrompt += `\n\nAspect ratio: ${imageConfig.aspectRatio}`;
+          console.log(`Building brand-aware prompt (strictness: ${strictness}, treatment: ${treatment || 'none'})`);
+        } else if (brandStylePriorityEnabled && typedBrandStyle?.masterPrompt) {
+          // LEGACY SYSTEM: Use brand style as the primary visual authority
           fullPrompt = `${typedBrandStyle.masterPrompt}
 
 ---
@@ -285,10 +304,9 @@ CRITICAL OUTPUT REQUIREMENTS:
 - DO NOT include any social media mockups or frames
 - The output should be ONLY the designed graphic itself
 - Match the brand's visual identity PRECISELY`;
-
           console.log('Using BrandStyle masterPrompt as PRIMARY AUTHORITY for single image generation');
         } else {
-          // Standard prompt without brand style
+          // Fallback: Standard prompt without brand styling
           fullPrompt = `${prompt}
 
 CRITICAL OUTPUT REQUIREMENTS:
@@ -304,6 +322,24 @@ CRITICAL OUTPUT REQUIREMENTS:
 
         // Use the selected model for image generation
         console.log(`Using model: ${modelConfig.name} (${modelConfig.id})`);
+
+        // Build generation config, adding thinking support if model supports it
+        const generationConfig: Record<string, unknown> = {
+          responseModalities: ["TEXT", "IMAGE"],
+          imageConfig: {
+            aspectRatio: imageConfig.aspectRatio,
+          },
+        };
+
+        // Add thinking config for models that support it
+        if ('supportsThinking' in modelConfig && modelConfig.supportsThinking) {
+          const thinkingBudget = 'thinkingBudget' in modelConfig ? modelConfig.thinkingBudget : 2048;
+          generationConfig.thinkingConfig = {
+            thinkingBudget: thinkingBudget,
+          };
+          console.log(`Thinking enabled with budget: ${thinkingBudget}`);
+        }
+
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:generateContent?key=${googleApiKey}`,
           {
@@ -321,12 +357,7 @@ CRITICAL OUTPUT REQUIREMENTS:
                   ],
                 },
               ],
-              generationConfig: {
-                responseModalities: ["TEXT", "IMAGE"],
-                imageConfig: {
-                  aspectRatio: imageConfig.aspectRatio,
-                },
-              },
+              generationConfig,
             }),
           }
         );

@@ -36,6 +36,7 @@ import { computeDesignContext, type DesignContext } from '@/lib/design';
 import { IMAGE_MODELS, DEFAULT_MODEL, type ImageModelKey } from '@/lib/image-models';
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL, type VideoModelKey, platformSupportsMixedCarousel } from '@/lib/video-models';
 import { BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from '@/types/database';
+import { buildBrandAwareBackgroundPrompt, getVisualStrictnessConfig } from '@/lib/visual-strictness';
 
 // Helper to update job status
 async function updateJobStatus(
@@ -88,7 +89,7 @@ import { BrandStyle } from '@/contexts/brand-context';
 async function generateBackground(
   style: string,
   googleApiKey: string,
-  modelConfig: { id: string; name: string },
+  modelConfig: { id: string; name: string; supportsThinking?: boolean; thinkingBudget?: number },
   brandColors?: {
     primary_color?: string;
     accent_color?: string;
@@ -97,8 +98,9 @@ async function generateBackground(
     fonts?: { heading?: string; body?: string };
     master_brand_prompt?: string;
   },
-  brandStyle?: BrandStyle, // NEW: Enhanced brand style with full visual specifications
-  useBrandStylePriority?: boolean // NEW: Flag to use brand style as primary authority
+  brandStyle?: BrandStyle,
+  useBrandStylePriority?: boolean,
+  strictness: number = 0.5
 ): Promise<string | null> {
   // Typography/Abstract backgrounds (text-overlay optimized)
   const TYPOGRAPHY_BACKGROUNDS: Record<string, string> = {
@@ -163,13 +165,14 @@ async function generateBackground(
     ...COLLAGE_BACKGROUNDS,
   };
 
+  // Use the visual strictness utility for brand-aware background generation
+  const strictnessConfig = getVisualStrictnessConfig(strictness);
+  console.log(`Generating background with strictness: ${strictness} (${strictnessConfig.level})`);
+
   let prompt: string;
 
   // BRAND STYLE PRIORITY: When enabled, use the comprehensive BrandStyle as the SOLE authority
-  // This is the new enhanced system that completely bypasses preset styles
   if (useBrandStylePriority && brandStyle?.masterPrompt) {
-    // Use the BrandStyle's masterPrompt as the complete visual specification
-    // This provides the most accurate brand representation
     prompt = `${brandStyle.masterPrompt}
 
 ---
@@ -184,63 +187,36 @@ NOW CREATE A BACKGROUND IMAGE:
 - Aspect ratio: 4:5 (portrait, Instagram carousel)`;
 
     console.log('Using BrandStyle masterPrompt as PRIMARY AUTHORITY (ignoring all preset styles)');
-  }
-  // LEGACY: Master brand prompt from the old system (backwards compatibility)
-  else if (brandColors?.master_brand_prompt) {
-    // Create a fresh prompt based purely on the master brand description
-    // DON'T mix with preset styles - they will conflict with the analyzed brand style
-    prompt = `Create a social media background image following these EXACT brand guidelines:
-
-${brandColors.master_brand_prompt}
-
-CRITICAL REQUIREMENTS:
-- Follow the color palette described above EXACTLY - use those specific colors
-- Follow the typography and visual style described above EXACTLY
-- This is a background for text overlay, so leave clear space for text in the center
-- Do NOT add any text, words, letters, or numbers to the image
-- Match the mood, aesthetic, and design language precisely
-- The background should be suitable for overlaying white or dark text`;
-
-    console.log('Using master brand prompt as primary directive (ignoring preset styles)');
   } else {
-    // No master brand prompt - use preset styles with color overrides
-    prompt = ALL_STYLES[style] || TYPOGRAPHY_BACKGROUNDS['gradient-dark'];
-
-    // BRAND COLORS: Inject brand colors into the background prompt for visual consistency
-    if (brandColors?.primary_color || brandColors?.accent_color) {
-      const primaryHex = brandColors.primary_color || '#cc100a';
-      const accentHex = brandColors.accent_color || '#d9d9d9';
-      const secondaryHex = brandColors.secondary_color || '#1a1a1a';
-
-      // Build a brand color directive to append to the prompt
-      const brandColorDirective = `
-
-BRAND COLOR REQUIREMENTS (MUST FOLLOW):
-- Primary brand color: ${primaryHex} - use this as the dominant accent color
-- Secondary brand color: ${accentHex} - use for highlights and secondary elements
-- Background base: ${secondaryHex} - integrate into the color scheme
-- The overall color palette MUST prominently feature these brand colors
-- Replace any generic colors in the design with these brand-specific colors`;
-
-      prompt = prompt + brandColorDirective;
-
-      console.log(`Background prompt enhanced with brand colors: ${primaryHex}, ${accentHex}`);
-    }
-
-    // BRAND FONTS: If detected, mention for any text elements in the background
-    if (brandColors?.fonts?.heading || brandColors?.fonts?.body) {
-      const headingFont = brandColors.fonts.heading || 'Inter';
-      const bodyFont = brandColors.fonts.body || headingFont;
-      prompt = prompt + `\n\nTYPOGRAPHY HINT: If any text elements appear, use fonts similar to "${headingFont}" for headlines and "${bodyFont}" for body text.`;
-    }
-
-    // If brand has a preferred image style, factor it in
-    if (brandColors?.image_style) {
-      prompt = prompt + `\n\nSTYLE NOTE: Align with "${brandColors.image_style}" aesthetic.`;
-    }
+    // Use the brand-aware background utility with strictness
+    prompt = buildBrandAwareBackgroundPrompt(
+      brandColors?.master_brand_prompt,
+      style,
+      strictness,
+      brandColors ? {
+        primary_color: brandColors.primary_color,
+        accent_color: brandColors.accent_color,
+        secondary_color: brandColors.secondary_color,
+        fonts: brandColors.fonts,
+        image_style: brandColors.image_style,
+      } : undefined
+    );
   }
 
   try {
+    // Build generation config, adding thinking support if model supports it
+    const generationConfig: Record<string, unknown> = {
+      responseModalities: ['TEXT', 'IMAGE'],
+      imageConfig: { aspectRatio: '4:5' },
+    };
+
+    if (modelConfig.supportsThinking) {
+      generationConfig.thinkingConfig = {
+        thinkingBudget: modelConfig.thinkingBudget || 2048,
+      };
+      console.log(`Background generation with thinking enabled (budget: ${modelConfig.thinkingBudget || 2048})`);
+    }
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.id}:generateContent?key=${googleApiKey}`,
       {
@@ -248,10 +224,7 @@ BRAND COLOR REQUIREMENTS (MUST FOLLOW):
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseModalities: ['TEXT', 'IMAGE'],
-            imageConfig: { aspectRatio: '4:5' },
-          },
+          generationConfig,
         }),
       }
     );
@@ -380,8 +353,9 @@ export async function POST(request: NextRequest) {
       model: requestedModel,
       jobId: providedJobId, // Allow passing existing job ID for tracking
       brandColors,         // NEW: Brand visual config { primary_color, accent_color, image_style, fonts, etc. }
-      brandStyle,          // NEW: Enhanced brand style with comprehensive visual specs
-      useBrandStylePriority, // NEW: When true, brandStyle takes complete precedence over presets
+      brandStyle,          // Enhanced brand style with comprehensive visual specs
+      useBrandStylePriority, // When true, brandStyle takes complete precedence over presets
+      strictness = 0.5,    // 0-1 strictness from voice_config
     } = body;
 
     // Type the brandColors for TypeScript
@@ -719,7 +693,7 @@ export async function POST(request: NextRequest) {
         }
 
         const bgStyleForGeneration = brandStylePriorityEnabled ? 'brand-custom' : backgroundStyle;
-        console.log(`Generating background: ${bgStyleForGeneration}${brandStylePriorityEnabled ? ' (BRAND STYLE PRIORITY)' : typedBrandColors ? ' with brand colors' : ''}`);
+        console.log(`Generating background: ${bgStyleForGeneration}${brandStylePriorityEnabled ? ' (BRAND STYLE PRIORITY)' : typedBrandColors ? ' with brand colors' : ''} (strictness: ${strictness})`);
 
         bgImage = await generateBackground(
           bgStyleForGeneration || 'gradient-dark',
@@ -727,7 +701,8 @@ export async function POST(request: NextRequest) {
           modelConfig,
           typedBrandColors,
           typedBrandStyle,
-          brandStylePriorityEnabled
+          brandStylePriorityEnabled,
+          strictness
         );
 
         if (!bgImage) {

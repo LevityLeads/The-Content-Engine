@@ -387,7 +387,7 @@ export default function ContentPage() {
     }
   };
 
-  const handleGenerateImage = async (contentId: string, prompt: string, slideNumber?: number) => {
+  const handleGenerateImage = async (contentId: string, prompt: string, slideNumber?: number, treatment?: string) => {
     const key = slideNumber ? `${contentId}-${slideNumber}` : contentId;
     setGeneratingImage(key);
 
@@ -401,10 +401,32 @@ export default function ContentPage() {
     setImageMessage(null);
     try {
       const slidePrompt = slideNumber ? `[Slide ${slideNumber}] ${prompt}` : prompt;
+
+      // Build brand config from selected brand's visual config
+      const brandConfig = selectedBrand?.visual_config ? {
+        primary_color: selectedBrand.visual_config.primary_color,
+        accent_color: selectedBrand.visual_config.accent_color,
+        secondary_color: selectedBrand.visual_config.secondary_color,
+        master_brand_prompt: selectedBrand.visual_config.master_brand_prompt,
+        approvedStyles: selectedBrand.visual_config.approvedStyles,
+        image_style: selectedBrand.visual_config.image_style,
+        fonts: selectedBrand.visual_config.fonts,
+      } : undefined;
+
+      // Get strictness from voice_config (0-1 scale)
+      const strictness = selectedBrand?.voice_config?.strictness ?? 0.5;
+
       const res = await fetch("/api/images/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentId, prompt: slidePrompt, model: selectedModel }),
+        body: JSON.stringify({
+          contentId,
+          prompt: slidePrompt,
+          model: selectedModel,
+          brandConfig,
+          strictness,
+          treatment,  // Optional visual treatment
+        }),
       });
       const data = await res.json();
       if (data.success) {
