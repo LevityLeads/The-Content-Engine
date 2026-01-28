@@ -210,15 +210,40 @@ function SettingsPageContent() {
         updates = { voice_config: voiceConfig };
         break;
       case "visual":
-        // Debug: log what's being saved
-        console.log("[Settings] Saving visual_config:", {
-          hasBrandStyle: !!visualConfig.brandStyle,
-          brandStyleId: visualConfig.brandStyle?.id,
-          masterPromptLength: visualConfig.brandStyle?.masterPrompt?.length,
-          testImagesCount: visualConfig.brandStyle?.testImages?.length,
-          examplePostsV2Count: visualConfig.examplePostsV2?.length,
+        // Strip large base64 data to avoid 413 Content Too Large errors
+        // Vercel has a 4.5MB body limit, and base64 images can easily exceed this
+        const configToSave = { ...visualConfig };
+
+        // Strip test images (they're temporary for review, not needed in DB)
+        if (configToSave.brandStyle?.testImages) {
+          configToSave.brandStyle = {
+            ...configToSave.brandStyle,
+            testImages: [], // Clear test images - they're just for preview
+          };
+        }
+
+        // Strip base64 from example posts, keep only metadata
+        // The images are already analyzed, we just need the style info
+        if (configToSave.examplePostsV2 && configToSave.examplePostsV2.length > 0) {
+          configToSave.examplePostsV2 = configToSave.examplePostsV2.map(post => ({
+            ...post,
+            url: post.url.startsWith('data:') ? '[base64-stripped]' : post.url,
+          }));
+        }
+        if (configToSave.example_posts && configToSave.example_posts.length > 0) {
+          configToSave.example_posts = configToSave.example_posts.map(url =>
+            url.startsWith('data:') ? '[base64-stripped]' : url
+          );
+        }
+
+        console.log("[Settings] Saving visual_config (stripped):", {
+          hasBrandStyle: !!configToSave.brandStyle,
+          brandStyleId: configToSave.brandStyle?.id,
+          masterPromptLength: configToSave.brandStyle?.masterPrompt?.length,
+          testImagesCount: configToSave.brandStyle?.testImages?.length,
+          examplePostsV2Count: configToSave.examplePostsV2?.length,
         });
-        updates = { visual_config: visualConfig };
+        updates = { visual_config: configToSave };
         break;
     }
 
