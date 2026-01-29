@@ -423,6 +423,7 @@ export default function ContentPage() {
         body: JSON.stringify({
           contentId,
           prompt: slidePrompt,
+          slideNumber,  // Pass slide number for reliable database matching
           model: selectedModel,
           brandConfig,
           strictness,

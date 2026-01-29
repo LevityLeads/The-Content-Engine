@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
       contentId,
       prompt,
       model: requestedModel,
+      slideNumber, // Slide number for carousel images (1-indexed)
       // Legacy: Enhanced brand style system
       brandStyle,
       useBrandStylePriority,
@@ -477,7 +478,8 @@ CRITICAL OUTPUT REQUIREMENTS:
         prompt: prompt,
         url: imageUrl || `placeholder:${content.platform}`,
         storage_path: storagePath,
-        is_primary: true,
+        is_primary: !slideNumber, // Primary only if not a slide
+        slide_number: slideNumber || null, // Save slide number for reliable matching
         format: "png",
         dimensions: {
           width: imageConfig.width,
