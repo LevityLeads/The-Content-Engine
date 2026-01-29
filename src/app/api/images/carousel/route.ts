@@ -858,6 +858,7 @@ export async function POST(request: NextRequest) {
             url: finalImageUrl,
             storage_path: storagePath,
             is_primary: slide.slideNumber === 1,
+            slide_number: slide.slideNumber, // Save slide number for reliable matching
             format: 'png',
             dimensions: { width, height, aspectRatio: '4:5', model: 'composite' },
           })
