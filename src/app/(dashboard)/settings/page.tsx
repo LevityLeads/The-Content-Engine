@@ -99,6 +99,10 @@ function SettingsPageContent() {
   // Style picker state
   const [showStylePicker, setShowStylePicker] = useState(false);
 
+  // Logo upload state
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+
   // Handle OAuth callback messages from URL params
   useEffect(() => {
     const success = searchParams.get("success");
@@ -456,6 +460,89 @@ function SettingsPageContent() {
     } finally {
       setIsAnalyzingVisuals(false);
       setTimeout(() => setSaveMessage(null), 5000);
+    }
+  };
+
+  // Handle logo upload
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedBrand) return;
+
+    // Validate file type
+    const allowedTypes = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setLogoError("Please upload a PNG, JPEG, SVG, or WebP image");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoError("Logo must be smaller than 5MB");
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setLogoError(null);
+
+    try {
+      // Convert to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Upload to storage
+      const res = await fetch("/api/brands/upload-logo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brandId: selectedBrand.id,
+          imageData: base64,
+          mimeType: file.type,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        // Update visual config with new logo URL
+        const updatedConfig = { ...visualConfig, logo_url: data.url };
+        setVisualConfig(updatedConfig);
+
+        // Save to database
+        await updateBrand(selectedBrand.id, { visual_config: updatedConfig });
+        setSaveMessage({ type: "success", text: "Logo uploaded successfully!" });
+      } else {
+        setLogoError(data.error || "Failed to upload logo");
+      }
+    } catch (err) {
+      console.error("Logo upload error:", err);
+      setLogoError("Failed to upload logo. Please try again.");
+    } finally {
+      setIsUploadingLogo(false);
+      // Reset file input
+      e.target.value = "";
+      setTimeout(() => setSaveMessage(null), 3000);
+    }
+  };
+
+  // Handle logo removal
+  const handleRemoveLogo = async () => {
+    if (!selectedBrand) return;
+
+    try {
+      const updatedConfig = { ...visualConfig };
+      delete updatedConfig.logo_url;
+      setVisualConfig(updatedConfig);
+
+      await updateBrand(selectedBrand.id, { visual_config: updatedConfig });
+      setSaveMessage({ type: "success", text: "Logo removed" });
+    } catch (err) {
+      console.error("Error removing logo:", err);
+      setSaveMessage({ type: "error", text: "Failed to remove logo" });
+    } finally {
+      setTimeout(() => setSaveMessage(null), 3000);
     }
   };
 
@@ -852,6 +939,93 @@ function SettingsPageContent() {
                   ))}
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Brand Logo Section */}
+          <div className="space-y-4 border-t pt-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <ImageIcon className="h-4 w-4" />
+              Brand Logo
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Upload your brand logo to automatically include it on all generated images.
+              The logo will be placed subtly in the corner of each image.
+            </p>
+
+            {visualConfig.logo_url ? (
+              <div className="flex items-center gap-4 p-4 rounded-lg border bg-muted/30">
+                <div className="relative h-16 w-16 rounded-lg overflow-hidden bg-background border">
+                  <img
+                    src={visualConfig.logo_url}
+                    alt="Brand logo"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Logo uploaded</p>
+                  <p className="text-xs text-muted-foreground">
+                    This logo will appear on your generated images
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={isUploadingLogo} className="relative">
+                    {isUploadingLogo ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="mr-2 h-4 w-4" />
+                    )}
+                    Replace
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={handleLogoUpload}
+                      disabled={isUploadingLogo}
+                    />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRemoveLogo}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center p-6 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30 transition-colors cursor-pointer">
+                {isUploadingLogo ? (
+                  <>
+                    <Loader2 className="h-8 w-8 text-primary animate-spin mb-2" />
+                    <span className="text-sm font-medium">Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                    <span className="text-sm font-medium">Upload Logo</span>
+                    <span className="text-xs text-muted-foreground mt-1">
+                      PNG, JPEG, SVG, or WebP (max 5MB)
+                    </span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  className="hidden"
+                  onChange={handleLogoUpload}
+                  disabled={isUploadingLogo}
+                />
+              </label>
+            )}
+
+            {logoError && (
+              <p className="text-sm text-destructive flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                {logoError}
+              </p>
             )}
           </div>
 

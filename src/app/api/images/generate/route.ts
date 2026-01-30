@@ -5,6 +5,7 @@ import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/video-models";
 import { BrandVideoConfig, DEFAULT_VIDEO_CONFIG } from "@/types/database";
 import { BrandStyle } from "@/contexts/brand-context";
 import { buildBrandAwareImagePrompt, type BrandVisualConfig } from "@/lib/visual-strictness";
+import { compositeLogoOnImage } from "@/lib/logo-composite";
 
 // Helper to update job status
 async function updateJobStatus(
@@ -383,9 +384,37 @@ CRITICAL OUTPUT REQUIREMENTS:
           const parts = data.candidates?.[0]?.content?.parts || [];
           for (const part of parts) {
             if (part.inlineData?.data) {
-              const base64Data = part.inlineData.data as string;
+              let base64Data = part.inlineData.data as string;
+              let mimeType = part.inlineData.mimeType || "image/png";
+
+              // Composite brand logo onto the generated image if available
+              if (typedBrandConfig?.logo_url) {
+                console.log(`Compositing brand logo onto generated image...`);
+                if (jobId) {
+                  await updateJobStatus(supabase, jobId, { progress: 65, currentStep: 'Adding brand logo' });
+                }
+
+                const compositeResult = await compositeLogoOnImage({
+                  imageSource: `data:${mimeType};base64,${base64Data}`,
+                  logoUrl: typedBrandConfig.logo_url,
+                  position: "bottom-right",
+                  logoSizePercent: 12,
+                  padding: 20,
+                  opacity: 0.9,
+                });
+
+                if (compositeResult.success && compositeResult.imageBase64) {
+                  // Extract just the base64 data (remove data:image/png;base64, prefix)
+                  const compositedBase64 = compositeResult.imageBase64.split(",")[1];
+                  base64Data = compositedBase64;
+                  mimeType = compositeResult.mimeType || "image/png";
+                  console.log(`Logo composited successfully`);
+                } else {
+                  console.warn(`Logo compositing failed: ${compositeResult.error}. Using original image.`);
+                }
+              }
+
               imageBase64 = base64Data;
-              const mimeType = part.inlineData.mimeType || "image/png";
               const extension = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
 
               // Upload image to Supabase Storage for better performance and caching
@@ -417,7 +446,7 @@ CRITICAL OUTPUT REQUIREMENTS:
               }
 
               generationStatus = "generated";
-              generationMessage = `Image generated with ${modelConfig.name} for ${platform.toUpperCase()} (${imageConfig.width}x${imageConfig.height})`;
+              generationMessage = `Image generated with ${modelConfig.name} for ${platform.toUpperCase()} (${imageConfig.width}x${imageConfig.height})${typedBrandConfig?.logo_url ? ' with brand logo' : ''}`;
               console.log(`Image generated successfully with ${modelConfig.name}, base64 length: ${base64Data.length}`);
               break;
             }
